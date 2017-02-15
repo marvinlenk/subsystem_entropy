@@ -1,5 +1,8 @@
+# This program is explicitly written for PYTHON3.X and will not work under Python2.X
+
 import numpy as np
 from numpy import dot as npdot
+import shutil
 from scipy.special import binom
 from scipy.sparse import coo_matrix,csr_matrix
 from scipy.sparse import identity as spidentity
@@ -11,6 +14,8 @@ import entPlot as ep
 from numpy import sqrt
 from numpy import log as nplog
 from numpy.linalg import matrix_power as npmatrix_power
+from configparser import ConfigParser
+from scipy.special.basic import factorial
 
 #manyparticle system class
 class mpSystem:
@@ -36,7 +41,6 @@ class mpSystem:
         self.energy = 0
         self.operators = quadraticArray(self)
         self.occNo = np.zeros(self.m,dtype=np.float64)
-        self.transVal = np.zeros( len(self.transExp) , dtype = np.float64)
         # hamiltonian - initialized with zeros (note - datatype is not! complex)
         self.hamiltonian = coo_matrix(np.zeros((self.dim,self.dim)),shape=(self.dim,self.dim),dtype=np.float64).tocsr()
         # matrix for time evolution - initially empty
@@ -46,6 +50,7 @@ class mpSystem:
         self.evolStepTmp = 0
         self.evolTime = 0
         self.tavg = 0    #needed for estimation of remaining time
+        self.dmcount = 0 #needed for numbering of density matrix files
         ###### variables for the partial trace algorithm
         self.mRed = self.m - len(self.kRed)
         self.mRedComp = len(self.kRed)
@@ -97,31 +102,43 @@ class mpSystem:
         self.deltaT = np.float64(configParser.getfloat('iteration','deltaT'))
         ### file management
         self.dataPoints = int(configParser.getfloat('filemanagement','datapoints'))
-        self.dmFilesSkipPoints = int(configParser.getfloat('filemanagement','dmfile_skippoints'))
+        self.dmFilesSkipFactor = int(configParser.getfloat('filemanagement','dmfile_skipfactor'))
         self.boolClear = configParser.getboolean('filemanagement','clear')
         self.boolDataStore = configParser.getboolean('filemanagement','datastore')
         self.boolDMStore = configParser.getboolean('filemanagement','dmstore') 
-        self.transExp = [tuple( [int(el[0]), int(el[1])] ) for el in configParser.get('filemanagement','transexp').split(',')]
+        self.boolHamilStore = configParser.getboolean('filemanagement','hamilstore')
+        self.boolHamilEigStore = configParser.getboolean('filemanagement','hamilstore_eigenvalues')
         ### calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams','onlyreduced')
         self.boolTotalEnt = configParser.getboolean('calcparams','totalentropy')
+        self.boolTotalEnergy = configParser.getboolean('calcparams','totalenergy')
         ### plotting booleans and parameters
         self.boolPlotData = configParser.getboolean('plotbools','plotdata')
+        self.boolPlotAverages = configParser.getboolean('plotbools','plotavgs')
+        self.boolPlotHamilEig = configParser.getboolean('plotbools','ploteigenenergies')
         self.boolPlotHamiltonian = configParser.getboolean('plotbools','plothamiltonian')
         self.boolPlotDMAnimation = configParser.getboolean('plotbools','plotdens')
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools','plotdensred')
-        self.dmFilesStepSize = configParser.getint('plotbools','dmstepsize')
+        ### plotting variables
+        self.dmFilesStepSize = configParser.getint('plotvals','dmstepsize')
+        self.dmFilesFPS = configParser.getint('plotvals','dmfps')
+        self.plotFontSize = configParser.getint('plotvals','fontsize')
+        self.plotLegendSize = configParser.getint('plotvals','legendsize')
+        self.plotSavgolFrame = configParser.getint('plotvals','avg_frame')
+        self.plotSavgolOrder = configParser.getint('plotvals','avg_order')
+        # normally some coefficient in the hamiltonian (J or t)
+        self.plotTimeScale = configParser.getfloat('plotvals','timescale')
         
         self.evolStepDist = int(self.steps/self.dataPoints)
         if self.evolStepDist < 100:
-            self.steps += (100 - self.evolStepDist) * self.steps
+            self.steps = 100 * self.dataPoints
             self.evolStepDist = 100
-            print('Number of steps must be at least by factor 100 larger than datapoints! Fixed this.')
-        self.dmFiles = self.dataPoints / self.dmFilesSkipPoints    
+            print('Number of steps must be at least factor 100 larger than datapoints! New number of steps: %e' % self.steps)
+        self.dmFiles = self.dataPoints / self.dmFilesSkipFactor    
         
         if self.dataPoints > self.steps:
-            self.dataPoints = self.steps
-            print('Number of data points was larger than number of steps - think again!')
+            self.dataPoints = self.steps/100
+            print('Number of data points was larger than number of steps - think again! Fixed the number of data points to be: %e' % self.dataPoints)
         
     ###### Methods:
     def updateDensityMatrix(self):
@@ -162,25 +179,28 @@ class mpSystem:
                 self.densityMatrixRed[el[1],el[0]] += self.state[el[3],0] * stTmp[el[2],0]
     #end of reduceDensityMatrixFromState
         
-    #Runge Kutta of order 1 to 4, standard is 4th Order - the matrix already inherits the identity so step is just mutliplication
+    #The matrix already inherits the identity so step is just mutliplication
+    #time evolution order given by order of the exponential series
     def initEvolutionMatrix(self, order = 4):
+        if order == 0:
+            print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.hamiltonian.toarray(), np.conjugate(self.hamiltonian.toarray().T))):
             print('Warning - hamiltonian is not hermitian!')
-        if order > 4:
-            exit('Only Runge-Kutta to order 4 is supported')
         self.evolutionMatrix = spidentity(self.dim, dtype=self.datType, format='csr')
-        if order >= 1:
-            self.evolutionMatrix += (-1j * self.deltaT) * self.hamiltonian
-        if order >= 2:
-            self.evolutionMatrix += (-1 * self.deltaT**2 / 2.0) * self.hamiltonian **2
-        if order >= 3:
-            self.evolutionMatrix += (1j * self.deltaT**3 / 6.0) * self.hamiltonian **3
-        if order == 4:
-            self.evolutionMatrix += (1 * self.deltaT**4 / 24.0) * self.hamiltonian **4
+        
+        for i in range(1,order+1):
+            self.evolutionMatrix += (-1j)**i * (self.deltaT)**i * self.hamiltonian**i / factorial(i)
+            
         self.evolutionMatrix = np.matrix(self.evolutionMatrix.toarray(), dtype = self.datType)
-        storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.txt', 1)
-        storeMatrix(self.evolutionMatrix, './data/evolutionmatrix.txt', 1)
-        self.evolutionMatrix = npmatrix_power(self.evolutionMatrix,self.evolStepDist)
+        if self.boolHamilStore:
+            storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.txt', 1)
+            storeMatrix(self.evolutionMatrix, './data/evolutionmatrix.txt', 1)
+            self.evolutionMatrix = npmatrix_power(self.evolutionMatrix,self.evolStepDist)
+        if self.boolHamilEigStore:
+            tfil = open('./data/hamiltonian_eigvals.txt','w')                    
+            for el in la.eigvalsh(self.hamiltonian.toarray()):
+                tfil.write('%.16e \n' % el)
+            tfil.close()
     #end
     
     def timeStep(self):
@@ -201,6 +221,7 @@ class mpSystem:
                 self.stateNormCheck = 1e2
             else:
                 self.filEnt.close()
+                self.filTotEnt.close()
                 self.filNorm.close()
                 self.filOcc.close()
                 self.filEnergy.close()
@@ -249,15 +270,11 @@ class mpSystem:
             self.occNo[m] = np.real(self.expectValue(self.operators[m,m].toarray()))
     #end of updateOccNumbers
     
-    def updateTransNumbers(self):
-        for tup in self.transExp:
-            return
-            
-    
     def updateEnergy(self):
         self.energy = np.real(self.expectValue(self.hamiltonian.toarray()))
     #end of updateEnergy
     
+    #update everything EXCEPT for total entropy and energy - they are only updated 100 times
     def updateEverything(self):
         self.evolTime += ( self.evolStep - self.evolStepTmp ) * self.deltaT
         self.evolStepTmp = self.evolStep
@@ -267,10 +284,7 @@ class mpSystem:
         else:
             self.updateDensityMatrix()
             self.reduceDensityMatrix()
-            if self.boolTotalEnt:
-                self.updateEntropy()
             self.updateOccNumbers()
-            self.updateEnergy()
         
         self.updateEntropyRed()
         
@@ -278,6 +292,7 @@ class mpSystem:
     def evolve(self):
         if self.boolDataStore:
             self.filEnt = open('./data/entropy.txt','w')
+            self.filTotEnt = open('./data/total_entropy.txt','w')
             self.filNorm = open('./data/norm.txt','w')
             self.filOcc = open('./data/occupation.txt','w')
             self.filEnergy = open('./data/energy.txt','w')
@@ -286,7 +301,7 @@ class mpSystem:
             
         self.evolStepTmp = self.evolStep
         stepNo = int(self.dataPoints/100)
-        dmFileSkip = self.dmFilesSkipPoints
+        dmFileFactor = self.dmFilesSkipFactor
         t0 = t1 = tm.time() #time before iteration
         self.tavg = 0    #needed for estimation of remaining time
         print('Time evolution\n'+'0%  ',end='')
@@ -303,28 +318,37 @@ class mpSystem:
                         self.updateEverything()
                         
                         if self.boolDMStore:
-                            if dmFileSkip == self.dmFilesSkipPoints:
-                                dmFileSkip = 0
+                            if dmFileFactor == self.dmFilesSkipFactor:
+                                dmFileFactor = 1
                                 if not self.boolOnlyRed:
-                                    storeMatrix(self.densityMatrix,'./data/density/densmat'+str(self.evolStep)+'.txt')
+                                    storeMatrix(self.densityMatrix,'./data/density/densmat'+str(int(self.dmcount))+'.txt')
                             
-                                    storeMatrix(self.densityMatrixRed,'./data/red_density/densmat'+str(self.evolStep)+'.txt')
+                                    storeMatrix(self.densityMatrixRed,'./data/red_density/densmat'+str(int(self.dmcount))+'.txt')
+                                    self.dmcount += 1
                             else:
-                                dmFileSkip += 1
+                                dmFileFactor += 1
 
-                        self.filEnt.write( str(self.evolTime) + ' ' + str(self.entropy) + ' ' + str(self.entropyRed) + '\n' )
-                        self.filNorm.write( str(self.evolTime) + ' ' + str(self.stateNorm) + ' ' + str(self.stateNormAbs) + '\n' )
-                        self.filOcc.write(str(self.evolTime)+ ' ')
+                        self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
+                        self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
+                        self.filOcc.write('%.16e ' % self.evolTime)
                         for m in range(0,self.m):
-                            self.filOcc.write(str(self.occNo[m]) + ' ')
+                            self.filOcc.write('%.16e ' % self.occNo[m])
                         self.filOcc.write('\n')
-                        self.filEnergy.write( str(self.evolTime) + ' ' + str(self.energy) + '\n' )
                             
                     ### Time Step!
                     self.timeStep()
                     self.evolStep += self.evolStepDist
                     #print(i,ii,j)
+                
+                #calculate total entropy and energy only 100 times, it is time consuming and only a check
+                if self.boolTotalEnt:
+                    self.updateEntropy()
+                    self.filTotEnt.write( '%.16e %.16e \n' % (self.evolTime, self.entropy))
                     
+                if self.boolTotalEnergy:
+                    self.updateEnergy()
+                    self.filEnergy.write( '%.16e %.16e \n' % (self.evolTime, self.energy) )
+                
                 print('.',end='',flush=True)
                 if self.dim > 1e3 or self.steps > 1e7 :
                     self.filProg = open('./data/progress.log','a')
@@ -335,25 +359,26 @@ class mpSystem:
             self.tavg += tm.time() - t1  #add passed time
             self.tavg /= self.evolStep   #average over total number of steps
             t1 = tm.time()
-            print(' norm total: '+str(np.round(self.stateNormAbs,2))+ ' ' + time_elapsed(t0,60,0) + " ######## etr: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s", "\n" + str(i*10) + "% ",end='')
+            print(' norm total: '+str(np.round(self.stateNormAbs,2))+ ' ' + time_elapsed(t0,60,0) + " ######## eta: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s", "\n" + str(i*10) + "% ",end='')
             self.filProg = open('./data/progress.log','a')
-            self.filProg.write(' norm total: '+str(np.round(self.stateNormAbs,2))+ ' ' + time_elapsed(t0,60,0) + " ######## etr: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s"+ "\n" + str(i*10) + "% ")
+            self.filProg.write(' norm total: '+str(np.round(self.stateNormAbs,2))+ ' ' + time_elapsed(t0,60,0) + " ######## eta: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s"+ "\n" + str(i*10) + "% ")
             self.filProg.close()
         print('\n'+'Time evolution finished after',time_elapsed(t0, 60), 'with average time/step of',"%.4e" % self.tavg)
         
         if self.boolDataStore:
             self.filEnt.close()
+            self.filTotEnt.close()
             self.filNorm.close()
             self.filOcc.close()
             self.filEnergy.close()
     #end
     
     def plotDMAnimation(self, stepSize):
-        ep.plotDensityMatrixAnimation(self.steps, self.deltaT ,self.dmFiles , stepSize)
+        ep.plotDensityMatrixAnimation(self.steps, self.deltaT ,self.dmFiles , stepSize, framerate=self.dmFilesFPS)
     #end of plotDMAnimation
     
     def plotDMRedAnimation(self, stepSize):
-        ep.plotDensityMatrixAnimation(self.steps, self.deltaT ,self.dmFiles , stepSize, 1)
+        ep.plotDensityMatrixAnimation(self.steps, self.deltaT ,self.dmFiles , stepSize, 1, framerate=self.dmFilesFPS)
     #end of plotDMAnimation
     
     def plotData(self):
@@ -362,7 +387,7 @@ class mpSystem:
     
     def plotHamiltonian(self):
         ep.plotHamiltonian()
-    #end of plotMatrix
+    #end of plotHamiltonian
     
     def plot(self):
         if self.boolPlotData:
@@ -394,13 +419,7 @@ def prepFolders(clearbool = 0, cFile = "config.ini"):
         os.mkdir("./plots/")
         print("Creating ./plts Folder since it didn't exist")
     if os.path.isfile("./"+cFile) == False:
-        confFile = open('./'+cFile,'w')
-        confFile.write('[system]\n'+'N = 10\n'+'m = 4'+'\n'+'kred = '+'\n\n')
-        confFile.write('[iteration]\n'+'deltaT = 1e-5\n'+'steps = 1e5\n\n')
-        confFile.write('[filemanagement]\n'+'datapoints = 1e2\n'+'dmfiles = 1e2\n'+'clear = False\n'+'datastore = True\n'+'dmstore = False\n\n')
-        confFile.write('[calcparams]\n'+'onlyreduced = False\n'+'totalentropy = False\n\n')
-        confFile.write('[plotbools]\n'+'plotdata = True\n'+'plothamiltonian = True\n'+'plotdens = False\n'+'plotdensred = False\n'+'dmstepsize = 2')
-        confFile.close()
+        shutil.copyfile('./config.ini','./'+cFile)
         print('Created generic config file with name',cFile)
     #remove the old stuff
     if clearbool:
@@ -557,31 +576,18 @@ def storeMatrix(mat,fil,absOnly=0):
         freal = open(fname + '_re' + fend,'w')
         for n in range(0,matDim):
             for nn in range(0,matDim-1):
-                f.write(str(np.abs(mat[(n,nn)])) + ' ')
-                fimag.write(str(np.imag(mat[(n,nn)])) + ' ')
-                freal.write(str(np.real(mat[(n,nn)])) + ' ')
-            f.write(str(np.abs(mat[(n,matDim-1)])) + "\n")
-            fimag.write(str(np.imag(mat[(n,matDim-1)])) + "\n")
-            freal.write(str(np.real(mat[(n,matDim-1)])) + "\n")
+                f.write('%.16e ' % np.abs(mat[(n,nn)]))
+                fimag.write('%.16e ' % np.imag(mat[(n,nn)]))
+                freal.write('%.16e ' % np.real(mat[(n,nn)]))
+            f.write('%.16e\n' % np.abs(mat[(n,matDim-1)]))
+            fimag.write('%.16e\n' % np.imag(mat[(n,matDim-1)]))
+            freal.write('%.16e\n' % np.real(mat[(n,matDim-1)]))
         f.close()
     else:
         f = open(fil,'w')
         #assume dot + 3 letter ending e.g. .txt
         for n in range(0,matDim):
             for nn in range(0,matDim-1):
-                f.write(str(np.abs(mat[(n,nn)])) + ' ')
-            f.write(str(np.abs(mat[(n,matDim-1)])) + "\n")
+                f.write('%.16e ' % np.abs(mat[(n,nn)]))
+            f.write('%.16e\n' % np.abs(mat[(n,matDim-1)]))
         f.close()   
-
-#gives entropy -Tr(rho*log(rho) ) from density matrix (also works for reduced)
-def densmat2ent(density_matrix):
-    ent = 0
-    for el in la.eigvalsh(density_matrix):
-        if np.imag(el) != 0:
-            print(np.imag(el))
-        if np.real(el) > 0:
-            ent -= np.real(el) * np.log(np.real(el))
-        if np.real(el) < 0 and np.abs(el) > 1e-7:
-            print('oh god, there is a negative eigenvalue smaller than 1e-7 !')
-            print(el)
-    return ent
