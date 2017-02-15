@@ -1,0 +1,145 @@
+changelog
+
+### 01.02.2017
+- added runing average and total average and fluctuations... nice stuff though
+
+### 26.01.2017
+- changed entPlot to only plot total entropy if calculated
+
+### 24.01.2017
+- still no progress in transition element expectation value (frozen for now!!!)
+- changed hamiltonian and all the quartic and quadratic matrices to sparse ones <--- important
+
+### 20.01.2017
+- added expectation value of transition elements
+- corrected typo in 14.01.2017 changelog
+- note that the quadratic operators are now stored in the mpSystem class
+- Work in progress!!!
+
+### 16.01.2017
+- finally changed the initial state part to a working one
+- changed time evolution to be calculated only by datapoint evaluation, so instead of doing all the time steps,
+	raise the time evolution matrix at the beginning to the power of timesteps between datapoints and just do it ONCE betwen every datapoint - might be inaccurate!
+- added energy to plotting as well
+
+### 14.01.2017
+- omitted some changes... sorry for that
+- changed plot to use Agg (works better with the cluster)
+- better reduction algorithm (order of magnitude faster, iterator is stored)
+- storing logfile in data
+- changed renormalize to normalize since it is misleading (ren. group is quite different)
+- cosmetics
+- added total system energy to calculation
+
+### 06.01.2017
+- changed renormalization to np.einsum which is about 10 times faster
+- added printing out of norm every 10%
+- Runge-Kutta had an error - the matrix power was actually just array multiplication, stability is now really better than before!
+- added boolean for total entropy calculation (avoid this for faster calculation)
+- added very strict hermiticity check! (may be too strict, check)
+
+### 05.01.2017
+- added only reduced density matrix calculation option
+- cosmetics
+- added state norm check to avoid numerical errors leading to unphysical behaviour
+- clearing of data after plot only!
+
+### 04.01.2017
+- changed plotting to intelligent state number catching
+
+### 03.01.2017
+- removed old functions from mpEntropy
+- minor writing bugfixes
+- added variable config.ini naming
+
+### 01.01.2017
+- changed filename entangle_entropy.py to mpEntropy.py
+- changed filename plot.py to entPlot.py
+- moved plotting to mpSystem class
+- imported dot differently for ever faster time evolution
+- completed transition to class
+- added ini file for configuration parameters! (not in repo, is produced automatically if not given)
+
+### 31.12.2016
+- changed density matrix back to outer product, since it is a lot faster
+- changed trace algorithm to np.einsum for it is faster than trace (computes only the needed elements)
+
+### 30.12.2016
+- found failure in old reduction algorithm - if traced out states are not in a block, the algorithm produces errors
+- new class is now complete, everything up and running and ready to go
+- changed main to use new class and methods -> keep changing!
+- new reduce density algorithm works super nice, is actually intelligent now (only accesses needed states)
+- state evolution extremely fast -> pointstore takes long time (check what's going on there)
+- renormalization not after every step, takes too long (suggestion: do once, store and repeat until told to repeat again)
+
+### 29.12.2016
+- overhaul of naming in entangle_entropy as well as defining a class for all system parameters
+- rewrite of all essential functions in terms of new system class
+- new reduce matrix algorithm has to be tested! but speed has been increased
+
+### 28.12.2016
+- better platform independent folder function is prepare folders
+- removed reverse ordering in reduced density matrix algorithm (not needed since it is treated in offset algorithm)
+- abandoned analytic solution approach so speed this thing up
+
+### 21.12.2016
+- occupation numbers never have imaginary parts (checked) so threw them away
+
+### 20.12.2016
+- checked reduction of 3 states in N=2,m=4 thing - worked nicely
+- introduced a way of calculating interaction hamiltonian with loops (N=10,m=4 already 10s)
+
+### 19.12.2016
+- added a routine to interact, which sets elements smaller than 1e-4 to 0
+- changed precision in matrix and state to double
+- changed norm calculation to la.norm
+- fixed hamiltonian use in time step
+- changed to Runge Kutta 4th order
+- fixed non square check - only the imaginary part is now differing big time... actually increasing with time
+- checked interaction terms
+- changed basis2dict and reduce_dens to intelligent array thing (tested for N=1,m=4 do again for N=2,m=4!!!!!)
+- removed unnecessary case separation in basis2tuple
+
+### 15.12.2016
+- some cleanup fixes (still pretty slow)
+- messed around with datatypes to increase precision - revise! now it shouldn't be changed
+- reduced precision on negative eigenvalues error output
+- removed timestep function and included it manifestly in main code 
+- changed int to int32 in noofel
+
+### 14.12.2016
+- fixed cleanup of density matrix
+- reduced number of bools in main
+- reduced number of plotting functions
+- cleaned up some print functions
+- added better step output to print function
+
+### 13.12.2016
+- added possibility to trace out 1st state (index 0)
+- checked results for N=2,m=3 rdm (traced out every single state)
+- checked for N=1,m=4 NOTE: no need for ordering change in rdm algorithm,
+	since it nevertheless is in non connected block form so the eigenvalues are the same yet in different ordering
+- note: in myplot2 there has been a change at some time, where you can activate or deactivate the analytic plot for Rabi 1 particle
+
+### 09.12.2016
+- changed + expanded consistency check of density matrices
+- analytic check of subsystem entropy for 2-state system 1 particle
+- added eta to evaluation and changed some cosmetics (added comments to reduce matrix algorithm)
+- super cool mega nice time display thingy
+- todo list: 	- treated negative eigenvalues of rdm, (they are very very small -> more computer error than else)
+				- removed norm, seems to be no problem
+				- added square of density matrix problem
+
+### 07.12.2016
+- just some parameter changes, renaming of stuff, nothing special or functional
+
+### 06.12.2016
+- created changelog
+- code-files:
+	harmosz_mp.py
+	myplot2.py
+	interface.py
+	entangle_entropy.py
+- introduced entropy function in entangle_entropy.py
+- added benchmarking code and plot
+- reimplemented renormalization, since time evolution is not unitary in discrete steps of finite t... Hans said it's ok
