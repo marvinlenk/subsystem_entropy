@@ -34,9 +34,10 @@ class mpSystem:
         self.state = np.zeros( (self.dim,1) , dtype = self.datType)
         # parameter for storing in file
         self.stateNorm = 0
-        self.stateNormAbs = 1
+        self.stateNormAbs = 0
         self.stateNormCheck = 1e1 #check if norm has been supressed too much
-        self.densityMatrix = np.zeros( (self.dim , self.dim) , dtype = self.datType) 
+        self.densityMatrix = [] #do not initialize yet - it wait until hamiltonian decomposition has been done for memory efficiency 
+        self.densityMatrixInd = False
         self.entropy = 0
         self.energy = 0
         self.operators = quadraticArray(self)
@@ -45,6 +46,10 @@ class mpSystem:
         self.hamiltonian = coo_matrix(np.zeros((self.dim,self.dim)),shape=(self.dim,self.dim),dtype=np.float64).tocsr()
         # matrix for time evolution - initially empty
         self.evolutionMatrix = None
+        # eigenvalue and vectors
+        self.eigVals = []
+        self.eigVects = []
+        self.eigInd = False
         # iteration step
         self.evolStep = 0
         self.evolStepTmp = 0
@@ -106,8 +111,8 @@ class mpSystem:
         self.boolClear = configParser.getboolean('filemanagement','clear')
         self.boolDataStore = configParser.getboolean('filemanagement','datastore')
         self.boolDMStore = configParser.getboolean('filemanagement','dmstore') 
+        self.boolDMRedStore = configParser.getboolean('filemanagement','dmredstore') 
         self.boolHamilStore = configParser.getboolean('filemanagement','hamilstore')
-        self.boolHamilEigStore = configParser.getboolean('filemanagement','hamilstore_eigenvalues')
         ### calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams','onlyreduced')
         self.boolTotalEnt = configParser.getboolean('calcparams','totalentropy')
@@ -115,7 +120,6 @@ class mpSystem:
         ### plotting booleans and parameters
         self.boolPlotData = configParser.getboolean('plotbools','plotdata')
         self.boolPlotAverages = configParser.getboolean('plotbools','plotavgs')
-        self.boolPlotHamilEig = configParser.getboolean('plotbools','ploteigenenergies')
         self.boolPlotHamiltonian = configParser.getboolean('plotbools','plothamiltonian')
         self.boolPlotDMAnimation = configParser.getboolean('plotbools','plotdens')
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools','plotdensred')
@@ -142,6 +146,11 @@ class mpSystem:
         
     ###### Methods:
     def updateDensityMatrix(self):
+        if self.densityMatrixInd == False:
+            # there might be a memory reallocation error with np.outer... however, initialization is always nice
+            self.densityMatrix = np.zeros( (self.dim , self.dim) , dtype = self.datType)
+            self.densMatrixInd = True
+            
         self.densityMatrix = np.outer( self.state[:,0], np.conjugate(self.state[:,0]) )
     #end of updateDensityMatrix
     
@@ -181,7 +190,7 @@ class mpSystem:
         
     #The matrix already inherits the identity so step is just mutliplication
     #time evolution order given by order of the exponential series
-    def initEvolutionMatrix(self, order = 4):
+    def initEvolutionMatrix(self, order = 4, diagonalize = True):
         if order == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.hamiltonian.toarray(), np.conjugate(self.hamiltonian.toarray().T))):
@@ -196,11 +205,10 @@ class mpSystem:
             storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.txt', 1)
             storeMatrix(self.evolutionMatrix, './data/evolutionmatrix.txt', 1)
             self.evolutionMatrix = npmatrix_power(self.evolutionMatrix,self.evolStepDist)
-        if self.boolHamilEigStore:
-            tfil = open('./data/hamiltonian_eigvals.txt','w')                    
-            for el in la.eigvalsh(self.hamiltonian.toarray()):
-                tfil.write('%.16e \n' % el)
-            tfil.close()
+        
+        # Store hamiltonian eigenvalues
+        if diagonalize:
+            self.updateEigenenergies()
     #end
     
     def timeStep(self):
@@ -208,6 +216,7 @@ class mpSystem:
     #end of timeStep
 
     def normalize(self,initial=False):
+        # note that the shape of the state vector is (dim,1) for reasons of matrix multiplication in numpy
         self.stateNorm = np.real(sqrt(npeinsum('ij,ij->j',self.state,np.conjugate(self.state))))[0]
         self.stateNormAbs *= self.stateNorm
         self.state /= self.stateNorm
@@ -215,6 +224,7 @@ class mpSystem:
         #self.stateNorm = np.real(sqrt(npeinsum('ij,ij->j',self.state,np.conjugate(self.state))))[0]
         if bool(initial) == True:
             self.stateNormAbs = 1
+            self.updateEigendecomposition()
         if np.abs(self.stateNormAbs) > self.stateNormCheck:
             if self.stateNormCheck == 1e1:
                 print('\n'+'### WARNING! ### state norm has been normalized by more than the factor 10 now!'+'\n'+'Check corresponding plot if behavior is expected - indicator for numerical instability!'+'\n')
@@ -240,6 +250,28 @@ class mpSystem:
         if np.shape(operator) != ( self.dimRed, self.dimRed ):
             exit('Dimension of operator is',np.shape(operator),'but',( self.dimRed, self.dimRed ), 'is needed!')
         return np.trace( npdot(self.densityMatrixRed, operator) )
+    
+    def updateEigenenergies(self):
+        self.eigVals, self.eigVects = la.eigh(self.hamiltonian.toarray())
+        self.eigInd = True
+        
+    def updateEigendecomposition(self):
+        if self.eigInd == False:
+            self.updateEigenenergies()
+               
+        tfil = open('./data/hamiltonian_eigvals.txt','w')  
+        for i in range(0,self.dim):
+            tmp = np.dot(self.eigVects[:,i],self.state[:,0])                  
+            tfil.write('%.16e %.16e \n' % (self.eigVals[i], np.real((tmp * np.conjugate(tmp))) ))
+        tfil.close()   
+        
+        #free the memory
+        del self.eigVals
+        del self.eigVects
+        self.eigInd
+        self.eigVals = []
+        self.eigVects = []
+        self.eigInd = False
     
     def updateEntropy(self):
         self.entropy = 0
@@ -290,6 +322,10 @@ class mpSystem:
         
     ###### the magic of time evolution
     def evolve(self):
+        # check if state has been normalized yet (or initialized)
+        if self.stateNormAbs == 0:
+            self.normalize(True)
+        
         if self.boolDataStore:
             self.filEnt = open('./data/entropy.txt','w')
             self.filTotEnt = open('./data/total_entropy.txt','w')
@@ -317,13 +353,14 @@ class mpSystem:
                     if self.boolDataStore:
                         self.updateEverything()
                         
-                        if self.boolDMStore:
+                        if self.boolDMStore or self.boolDMRedStore:
                             if dmFileFactor == self.dmFilesSkipFactor:
                                 dmFileFactor = 1
                                 if not self.boolOnlyRed:
-                                    storeMatrix(self.densityMatrix,'./data/density/densmat'+str(int(self.dmcount))+'.txt')
-                            
-                                    storeMatrix(self.densityMatrixRed,'./data/red_density/densmat'+str(int(self.dmcount))+'.txt')
+                                    if self.boolDMStore:
+                                        storeMatrix(self.densityMatrix,'./data/density/densmat'+str(int(self.dmcount))+'.txt')
+                                    if self.boolDMRedStore:
+                                        storeMatrix(self.densityMatrixRed,'./data/red_density/densmat'+str(int(self.dmcount))+'.txt')
                                     self.dmcount += 1
                             else:
                                 dmFileFactor += 1

@@ -1,6 +1,12 @@
 change log
 
-### 14.02.2017
+### 16.02.2017
+- funny enough, there was a date error in the last changelog entry
+- removed hamiltonian eigenvalue decomposition from config, since it will be needed from now on
+- density matrix will only be allocated when needed (better memory usage, since eigenvectors have to be stored at some point)
+- added eigenvector decomposition
+
+### 15.02.2017
 - removed expectation value of transition... not needed at this point and it was only work in progress
 - changed ini file creation to copy from default config.ini
 - added hamiltonian eigenvalue decomposition as parameter and save txt file in data folder now

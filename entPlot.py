@@ -38,12 +38,11 @@ def plotData(sysVar):
     entfile = './data/entropy.txt'
     ent_array = np.loadtxt(entfile)
     
+    engies = np.loadtxt('./data/hamiltonian_eigvals.txt')
+    
     if sysVar.boolTotalEnt:
         totentfile = './data/total_entropy.txt'
         totent_array = np.loadtxt(totentfile)
-    
-    if sysVar.boolPlotHamilEig:
-        engies = np.loadtxt('./data/hamiltonian_eigvals.txt')
     
     if sysVar.boolTotalEnergy:
         energyfile = './data/energy.txt'
@@ -198,16 +197,16 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='')
     ### Hamiltonian eigenvalues (Eigenenergies)
-    if sysVar.boolPlotHamilEig:
-        plt.plot(engies,linestyle='none',marker='o',ms=1)
-        plt.ylabel(r'Energy')
-        plt.xlabel(r'\#')
-        plt.grid(False)
-        plt.xlim(xmin=-1)
-        ###
-        pp.savefig()
-        plt.clf()
-        print('.',end='')
+    plt.plot(engies,linestyle='none',marker='o',ms=1)
+    plt.ylabel(r'Energy')
+    plt.xlabel(r'\#')
+    plt.grid(False)
+    plt.xlim(xmin=-1)
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='')
+    ###
     pp.close()
     print(" done!")
 
