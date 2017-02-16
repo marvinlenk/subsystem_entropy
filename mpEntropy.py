@@ -214,7 +214,20 @@ class mpSystem:
     def timeStep(self):
         self.state = npdot(self.evolutionMatrix, self.state)
     #end of timeStep
-
+    
+    # approximate gaussian distribution in energy space
+    def stateEnergy(self,muperc=50,sigma=1):
+        if self.eigInd == False:
+            self.updateEigenenergies()
+        
+        self.state.fill(0)
+        mupos = int(self.dim*(muperc/100.0))
+        mu = self.eigVals[mupos]
+        for i in range(0,self.dim):
+            self.state[:,0] += gaussian(self.eigVals[i],mu,sigma,norm=True) * self.eigVects[:,i]
+        
+        self.normalize(True)
+    
     def normalize(self,initial=False):
         # note that the shape of the state vector is (dim,1) for reasons of matrix multiplication in numpy
         self.stateNorm = np.real(sqrt(npeinsum('ij,ij->j',self.state,np.conjugate(self.state))))[0]
@@ -262,7 +275,7 @@ class mpSystem:
         tfil = open('./data/hamiltonian_eigvals.txt','w')  
         for i in range(0,self.dim):
             tmp = np.dot(self.eigVects[:,i],self.state[:,0])                  
-            tfil.write('%.16e %.16e \n' % (self.eigVals[i], np.real((tmp * np.conjugate(tmp))) ))
+            tfil.write('%i %.16e %.16e \n' % (i, self.eigVals[i], np.real((tmp * np.conjugate(tmp))) ))
         tfil.close()   
         
         #free the memory
@@ -340,9 +353,9 @@ class mpSystem:
         dmFileFactor = self.dmFilesSkipFactor
         t0 = t1 = tm.time() #time before iteration
         self.tavg = 0    #needed for estimation of remaining time
-        print('Time evolution\n'+'0%  ',end='')
+        print('Time evolution\n'+' 0% ',end='')
         self.filProg = open('./data/progress.log','a')
-        self.filProg.write('Time evolution\n'+'0%  ')
+        self.filProg.write('Time evolution\n'+' 0% ')
         self.filProg.close()
         #percent loop
         for i in range(1,11):
@@ -375,7 +388,6 @@ class mpSystem:
                     ### Time Step!
                     self.timeStep()
                     self.evolStep += self.evolStepDist
-                    #print(i,ii,j)
                 
                 #calculate total entropy and energy only 100 times, it is time consuming and only a check
                 if self.boolTotalEnt:
@@ -396,9 +408,9 @@ class mpSystem:
             self.tavg += tm.time() - t1  #add passed time
             self.tavg /= self.evolStep   #average over total number of steps
             t1 = tm.time()
-            print(' norm total: '+str(np.round(self.stateNormAbs,2))+ ' ' + time_elapsed(t0,60,0) + " ######## eta: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s", "\n" + str(i*10) + "% ",end='')
+            print(' 1-norm: '+str(np.round(1 - self.stateNormAbs,2))+ ' elapsed: ' + time_elapsed(t0,60,0) + " ###### eta: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s", "\n" + str(i*10) + "% ",end='')
             self.filProg = open('./data/progress.log','a')
-            self.filProg.write(' norm total: '+str(np.round(self.stateNormAbs,2))+ ' ' + time_elapsed(t0,60,0) + " ######## eta: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s"+ "\n" + str(i*10) + "% ")
+            self.filProg.write(' 1-norm: '+str(1 - np.round(self.stateNormAbs,2))+ ' elapsed ' + time_elapsed(t0,60,0) + " ###### eta: " + str(int(self.tavg*(self.steps-self.evolStep)/60)) + "m " + str(int(self.tavg*(self.steps-self.evolStep)%60)) + "s"+ "\n" + str(i*10) + "% ")
             self.filProg.close()
         print('\n'+'Time evolution finished after',time_elapsed(t0, 60), 'with average time/step of',"%.4e" % self.tavg)
         
@@ -487,6 +499,12 @@ def fillBasis(basis,N,m,offset=0):
     else:
         basis[offset,0] = int(N)
     #end
+
+def gaussian(x,mu,sigm,norm=1):
+    tmp = np.exp(-(x-mu)**2 / (2 * sigm**2))
+    if norm:
+        tmp /= np.sqrt(2 * np.pi * sigm**2)
+    return tmp
 
 def basisOffsets(N,m):
     offsets = np.zeros( (N+2) ,dtype = np.int32)

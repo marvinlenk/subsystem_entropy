@@ -2,9 +2,14 @@ change log
 
 ### 16.02.2017
 - funny enough, there was a date error in the last changelog entry
+- forgot to put a change in last entry
 - removed hamiltonian eigenvalue decomposition from config, since it will be needed from now on
 - density matrix will only be allocated when needed (better memory usage, since eigenvectors have to be stored at some point)
-- added eigenvector decomposition
+- added eigenvector decomposition (in calculation and plotting)
+- added flag -p for only plotting
+- added flag -pd for only data plotting
+- added flag -pa for only animation plotting
+- added workaround for supressing scipy linalg lapack error... harmless testing error
 
 ### 15.02.2017
 - removed expectation value of transition... not needed at this point and it was only work in progress
@@ -19,6 +24,7 @@ change log
 - NO BACKWADS COMPATIBILITY FOR THIS!!!
 - changed typo in changelog 01.02.2017
 - changed data storage to %.16e for almost everything!
+- added timescale to plotting (usually transition element t or J)
 
 ### 01.02.2017
 - added running average and total average and fluctuations... nice stuff though

@@ -6,6 +6,10 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
+#This is a workaround until scipy fixes the issue
+import warnings
+warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
+
 def plotData(sysVar):
     print("Plotting datapoints to pdf",end='')
     
@@ -60,7 +64,7 @@ def plotData(sysVar):
         ###
         pp.savefig()
         plt.clf()
-        print('.',end='')
+        print('.',end='',flush=True)
     ### Subsystem Entropy
     plt.plot(step_array,ent_array[:,1], linewidth =0.8, color = 'r')
     plt.grid()
@@ -71,7 +75,7 @@ def plotData(sysVar):
     plt.ylabel('Subsystem entropy')
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
     ### Single-level occupation numbers
     for i in range(0,sysVar.m):
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.5)
@@ -86,7 +90,7 @@ def plotData(sysVar):
     ###
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
     ### Traced out (bath) occupation numbers
     for i in sysVar.kRed:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
@@ -101,7 +105,7 @@ def plotData(sysVar):
     ###
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
     ### Leftover (system) occupation numbers
     for i in np.arange(sysVar.m)[sysVar.mask]:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
@@ -116,47 +120,51 @@ def plotData(sysVar):
     ###
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
     ### Subsystems occupation numbers
+    #store fluctuations in a data
+    fldat = open('./data/fluctuation.txt','w')
     tmp = np.zeros(len(step_array))
     for i in sysVar.kRed:
         tmp += occ_array[:,i+1]
     plt.plot(step_array,tmp,label="bath", linewidth =0.8, color = 'magenta')
-    if sysVar.boolPlotAverages:
-        tavg = savgol_filter(tmp,fwidth,ford)
-        plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
-        avg = 0
-        var = 0
-        for i in range(0,np.shape(step_array[100:])[0]):
-            avg += tmp[i+100]
-        avg /= np.shape(step_array[100:])[0]
     
-        for i in range(0,np.shape(step_array[100:])[0]):
-            var += (tmp[i+100] - avg)**2
-        var /= np.shape(step_array[100:])[0]-1
-        print('')
-        print('bath average:', avg)
-        print('bath fluctuation:',np.sqrt(var)/avg)
+    tavg = savgol_filter(tmp,fwidth,ford)
+    if sysVar.boolPlotAverages:
+        plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+    avg = 0
+    var = 0
+    for i in range(0,np.shape(step_array[100:])[0]):
+        avg += tmp[i+100]
+    avg /= np.shape(step_array[100:])[0]
+
+    for i in range(0,np.shape(step_array[100:])[0]):
+        var += (tmp[i+100] - avg)**2
+    var /= np.shape(step_array[100:])[0]-1
+    fldat.write('bath average: %.16e\n' % avg)
+    fldat.write('bath fluctuation: %.16e\n' % (np.sqrt(var)/avg))
     
     tmp.fill(0)
     for i in np.arange(sysVar.m)[sysVar.mask]:
         tmp += occ_array[:,i+1]
     plt.plot(step_array,tmp,label="system", linewidth =0.8, color = 'darkgreen')
+
+    tavg = savgol_filter(tmp,fwidth,ford)
     if sysVar.boolPlotAverages:
-        tavg = savgol_filter(tmp,fwidth,ford)
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
-        avg = 0
-        var = 0
-        for i in range(0,np.shape(step_array[100:])[0]):
-            avg += tmp[i+100]
-        avg /= np.shape(step_array[100:])[0]
-        
-        for i in range(0,np.shape(step_array[100:])[0]):
-            var += (tmp[i+100] - avg)**2
-        var /= np.shape(step_array[100:])[0]-1
-        print('system average:', avg)
-        print('system fluctuation:',np.sqrt(var)/avg)
-        
+    avg = 0
+    var = 0
+    for i in range(0,np.shape(step_array[100:])[0]):
+        avg += tmp[i+100]
+    avg /= np.shape(step_array[100:])[0]
+    
+    for i in range(0,np.shape(step_array[100:])[0]):
+        var += (tmp[i+100] - avg)**2
+    var /= np.shape(step_array[100:])[0]-1
+    fldat.write('system average: %.16e\n' % avg)
+    fldat.write('system fluctuation: %.16e\n' % (np.sqrt(var)/avg))
+    fldat.close()
+    
     plt.ylabel(r'Occupation number')
     plt.xlabel(r'$J\,t$')
     plt.legend(loc='center right')
@@ -164,18 +172,18 @@ def plotData(sysVar):
     ###
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
     ### Total system energy
     if sysVar.boolTotalEnergy:
-        plt.title('$E_{\text{tot}}$, $E_0$ = %.4e' % en0)
+        plt.title('$E_{\text{tot}}, \; E_0$ = %.2e' % en0)
         plt.plot(en_array[:,0]*sysVar.plotTimeScale,en_array[:,1]*1e10, linewidth =0.6)
-        plt.ylabel(r'$E_{\text{tot}} - E_0 \; /\; 10^{-10}$')
+        plt.ylabel(r'$E_{tot} - E_0 / 10^{-10}$')
         plt.xlabel(r'$J\,t$')
         plt.grid()
         ###
         pp.savefig()
         plt.clf()
-        print('.',end='')
+        print('.',end='',flush=True)
     ### Norm deviation
     plt.plot(step_array,norm_array[:,1], "ro", ms=0.5)
     plt.ylabel('norm deviation from 1')
@@ -184,7 +192,7 @@ def plotData(sysVar):
     ###
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
     ###
     plt.title('State Norm multiplied (deviation from 1)')
     plt.plot(step_array,norm_array[:,2]-1, linewidth =0.6, color = 'r')
@@ -195,17 +203,30 @@ def plotData(sysVar):
     ###
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
     ### Hamiltonian eigenvalues (Eigenenergies)
-    plt.plot(engies,linestyle='none',marker='o',ms=1)
-    plt.ylabel(r'Energy')
-    plt.xlabel(r'\#')
+    fig, ax1 = plt.subplots()
+    ax1.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
+    ax1.set_ylabel(r'Energy')
+    ax1.set_xlabel(r'\#')
+    ax2 = ax1.twinx()
+    ax2.bar(engies[:,0], engies[:,2], alpha=0.2,color='red',width=0.01,align='center')
+    ax2.set_ylabel(r'$|c_n|^2$')
     plt.grid(False)
-    plt.xlim(xmin=-1)
+    ax1.set_xlim(xmin=-5)
     ###
     pp.savefig()
     plt.clf()
-    print('.',end='')
+    print('.',end='',flush=True)
+    ### Eigenvalue decomposition with energy x-axis
+    plt.bar(engies[:,1], engies[:,2], alpha=0.5,color='red',width=0.01,align='center')
+    plt.xlabel(r'Energy')
+    plt.ylabel(r'$|c_n|^2$')
+    plt.grid(False)
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
     ###
     pp.close()
     print(" done!")
