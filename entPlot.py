@@ -23,7 +23,7 @@ def plotData(sysVar):
         'font.size': sysVar.plotFontSize,
         'mathtext.default' : 'rm' # see http://matplotlib.org/users/customizing.html
     }
-    plt.rcParams['agg.path.chunksize']=20000
+    plt.rcParams['agg.path.chunksize']=0
     plt.rcParams.update(params)
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
@@ -132,17 +132,11 @@ def plotData(sysVar):
     tavg = savgol_filter(tmp,fwidth,ford)
     if sysVar.boolPlotAverages:
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
-    avg = 0
-    var = 0
-    for i in range(0,np.shape(step_array[100:])[0]):
-        avg += tmp[i+100]
-    avg /= np.shape(step_array[100:])[0]
-
-    for i in range(0,np.shape(step_array[100:])[0]):
-        var += (tmp[i+100] - avg)**2
-    var /= np.shape(step_array[100:])[0]-1
+    avg = np.mean(tmp[100:],dtype=np.float64)
+    stddev = np.std(tmp[100:],dtype=np.float64)
     fldat.write('bath average: %.16e\n' % avg)
-    fldat.write('bath fluctuation: %.16e\n' % (np.sqrt(var)/avg))
+    fldat.write('bath stddev: %.16e\n' % stddev)
+    fldat.write('bath rel. fluctuation: %.16e\n' % (stddev/avg))
     
     tmp.fill(0)
     for i in np.arange(sysVar.m)[sysVar.mask]:
@@ -152,17 +146,12 @@ def plotData(sysVar):
     tavg = savgol_filter(tmp,fwidth,ford)
     if sysVar.boolPlotAverages:
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
-    avg = 0
-    var = 0
-    for i in range(0,np.shape(step_array[100:])[0]):
-        avg += tmp[i+100]
-    avg /= np.shape(step_array[100:])[0]
     
-    for i in range(0,np.shape(step_array[100:])[0]):
-        var += (tmp[i+100] - avg)**2
-    var /= np.shape(step_array[100:])[0]-1
+    avg = np.mean(tmp[100:],dtype=np.float64)
+    stddev = np.std(tmp[100:],dtype=np.float64)
     fldat.write('system average: %.16e\n' % avg)
-    fldat.write('system fluctuation: %.16e\n' % (np.sqrt(var)/avg))
+    fldat.write('system stddev: %.16e\n' % stddev)
+    fldat.write('system rel. fluctuation: %.16e\n' % (stddev/avg))
     fldat.close()
     
     plt.ylabel(r'Occupation number')
@@ -175,7 +164,7 @@ def plotData(sysVar):
     print('.',end='',flush=True)
     ### Total system energy
     if sysVar.boolTotalEnergy:
-        plt.title('$E_{\text{tot}}, \; E_0$ = %.2e' % en0)
+        plt.title('$E_{tot}, \; E_0$ = %.2e' % en0)
         plt.plot(en_array[:,0]*sysVar.plotTimeScale,en_array[:,1]*1e10, linewidth =0.6)
         plt.ylabel(r'$E_{tot} - E_0 / 10^{-10}$')
         plt.xlabel(r'$J\,t$')
@@ -213,7 +202,7 @@ def plotData(sysVar):
     ax2.bar(engies[:,0], engies[:,2], alpha=0.2,color='red',width=0.01,align='center')
     ax2.set_ylabel(r'$|c_n|^2$')
     plt.grid(False)
-    ax1.set_xlim(xmin=-5)
+    ax1.set_xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
     ###
     pp.savefig()
     plt.clf()
@@ -223,6 +212,7 @@ def plotData(sysVar):
     plt.xlabel(r'Energy')
     plt.ylabel(r'$|c_n|^2$')
     plt.grid(False)
+    plt.xlim(xmin=-( np.abs(engies[0,1] - engies[-1,1]) * (5.0/100) ))
     ###
     pp.savefig()
     plt.clf()

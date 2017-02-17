@@ -34,14 +34,14 @@ print("Dimension of the basis:",sysVar.dim)
 #example hamiltonian with interaction
 
 # onsite energy distance
-dE = 1
+dE = 10
 
 # quadratic pre-factors
-t = 0.5
+t = 1
 
 # quartic prefactors
-u = 1e-2
-
+u_nn = 10
+u_nm = 1e-2
 for i in range(0, sysVar.m):
     for j in range(0, sysVar.m):
         if i!=j:
@@ -55,26 +55,25 @@ for i in range(0, sysVar.m):
         for k in range(0, sysVar.m):
             for l in range(0, sysVar.m):
                 tmp = getQuartic(sysVar,i,j,k,l)
-                if  i==l and j==k:
-                    sysVar.hamiltonian += u * tmp
+                if  i==j and k==l:
+                    sysVar.hamiltonian += u_nn * tmp
                 else:
-                    sysVar.hamiltonian += u * tmp
+                    sysVar.hamiltonian += u_nm * tmp
                 del tmp
 
 print('The Hamiltonian has been written!')
 
 sysVar.initEvolutionMatrix(3)
-'''
 #initially occupied states with relative weight (entanglement of starting state):
-initstates = [[(sysVar.N,0,0,0),1]]
+initstates = [[(sysVar.N/2,sysVar.N/2,0,0,0),1]]
 
 #start with all particles in 0th state
 for el in initstates:
     tmp = sysVar.basisDict[el[0]]
     sysVar.state[tmp, 0] = el[1]
 sysVar.normalize(True)
-'''
-sysVar.stateEnergy(muperc=90,sigma=0.6)
+
+#sysVar.stateEnergy(muperc=90,sigma=0.6)
 print("Preparations finished after " + time_elapsed(t0,1,4) + " \n")
 
 sysVar.evolve()

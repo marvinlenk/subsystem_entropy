@@ -1,5 +1,11 @@
 change log
 
+### 17.02.2017
+- changed AGG chunksize to 0, seems to be faster
+- corrected latex error in energy plot
+- changed mean value and standard deviation to numpy functions
+- cosmetics in eigendecomposition plot
+
 ### 16.02.2017
 - funny enough, there was a date error in the last changelog entry
 - forgot to put a change in last entry
