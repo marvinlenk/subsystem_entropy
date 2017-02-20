@@ -1,5 +1,8 @@
 change log
 
+### 20.02.2017
+- prepared for final parameter set with 5 levels
+
 ### 17.02.2017
 - changed AGG chunksize to 0, seems to be faster
 - corrected latex error in energy plot
