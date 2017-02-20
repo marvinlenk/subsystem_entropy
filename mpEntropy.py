@@ -221,8 +221,7 @@ class mpSystem:
             self.updateEigenenergies()
         
         self.state.fill(0)
-        mupos = int(self.dim*(muperc/100.0))
-        mu = self.eigVals[mupos]
+        mu = self.eigVals[0] + (muperc/100)*(self.eigVals[-1] - self.eigVals[0])
         for i in range(0,self.dim):
             self.state[:,0] += gaussian(self.eigVals[i],mu,sigma,norm=True) * self.eigVects[:,i]
         

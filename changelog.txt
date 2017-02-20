@@ -2,6 +2,7 @@ change log
 
 ### 20.02.2017
 - prepared for final parameter set with 5 levels
+- changed energy starting state routine to set mu according to the energy, not the number
 
 ### 17.02.2017
 - changed AGG chunksize to 0, seems to be faster
