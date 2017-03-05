@@ -11,7 +11,12 @@ args = parser.parse_args()
 #coarse benchmarking for preparations
 t0 = tm.time()
 
-sysVar = mpSystem("config.ini")
+if args.plot or args.plot_data or args.plot_animation:
+    plotBool = True
+else:
+    plotBool = False
+
+sysVar = mpSystem("config.ini",plotOnly=plotBool)
 
 if args.plot:
     sysVar.plot()
@@ -65,17 +70,18 @@ for i in range(0, sysVar.m):
 print('The Hamiltonian has been written!')
 
 sysVar.initEvolutionMatrix(3)
+'''
 #initially occupied states with relative weight (entanglement of starting state):
-initstates = [[(sysVar.N,0,0,0,0),1]]
+initstates = [[(sysVar.N,0,0,0),1]]
 
 #start with all particles in 0th state
 for el in initstates:
     tmp = sysVar.basisDict[el[0]]
     sysVar.state[tmp, 0] = el[1]
 sysVar.normalize(True)
-
-#sysVar.stateEnergy(muperc=90,sigma=0.6)
-print("Preparations finished after " + time_elapsed(t0,1,4) + " \n")
+'''
+sysVar.stateEnergy(muperc=20,sigma=5,altSign=True,skip=0)
+print("Preparations finished after " + time_elapsed(t0,60,0) + " \n")
 
 sysVar.evolve()
 sysVar.plot()

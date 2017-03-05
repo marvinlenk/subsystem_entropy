@@ -44,6 +44,8 @@ def plotData(sysVar):
     
     engies = np.loadtxt('./data/hamiltonian_eigvals.txt')
     
+    stfacts = np.loadtxt('./data/state.txt')
+    
     if sysVar.boolTotalEnt:
         totentfile = './data/total_entropy.txt'
         totent_array = np.loadtxt(totentfile)
@@ -194,12 +196,22 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     ### Hamiltonian eigenvalues (Eigenenergies)
+    plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
+    plt.ylabel(r'Energy')
+    plt.xlabel(r'\#')
+    plt.grid(False)
+    plt.xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+    ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
     fig, ax1 = plt.subplots()
     ax1.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
     ax1.set_ylabel(r'Energy')
     ax1.set_xlabel(r'\#')
     ax2 = ax1.twinx()
-    ax2.bar(engies[:,0], engies[:,2], alpha=0.2,color='red',width=0.01,align='center')
+    ax2.bar(engies[:,0], engies[:,2], alpha=0.15,color='red',width=0.01,align='center')
     ax2.set_ylabel(r'$|c_n|^2$')
     plt.grid(False)
     ax1.set_xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
@@ -217,6 +229,72 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
+    ### Eigenvalue decomposition en detail
+    n_rows = 3 #abs**2, phase/2pi, energy on a range from 0 to 1 
+    n_rows += sysVar.m #occupation numbers
+    n_rows += 1 #spacer
+    
+    index = np.arange(sysVar.dim)
+    bar_width = 1
+
+    # Initialize the vertical-offset for the stacked bar chart.
+    y_offset = np.array([0.0] * sysVar.dim)
+    spacing = np.array([1] * sysVar.dim)
+    enInt = np.abs(engies[-1,1] - engies[0,1])
+    cmapVar = plt.cm.OrRd
+    cmapVar.set_under(color='black')    
+    plt.ylim(0,n_rows)
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar((engies[:,1]-engies[0,1])/enInt), linewidth=0.005, edgecolor='gray')
+    y_offset = y_offset + spacing
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,2]/np.amax(engies[:,2]) - 1e-16), linewidth=0.005, edgecolor='gray')
+    y_offset = y_offset + spacing
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,3] - 1e-16), linewidth=0.01, edgecolor='gray')
+    y_offset = y_offset + spacing
+    
+    plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
+    y_offset = y_offset + np.array([1] * sysVar.dim)
+    
+    for row in range(4, n_rows):
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,row]/sysVar.N - 1e-16), linewidth=0.005, edgecolor='gray')
+        y_offset = y_offset + spacing
+    
+    plt.ylabel("shit")
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+    ### Occupation number basis decomposition en detail
+    n_rows = 2 #abs**2, phase/2pi
+    n_rows += sysVar.m #occupation numbers
+    n_rows += 1 #spacer
+    
+    index = np.arange(sysVar.dim)
+    bar_width = 1
+
+    # Initialize the vertical-offset for the stacked bar chart.
+    y_offset = np.array([0.0] * sysVar.dim)
+    spacing = np.array([1] * sysVar.dim)
+    cmapVar = plt.cm.OrRd
+    cmapVar.set_under(color='black')    
+    plt.ylim(0,n_rows)
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,1]/np.amax(stfacts[:,1]) - 1e-16), linewidth=0.005, edgecolor='gray')
+    y_offset = y_offset + spacing
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,2] - 1e-16), linewidth=0.01, edgecolor='gray')
+    y_offset = y_offset + spacing
+    
+    plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
+    y_offset = y_offset + np.array([1] * sysVar.dim)
+    
+    for row in range(3, n_rows):
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,row]/sysVar.N - 1e-16), linewidth=0.005, edgecolor='gray')
+        y_offset = y_offset + spacing
+    
+    plt.ylabel("shit")
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+
     ###
     pp.close()
     print(" done!")

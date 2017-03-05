@@ -1,5 +1,14 @@
 change log
 
+### 03.03.2017
+- changed plotting only to a faster version where NO matrices and bases are created
+- changed "preparations finished after" to minute and second instead of second
+- changed eigenvector decomposition to more detailed data (phase, eigenvalue expect. values and so on)
+--> axis labels for plot are still missing!
+- changed default settings back to four levels
+- changed option for varying sign and skipping of eigenvalues for stateEnergy
+- added plot and data file for decomposition in occupation number space
+
 ### 20.02.2017
 - prepared for final parameter set with 5 levels
 - changed energy starting state routine to set mu according to the energy, not the number

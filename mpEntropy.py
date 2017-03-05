@@ -20,74 +20,75 @@ from scipy.special.basic import factorial
 #manyparticle system class
 class mpSystem:
     #N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
-    def __init__(self,cFile="config.ini",dtType=np.complex128):
+    def __init__(self,cFile="config.ini",dtType=np.complex128,plotOnly=False):
         self.confFile = cFile
         prepFolders(0,self.confFile)
         self.loadConfig()
-        ###### system variables
-        self.datType = dtType
-        self.dim = dimOfBasis(self.N,self.m) 
-        self.basis = np.zeros( (self.dim , self.m) , dtype = np.int)
-        fillBasis(self.basis, self.N, self.m)
-        self.basisDict = basis2dict(self.basis, self.dim)
-        #note that there is an additional dimension there! needed for fast multiplication algorithm
-        self.state = np.zeros( (self.dim,1) , dtype = self.datType)
-        # parameter for storing in file
-        self.stateNorm = 0
-        self.stateNormAbs = 0
-        self.stateNormCheck = 1e1 #check if norm has been supressed too much
-        self.densityMatrix = [] #do not initialize yet - it wait until hamiltonian decomposition has been done for memory efficiency 
-        self.densityMatrixInd = False
-        self.entropy = 0
-        self.energy = 0
-        self.operators = quadraticArray(self)
-        self.occNo = np.zeros(self.m,dtype=np.float64)
-        # hamiltonian - initialized with zeros (note - datatype is not! complex)
-        self.hamiltonian = coo_matrix(np.zeros((self.dim,self.dim)),shape=(self.dim,self.dim),dtype=np.float64).tocsr()
-        # matrix for time evolution - initially empty
-        self.evolutionMatrix = None
-        # eigenvalue and vectors
-        self.eigVals = []
-        self.eigVects = []
-        self.eigInd = False
-        # iteration step
-        self.evolStep = 0
-        self.evolStepTmp = 0
-        self.evolTime = 0
-        self.tavg = 0    #needed for estimation of remaining time
-        self.dmcount = 0 #needed for numbering of density matrix files
-        ###### variables for the partial trace algorithm
-        self.mRed = self.m - len(self.kRed)
-        self.mRedComp = len(self.kRed)
-        self.entropyRed = 0
-        
         # mask selects only not traced out states
         self.mask = np.ones( (self.m) , dtype = bool)
         for k in self.kRed:
             self.mask[k] = False
-
-        if self.mRedComp == 0:
-            self.dimRed = 0
-            self.offsetsRed = None
-            self.basisRed = None
-            self.dimRedComp = self.dim
-            self.offsetsRedComp = np.zeros( (self.N+2), dtype=np.int32)
-            self.offsetsRedComp[-1] = self.dim
-            self.basisRedComp = self.basis
-            self.densityMatrixRed = None
-        else:
-            #particle number bound from above -> dim is that of 1 state more but with particle number conservation
-            self.dimRed = dimOfBasis( self.N , (self.mRed + 1) )
-            self.offsetsRed = basisOffsets( self.N, self.mRed)
-            self.basisRed = np.zeros( (self.dimRed , self.mRed) , dtype = np.int)
-            fillReducedBasis(self.basisRed, self.N, self.mRed, self.offsetsRed)
-            self.dimRedComp = dimOfBasis ( self.N , (self.mRedComp + 1) )
-            self.offsetsRedComp = basisOffsets(self.N, self.mRedComp)
-            self.basisRedComp = np.zeros( (self.dimRedComp , self.mRedComp) , dtype = np.int)
-            fillReducedBasis(self.basisRedComp, self.N, self.mRedComp, self.offsetsRedComp)
-            self.densityMatrixRed = np.zeros( (self.dimRed , self.dimRed) , dtype = self.datType)
-            self.iteratorRed = np.zeros( (0 , 4), dtype = np.int32 )
-            self.initIteratorRed() 
+        
+        self.dim = dimOfBasis(self.N,self.m)  #dimension of basis
+        ###### system variables
+        if not plotOnly:
+            self.datType = dtType
+            self.basis = np.zeros( (self.dim , self.m) , dtype = np.int)
+            fillBasis(self.basis, self.N, self.m)
+            self.basisDict = basis2dict(self.basis, self.dim)
+            #note that there is an additional dimension there! needed for fast multiplication algorithm
+            self.state = np.zeros( (self.dim,1) , dtype = self.datType)
+            # parameter for storing in file
+            self.stateNorm = 0
+            self.stateNormAbs = 0
+            self.stateNormCheck = 1e1 #check if norm has been supressed too much
+            self.densityMatrix = [] #do not initialize yet - it wait until hamiltonian decomposition has been done for memory efficiency 
+            self.densityMatrixInd = False
+            self.entropy = 0
+            self.energy = 0
+            self.operators = quadraticArray(self)
+            self.occNo = np.zeros(self.m,dtype=np.float64)
+            # hamiltonian - initialized with zeros (note - datatype is not! complex)
+            self.hamiltonian = coo_matrix(np.zeros((self.dim,self.dim)),shape=(self.dim,self.dim),dtype=np.float64).tocsr()
+            # matrix for time evolution - initially empty
+            self.evolutionMatrix = None
+            # eigenvalue and vectors
+            self.eigVals = []
+            self.eigVects = []
+            self.eigInd = False
+            # iteration step
+            self.evolStep = 0
+            self.evolStepTmp = 0
+            self.evolTime = 0
+            self.tavg = 0    #needed for estimation of remaining time
+            self.dmcount = 0 #needed for numbering of density matrix files
+            ###### variables for the partial trace algorithm
+            self.mRed = self.m - len(self.kRed)
+            self.mRedComp = len(self.kRed)
+            self.entropyRed = 0
+    
+            if self.mRedComp == 0:
+                self.dimRed = 0
+                self.offsetsRed = None
+                self.basisRed = None
+                self.dimRedComp = self.dim
+                self.offsetsRedComp = np.zeros( (self.N+2), dtype=np.int32)
+                self.offsetsRedComp[-1] = self.dim
+                self.basisRedComp = self.basis
+                self.densityMatrixRed = None
+            else:
+                #particle number bound from above -> dim is that of 1 state more but with particle number conservation
+                self.dimRed = dimOfBasis( self.N , (self.mRed + 1) )
+                self.offsetsRed = basisOffsets( self.N, self.mRed)
+                self.basisRed = np.zeros( (self.dimRed , self.mRed) , dtype = np.int)
+                fillReducedBasis(self.basisRed, self.N, self.mRed, self.offsetsRed)
+                self.dimRedComp = dimOfBasis ( self.N , (self.mRedComp + 1) )
+                self.offsetsRedComp = basisOffsets(self.N, self.mRedComp)
+                self.basisRedComp = np.zeros( (self.dimRedComp , self.mRedComp) , dtype = np.int)
+                fillReducedBasis(self.basisRedComp, self.N, self.mRedComp, self.offsetsRedComp)
+                self.densityMatrixRed = np.zeros( (self.dimRed , self.dimRed) , dtype = self.datType)
+                self.iteratorRed = np.zeros( (0 , 4), dtype = np.int32 )
+                self.initIteratorRed() 
     #end of init
     
     ###### reading from config file
@@ -216,15 +217,22 @@ class mpSystem:
     #end of timeStep
     
     # approximate gaussian distribution in energy space
-    def stateEnergy(self,muperc=50,sigma=1):
+    def stateEnergy(self,muperc=50,sigma=1,altSign=False,skip=0):
         if self.eigInd == False:
             self.updateEigenenergies()
         
+        skipCount = 0
+        signPref = 1
+        signInt = 1 - int(altSign)*2
         self.state.fill(0)
         mu = self.eigVals[0] + (muperc/100)*(self.eigVals[-1] - self.eigVals[0])
         for i in range(0,self.dim):
-            self.state[:,0] += gaussian(self.eigVals[i],mu,sigma,norm=True) * self.eigVects[:,i]
-        
+            if skipCount == 0:
+                self.state[:,0] += signPref * gaussian(self.eigVals[i],mu,sigma,norm=True) * self.eigVects[:,i]
+                signPref *= signInt
+                skipCount = skip+1 
+            skipCount -= 1
+            
         self.normalize(True)
     
     def normalize(self,initial=False):
@@ -274,8 +282,31 @@ class mpSystem:
         tfil = open('./data/hamiltonian_eigvals.txt','w')  
         for i in range(0,self.dim):
             tmp = np.dot(self.eigVects[:,i],self.state[:,0])                  
-            tfil.write('%i %.16e %.16e \n' % (i, self.eigVals[i], np.real((tmp * np.conjugate(tmp))) ))
+            tmpAbsSq = np.abs(tmp)**2
+            if tmpAbsSq != 0:
+                tmpPhase = np.angle(tmp)/(2 * np.pi) #angle in complex plane in units of two pi
+            else:
+                tmpPhase = 0
+            #occupation numbers of the eigenvalues
+            tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq , tmpPhase ))
+            for j in range(0,self.m):
+                tfil.write('%.16e ' % np.real( np.einsum('i,ii->', np.abs(self.eigVects[:,i])**2, self.operators[j,j].toarray()) ) )
+            tfil.write('\n')
         tfil.close()   
+        
+        sfil = open('./data/state.txt','w')
+        for i in range(0,self.dim):               
+            tmpAbsSq = np.abs(self.state[i,0])**2
+            if tmpAbsSq != 0:
+                tmpPhase = np.angle(self.state[i,0])/(2 * np.pi) #angle in complex plane in units of two pi
+            else:
+                tmpPhase = 0
+            #occupation numbers of the eigenvalues
+            sfil.write('%i %.16e %.16e ' % (i, tmpAbsSq , tmpPhase))
+            for j in range(0,self.m):
+                sfil.write('%i ' % self.basis[i,j] )
+            sfil.write('\n')
+        sfil.close()
         
         #free the memory
         del self.eigVals
