@@ -1,5 +1,20 @@
 change log
 
+### 09.03.2017
+- added energy-space plot of occupation number operators (remove in the future, is just a temporary feature)
+
+### 08.03.2017
+- added skewness option to gaussian distribution
+- added diagonal representation check (see ETH wiki article)
+
+### 07.03.2017
+- y-axis for new plots is no longer offending the reader but still not finished
+- added plt.tight_layout to the plotting
+- removed end-gap in new plots
+- added comparison to microcanonical expectation value
+- added rectangular distribution option for energy space
+- added differently weighted amplitudes for many overlapping distributions in energy space
+
 ### 03.03.2017
 - changed plotting only to a faster version where NO matrices and bases are created
 - changed "preparations finished after" to minute and second instead of second

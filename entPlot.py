@@ -6,6 +6,11 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
+#searches for closest to value element in array
+def find_nearest(array,value):
+    i = (np.abs(array-value)).argmin()
+    return int(i)
+
 #This is a workaround until scipy fixes the issue
 import warnings
 warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
@@ -15,6 +20,8 @@ def plotData(sysVar):
     
     avgstyle = 'dashed'
     avgsize = 0.6
+    expectstyle = 'solid'
+    expectsize = 1
     
     fwidth = sysVar.plotSavgolFrame
     ford = sysVar.plotSavgolOrder
@@ -55,6 +62,12 @@ def plotData(sysVar):
         en_array = np.loadtxt(energyfile)
         en0 = en_array[0,1]
         en_array[:,1] -= en0
+        #en_micind = find_nearest(engies[:,1], en0)
+        #print(' - |(E0 - Emicro)/E0|: %.0e - ' % (np.abs((en0 - engies[en_micind,1])/en0)), end='' )
+    
+    if sysVar.boolPlotAverages:
+        microexpfile = './data/diagexpect.txt'
+        microexp = np.loadtxt(microexpfile)
     
     #### Complete system Entropy
     if(sysVar.boolTotalEnt):
@@ -63,6 +76,7 @@ def plotData(sysVar):
         plt.grid()
         plt.xlabel(r'$J\,t$')
         plt.ylabel(r'Total system entropy $/ 10^{-13}$')
+        plt.tight_layout()
         ###
         pp.savefig()
         plt.clf()
@@ -75,6 +89,7 @@ def plotData(sysVar):
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     plt.xlabel(r'$J\,t$')
     plt.ylabel('Subsystem entropy')
+    plt.tight_layout()
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
@@ -84,11 +99,13 @@ def plotData(sysVar):
         if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth =avgsize, linestyle=avgstyle, color = 'black')
+            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = avgstyle)
     
     plt.ylabel(r'Occupation number')
     plt.xlabel(r'$J\,t$')
     plt.legend(loc='upper right')
     plt.grid()
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -97,6 +114,7 @@ def plotData(sysVar):
     for i in sysVar.kRed:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
         if sysVar.boolPlotAverages:
+            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = avgstyle)
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
@@ -104,6 +122,7 @@ def plotData(sysVar):
     plt.xlabel(r'$J\,t$')
     plt.legend(loc='lower right')
     plt.grid()
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -112,6 +131,7 @@ def plotData(sysVar):
     for i in np.arange(sysVar.m)[sysVar.mask]:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
         if sysVar.boolPlotAverages:
+            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = avgstyle)
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
@@ -119,6 +139,7 @@ def plotData(sysVar):
     plt.xlabel(r'$J\,t$')
     plt.legend(loc='lower right')
     plt.grid()
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -134,6 +155,10 @@ def plotData(sysVar):
     tavg = savgol_filter(tmp,fwidth,ford)
     if sysVar.boolPlotAverages:
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+        mictmp = 0
+        for i in sysVar.kRed:
+            mictmp += microexp[i,1]
+        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = avgstyle)
     avg = np.mean(tmp[100:],dtype=np.float64)
     stddev = np.std(tmp[100:],dtype=np.float64)
     fldat.write('bath average: %.16e\n' % avg)
@@ -147,6 +172,10 @@ def plotData(sysVar):
 
     tavg = savgol_filter(tmp,fwidth,ford)
     if sysVar.boolPlotAverages:
+        mictmp = 0
+        for i in np.arange(sysVar.m)[sysVar.mask]:
+            mictmp += microexp[i,1]
+        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = avgstyle)
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     avg = np.mean(tmp[100:],dtype=np.float64)
@@ -160,6 +189,7 @@ def plotData(sysVar):
     plt.xlabel(r'$J\,t$')
     plt.legend(loc='center right')
     plt.grid()
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -171,6 +201,7 @@ def plotData(sysVar):
         plt.ylabel(r'$E_{tot} - E_0 / 10^{-10}$')
         plt.xlabel(r'$J\,t$')
         plt.grid()
+        plt.tight_layout()
         ###
         pp.savefig()
         plt.clf()
@@ -180,6 +211,7 @@ def plotData(sysVar):
     plt.ylabel('norm deviation from 1')
     plt.xlabel(r'$J\,t$')
     plt.grid(False)
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -191,6 +223,7 @@ def plotData(sysVar):
     plt.ylabel('correction factor - 1')
     plt.xlabel(r'$J\,t$')
     plt.grid()
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -201,6 +234,7 @@ def plotData(sysVar):
     plt.xlabel(r'\#')
     plt.grid(False)
     plt.xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -215,6 +249,7 @@ def plotData(sysVar):
     ax2.set_ylabel(r'$|c_n|^2$')
     plt.grid(False)
     ax1.set_xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -225,17 +260,19 @@ def plotData(sysVar):
     plt.ylabel(r'$|c_n|^2$')
     plt.grid(False)
     plt.xlim(xmin=-( np.abs(engies[0,1] - engies[-1,1]) * (5.0/100) ))
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
     ### Eigenvalue decomposition en detail
     n_rows = 3 #abs**2, phase/2pi, energy on a range from 0 to 1 
-    n_rows += sysVar.m #occupation numbers
     n_rows += 1 #spacer
+    n_rows += sysVar.m #occupation numbers
     
     index = np.arange(sysVar.dim)
     bar_width = 1
+    plt.xlim(0,sysVar.dim)
 
     # Initialize the vertical-offset for the stacked bar chart.
     y_offset = np.array([0.0] * sysVar.dim)
@@ -246,30 +283,32 @@ def plotData(sysVar):
     plt.ylim(0,n_rows)
     plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar((engies[:,1]-engies[0,1])/enInt), linewidth=0.005, edgecolor='gray')
     y_offset = y_offset + spacing
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,2]/np.amax(engies[:,2]) - 1e-16), linewidth=0.005, edgecolor='gray')
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,2]/np.amax(engies[:,2]) - 1e-16), linewidth=0.00, edgecolor='gray')
     y_offset = y_offset + spacing
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,3] - 1e-16), linewidth=0.01, edgecolor='gray')
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,3] - 1e-16), linewidth=0.00, edgecolor='gray')
     y_offset = y_offset + spacing
     
     plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
     y_offset = y_offset + np.array([1] * sysVar.dim)
     
     for row in range(4, n_rows):
-        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,row]/sysVar.N - 1e-16), linewidth=0.005, edgecolor='gray')
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,row]/sysVar.N - 1e-16), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
     
-    plt.ylabel("shit")
+    plt.ylabel("tba")
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
     ### Occupation number basis decomposition en detail
     n_rows = 2 #abs**2, phase/2pi
-    n_rows += sysVar.m #occupation numbers
     n_rows += 1 #spacer
+    n_rows += sysVar.m #occupation numbers
     
     index = np.arange(sysVar.dim)
     bar_width = 1
+    plt.xlim(0,sysVar.dim)
 
     # Initialize the vertical-offset for the stacked bar chart.
     y_offset = np.array([0.0] * sysVar.dim)
@@ -277,19 +316,20 @@ def plotData(sysVar):
     cmapVar = plt.cm.OrRd
     cmapVar.set_under(color='black')    
     plt.ylim(0,n_rows)
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,1]/np.amax(stfacts[:,1]) - 1e-16), linewidth=0.005, edgecolor='gray')
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,1]/np.amax(stfacts[:,1]) - 1e-16), linewidth=0.00, edgecolor='gray')
     y_offset = y_offset + spacing
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,2] - 1e-16), linewidth=0.01, edgecolor='gray')
+    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,2] - 1e-16), linewidth=0.00, edgecolor='gray')
     y_offset = y_offset + spacing
     
     plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
     y_offset = y_offset + np.array([1] * sysVar.dim)
     
     for row in range(3, n_rows):
-        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,row]/sysVar.N - 1e-16), linewidth=0.005, edgecolor='gray')
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,row]/sysVar.N - 1e-16), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
     
-    plt.ylabel("shit")
+    plt.ylabel("tba")
+    plt.tight_layout()
     ###
     pp.savefig()
     plt.clf()
@@ -381,6 +421,33 @@ def plotHamiltonian():
     plt.colorbar() 
     pp.savefig()
     
+    pp.close()
+    plt.close()
+    print(" done!")
+
+def plotOccs(sysVar):     
+    print("Plotting occupations to pdf.",end='',flush=True)
+    pp = PdfPages('./plots/occs.pdf')
+    params={
+        'mathtext.default' : 'rm' # see http://matplotlib.org/users/customizing.html
+    }
+    plt.rcParams['agg.path.chunksize']=0
+    plt.rcParams.update(params)
+    plt.rc('text', usetex=True)
+    plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
+    plt.figure(num=None, figsize=(10, 10), dpi=300)
+    for i in range(0,sysVar.m):
+        plt.title(r'$n_'+str(i)+'$')
+        dre = np.loadtxt('./data/occ'+str(i)+'_re.txt')
+        plt.xlabel('column')
+        plt.ylabel('row')
+        cmapVar = plt.cm.seismic
+        plt.imshow(dre, cmap=cmapVar, interpolation='none',vmin=-10,vmax=10)   
+        cb=plt.colorbar()     
+        pp.savefig()
+        cb.remove()
+        plt.clf
+
     pp.close()
     plt.close()
     print(" done!")

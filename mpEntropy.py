@@ -6,6 +6,7 @@ import shutil
 from scipy.special import binom
 from scipy.sparse import coo_matrix,csr_matrix
 from scipy.sparse import identity as spidentity
+from scipy.special import erf
 import scipy.linalg as la
 from numpy import einsum as npeinsum
 import time as tm
@@ -217,21 +218,39 @@ class mpSystem:
     #end of timeStep
     
     # approximate gaussian distribution in energy space
-    def stateEnergy(self,muperc=50,sigma=1,altSign=False,skip=0):
+    def stateEnergy(self,muperc=50,sigma=1,altSign=False,skip=0,dist='std',muoff=[0],peakamps=[1],skew=0):
         if self.eigInd == False:
             self.updateEigenenergies()
         
+        if len(muoff) != len(peakamps):
+            peakamps = [1]*len(muoff)
+        
+        if dist == 'std':
+            dind = 1
+        elif dist == 'rect':
+            dind = 2
+        else:
+            dind = 1
+            
         skipCount = 0
         signPref = 1
         signInt = 1 - int(altSign)*2
         self.state.fill(0)
-        mu = self.eigVals[0] + (muperc/100)*(self.eigVals[-1] - self.eigVals[0])
-        for i in range(0,self.dim):
-            if skipCount == 0:
-                self.state[:,0] += signPref * gaussian(self.eigVals[i],mu,sigma,norm=True) * self.eigVects[:,i]
-                signPref *= signInt
-                skipCount = skip+1 
-            skipCount -= 1
+        
+        for j in range(0,len(muoff)):
+            skipCount = 0
+            signPref = peakamps[j]
+            #mu is given in percent so get mu in energy space - also offsets are taken into account
+            mu = self.eigVals[0] + ((muperc+muoff[j])/100)*(self.eigVals[-1] - self.eigVals[0])
+            for i in range(0,self.dim):
+                if skipCount == 0:
+                    if dind == 1:
+                        self.state[:,0] += signPref * gaussian(self.eigVals[i],mu,sigma,norm=True,skw = skew) * self.eigVects[:,i]
+                    elif dind == 2:
+                        self.state[:,0] += signPref * rect(self.eigVals[i],mu,sigma,norm=True) * self.eigVects[:,i]
+                    signPref *= signInt
+                    skipCount = skip+1 
+                skipCount -= 1
             
         self.normalize(True)
     
@@ -278,35 +297,50 @@ class mpSystem:
     def updateEigendecomposition(self):
         if self.eigInd == False:
             self.updateEigenenergies()
-               
+        
+        #decomposition in energy space       
         tfil = open('./data/hamiltonian_eigvals.txt','w')  
+        tmpAbsSq = np.zeros(self.dim)
         for i in range(0,self.dim):
             tmp = np.dot(self.eigVects[:,i],self.state[:,0])                  
-            tmpAbsSq = np.abs(tmp)**2
-            if tmpAbsSq != 0:
+            tmpAbsSq[i] = np.abs(tmp)**2
+            if tmpAbsSq[i] != 0:
                 tmpPhase = np.angle(tmp)/(2 * np.pi) #angle in complex plane in units of two pi
             else:
                 tmpPhase = 0
             #occupation numbers of the eigenvalues
-            tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq , tmpPhase ))
+            tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i] , tmpPhase ))
             for j in range(0,self.m):
                 tfil.write('%.16e ' % np.real( np.einsum('i,ii->', np.abs(self.eigVects[:,i])**2, self.operators[j,j].toarray()) ) )
             tfil.write('\n')
         tfil.close()   
         
+        #decomposition in fock space
         sfil = open('./data/state.txt','w')
         for i in range(0,self.dim):               
-            tmpAbsSq = np.abs(self.state[i,0])**2
-            if tmpAbsSq != 0:
+            tmpAbsSqFck = np.abs(self.state[i,0])**2
+            if tmpAbsSqFck != 0:
                 tmpPhase = np.angle(self.state[i,0])/(2 * np.pi) #angle in complex plane in units of two pi
             else:
                 tmpPhase = 0
             #occupation numbers of the eigenvalues
-            sfil.write('%i %.16e %.16e ' % (i, tmpAbsSq , tmpPhase))
+            sfil.write('%i %.16e %.16e ' % (i, tmpAbsSqFck , tmpPhase))
             for j in range(0,self.m):
                 sfil.write('%i ' % self.basis[i,j] )
             sfil.write('\n')
         sfil.close()
+        
+        eivectinv = la.inv(np.matrix(self.eigVects.T))
+        
+        #expectation values in diagonal representation (ETH)
+        ethfil = open('./data/diagexpect.txt','w')
+        for i in range(0,self.m):
+            tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i,i].toarray(), eivectinv)
+            ethfil.write('%i %.16e \n' % (i,tmpocc))
+        ethfil.close()
+        
+        for i in range(0,self.m):
+            storeMatrix(np.einsum('lj,jk,km -> lm',self.eigVects.T, self.operators[i,i].toarray(), eivectinv), './data/occ'+str(i)+'.txt', absOnly=0, stre=True, stim=False, stabs=False)
         
         #free the memory
         del self.eigVals
@@ -479,7 +513,8 @@ class mpSystem:
             self.plotDMRedAnimation(self.dmFilesStepSize)
         if self.boolClear:
             prepFolders(True)
-            
+        ep.plotOccs(self)
+        
     def clearDensityData(self):
         prepFolders(True)
     
@@ -530,10 +565,24 @@ def fillBasis(basis,N,m,offset=0):
         basis[offset,0] = int(N)
     #end
 
-def gaussian(x,mu,sigm,norm=1):
+#https://en.wikipedia.org/wiki/Skew_normal_distribution
+def gaussian(x,mu,sigm=1,norm=1,skw=0):
     tmp = np.exp(-(x-mu)**2 / (2 * sigm**2))
     if norm:
         tmp /= np.sqrt(2 * np.pi * sigm**2)
+    if skw != 0:
+        tmp *= (1 + erf( skw * (x - mu) / (sigm * sqrt(2)) ))
+    return tmp
+
+# mu=(a+b)/2 and sigma^2 = (b-a)^2 / 12 so a=mu-sqrt(3)*sigma and b=mu-sqrt(3)*sigma
+def rect(x,mu,sigm=1,norm=1):
+    if np.abs(x - mu) <= sqrt(3) * sigm:
+        tmp = 1
+    else:
+        tmp = 0
+        
+    if norm:
+        tmp /= 2*sqrt(3)*sigm 
     return tmp
 
 def basisOffsets(N,m):
@@ -650,24 +699,38 @@ def time_elapsed(t0,divider,decimals=0):
         return str(round(t_sec,decimals)) + "s"
 
 #stores the matrix of dimension sysvar[2] in a file
-def storeMatrix(mat,fil,absOnly=0):
+def storeMatrix(mat,fil,absOnly=0,stre=True,stim=True,stabs=True):
     matDim = np.shape(mat)[0]
     if absOnly == 0:
-        f = open(fil,'w')
         #assume dot + 3 letter ending e.g. .txt
         fname = fil[:-4]
         fend = fil[-4:]
-        fimag = open(fname + '_im' + fend,'w')
-        freal = open(fname + '_re' + fend,'w')
+        if stabs:
+            f = open(fil,'w')
+        if stim:
+            fimag = open(fname + '_im' + fend,'w')
+        if stre:
+            freal = open(fname + '_re' + fend,'w')
         for n in range(0,matDim):
             for nn in range(0,matDim-1):
-                f.write('%.16e ' % np.abs(mat[(n,nn)]))
-                fimag.write('%.16e ' % np.imag(mat[(n,nn)]))
-                freal.write('%.16e ' % np.real(mat[(n,nn)]))
-            f.write('%.16e\n' % np.abs(mat[(n,matDim-1)]))
-            fimag.write('%.16e\n' % np.imag(mat[(n,matDim-1)]))
-            freal.write('%.16e\n' % np.real(mat[(n,matDim-1)]))
-        f.close()
+                if stabs:
+                    f.write('%.16e ' % np.abs(mat[(n,nn)]))
+                if stim:
+                    fimag.write('%.16e ' % np.imag(mat[(n,nn)]))
+                if stre:
+                    freal.write('%.16e ' % np.real(mat[(n,nn)]))
+            if stabs:
+                f.write('%.16e\n' % np.abs(mat[(n,matDim-1)]))
+            if stim:
+                fimag.write('%.16e\n' % np.imag(mat[(n,matDim-1)]))
+            if stre:
+                freal.write('%.16e\n' % np.real(mat[(n,matDim-1)]))
+        if stabs:
+            f.close()
+        if stim:
+            fimag.close()
+        if stre:
+            freal.close()
     else:
         f = open(fil,'w')
         #assume dot + 3 letter ending e.g. .txt
@@ -675,4 +738,5 @@ def storeMatrix(mat,fil,absOnly=0):
             for nn in range(0,matDim-1):
                 f.write('%.16e ' % np.abs(mat[(n,nn)]))
             f.write('%.16e\n' % np.abs(mat[(n,matDim-1)]))
-        f.close()   
+        f.close()  
+        

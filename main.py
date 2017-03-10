@@ -80,7 +80,7 @@ for el in initstates:
     sysVar.state[tmp, 0] = el[1]
 sysVar.normalize(True)
 '''
-sysVar.stateEnergy(muperc=20,sigma=5,altSign=True,skip=0)
+sysVar.stateEnergy(muperc=30,sigma=50,altSign=True,skip=0,dist='std',muoff=[0],peakamps=[1],skew=10)
 print("Preparations finished after " + time_elapsed(t0,60,0) + " \n")
 
 sysVar.evolve()
