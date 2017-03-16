@@ -70,7 +70,7 @@ for i in range(0, sysVar.m):
 print('The Hamiltonian has been written!')
 
 sysVar.initEvolutionMatrix(3)
-'''
+
 #initially occupied states with relative weight (entanglement of starting state):
 initstates = [[(sysVar.N,0,0,0),1]]
 
@@ -79,8 +79,8 @@ for el in initstates:
     tmp = sysVar.basisDict[el[0]]
     sysVar.state[tmp, 0] = el[1]
 sysVar.normalize(True)
-'''
-sysVar.stateEnergy(muperc=30,sigma=50,altSign=True,skip=0,dist='std',muoff=[0],peakamps=[1],skew=10)
+
+#sysVar.stateEnergy(muperc=30,sigma=50,altSign=True,skip=0,dist='std',muoff=[0],peakamps=[1],skew=10)
 print("Preparations finished after " + time_elapsed(t0,60,0) + " \n")
 
 sysVar.evolve()

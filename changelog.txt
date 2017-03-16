@@ -1,7 +1,13 @@
 change log
 
+### 16.03.2017
+- added options for eigenvalue decomposition and plotting - still axis not labeled right!
+- added fluctuation calculation for all levels and subsystem-entropy! also added N_tot additionally
+- fixed microcanonical expectation values using average linestyle instead of expectation linestyle
+
 ### 09.03.2017
 - added energy-space plot of occupation number operators (remove in the future, is just a temporary feature)
+- added rectangular distribution
 
 ### 08.03.2017
 - added skewness option to gaussian distribution

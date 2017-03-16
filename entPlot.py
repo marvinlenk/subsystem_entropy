@@ -23,6 +23,8 @@ def plotData(sysVar):
     expectstyle = 'solid'
     expectsize = 1
     
+    loavgind = 100 #index to start at when calculating average and stddev
+    
     fwidth = sysVar.plotSavgolFrame
     ford = sysVar.plotSavgolOrder
     params={
@@ -99,7 +101,7 @@ def plotData(sysVar):
         if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth =avgsize, linestyle=avgstyle, color = 'black')
-            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = avgstyle)
+            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
     
     plt.ylabel(r'Occupation number')
     plt.xlabel(r'$J\,t$')
@@ -114,7 +116,7 @@ def plotData(sysVar):
     for i in sysVar.kRed:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
         if sysVar.boolPlotAverages:
-            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = avgstyle)
+            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
@@ -131,7 +133,7 @@ def plotData(sysVar):
     for i in np.arange(sysVar.m)[sysVar.mask]:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
         if sysVar.boolPlotAverages:
-            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = avgstyle)
+            plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
@@ -147,6 +149,7 @@ def plotData(sysVar):
     ### Subsystems occupation numbers
     #store fluctuations in a data
     fldat = open('./data/fluctuation.txt','w')
+    fldat.write('N_tot: %i\n' % (sysVar.N))
     tmp = np.zeros(len(step_array))
     for i in sysVar.kRed:
         tmp += occ_array[:,i+1]
@@ -158,12 +161,12 @@ def plotData(sysVar):
         mictmp = 0
         for i in sysVar.kRed:
             mictmp += microexp[i,1]
-        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = avgstyle)
-    avg = np.mean(tmp[100:],dtype=np.float64)
-    stddev = np.std(tmp[100:],dtype=np.float64)
-    fldat.write('bath average: %.16e\n' % avg)
-    fldat.write('bath stddev: %.16e\n' % stddev)
-    fldat.write('bath rel. fluctuation: %.16e\n' % (stddev/avg))
+        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = expectstyle)
+    avg = np.mean(tmp[loavgind:],dtype=np.float64)
+    stddev = np.std(tmp[loavgind:],dtype=np.float64)
+    fldat.write('bath_average: %.16e\n' % avg)
+    fldat.write('bath_stddev: %.16e\n' % stddev)
+    fldat.write('bath_rel._fluctuation: %.16e\n' % (stddev/avg))
     
     tmp.fill(0)
     for i in np.arange(sysVar.m)[sysVar.mask]:
@@ -175,14 +178,30 @@ def plotData(sysVar):
         mictmp = 0
         for i in np.arange(sysVar.m)[sysVar.mask]:
             mictmp += microexp[i,1]
-        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = avgstyle)
+        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = expectstyle)
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
-    avg = np.mean(tmp[100:],dtype=np.float64)
-    stddev = np.std(tmp[100:],dtype=np.float64)
-    fldat.write('system average: %.16e\n' % avg)
-    fldat.write('system stddev: %.16e\n' % stddev)
-    fldat.write('system rel. fluctuation: %.16e\n' % (stddev/avg))
+    avg = np.mean(tmp[loavgind:],dtype=np.float64)
+    stddev = np.std(tmp[loavgind:],dtype=np.float64)
+    fldat.write('system_average: %.16e\n' % avg)
+    fldat.write('system_stddev: %.16e\n' % stddev)
+    fldat.write('system_rel._fluctuation: %.16e\n' % (stddev/avg))
+    
+    for i in range(sysVar.m):
+        avg = np.mean(occ_array[loavgind:,i+1],dtype=np.float64)
+        stddev = np.std(occ_array[loavgind:,i+1],dtype=np.float64)
+        fldat.write('n%i_average: %.16e\n' % (i,avg))
+        fldat.write('n%i_stddev: %.16e\n' % (i,stddev))
+        fldat.write('n%i_rel._fluctuation: %.16e\n' % (i,(stddev/avg)))
+    
+    avg = np.mean(ent_array[loavgind:,1],dtype=np.float64)
+    stddev = np.std(ent_array[loavgind:,1],dtype=np.float64)
+    fldat.write('ssentropy_average: %.16e\n' % avg)
+    fldat.write('ssentropy_stddev: %.16e\n' % stddev)
+    fldat.write('ssentropy_rel._fluctuation: %.16e\n' % (stddev/avg))
+    
+    
+    
     fldat.close()
     
     plt.ylabel(r'Occupation number')
@@ -239,102 +258,102 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
-    ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
-    fig, ax1 = plt.subplots()
-    ax1.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
-    ax1.set_ylabel(r'Energy')
-    ax1.set_xlabel(r'\#')
-    ax2 = ax1.twinx()
-    ax2.bar(engies[:,0], engies[:,2], alpha=0.15,color='red',width=0.01,align='center')
-    ax2.set_ylabel(r'$|c_n|^2$')
-    plt.grid(False)
-    ax1.set_xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.',end='',flush=True)
-    ### Eigenvalue decomposition with energy x-axis
-    plt.bar(engies[:,1], engies[:,2], alpha=0.5,color='red',width=0.01,align='center')
-    plt.xlabel(r'Energy')
-    plt.ylabel(r'$|c_n|^2$')
-    plt.grid(False)
-    plt.xlim(xmin=-( np.abs(engies[0,1] - engies[-1,1]) * (5.0/100) ))
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.',end='',flush=True)
-    ### Eigenvalue decomposition en detail
-    n_rows = 3 #abs**2, phase/2pi, energy on a range from 0 to 1 
-    n_rows += 1 #spacer
-    n_rows += sysVar.m #occupation numbers
+    if sysVar.boolPlotDecomp:
+        ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
+        fig, ax1 = plt.subplots()
+        ax1.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
+        ax1.set_ylabel(r'Energy')
+        ax1.set_xlabel(r'\#')
+        ax2 = ax1.twinx()
+        ax2.bar(engies[:,0], engies[:,2], alpha=0.15,color='red',width=0.01,align='center')
+        ax2.set_ylabel(r'$|c_n|^2$')
+        plt.grid(False)
+        ax1.set_xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
+        ### Eigenvalue decomposition with energy x-axis
+        plt.bar(engies[:,1], engies[:,2], alpha=0.5,color='red',width=0.01,align='center')
+        plt.xlabel(r'Energy')
+        plt.ylabel(r'$|c_n|^2$')
+        plt.grid(False)
+        plt.xlim(xmin=-( np.abs(engies[0,1] - engies[-1,1]) * (5.0/100) ))
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
+        ### Eigenvalue decomposition en detail
+        n_rows = 3 #abs**2, phase/2pi, energy on a range from 0 to 1 
+        n_rows += 1 #spacer
+        n_rows += sysVar.m #occupation numbers
+        
+        index = np.arange(sysVar.dim)
+        bar_width = 1
+        plt.xlim(0,sysVar.dim)
     
-    index = np.arange(sysVar.dim)
-    bar_width = 1
-    plt.xlim(0,sysVar.dim)
-
-    # Initialize the vertical-offset for the stacked bar chart.
-    y_offset = np.array([0.0] * sysVar.dim)
-    spacing = np.array([1] * sysVar.dim)
-    enInt = np.abs(engies[-1,1] - engies[0,1])
-    cmapVar = plt.cm.OrRd
-    cmapVar.set_under(color='black')    
-    plt.ylim(0,n_rows)
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar((engies[:,1]-engies[0,1])/enInt), linewidth=0.005, edgecolor='gray')
-    y_offset = y_offset + spacing
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,2]/np.amax(engies[:,2]) - 1e-16), linewidth=0.00, edgecolor='gray')
-    y_offset = y_offset + spacing
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,3] - 1e-16), linewidth=0.00, edgecolor='gray')
-    y_offset = y_offset + spacing
-    
-    plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
-    y_offset = y_offset + np.array([1] * sysVar.dim)
-    
-    for row in range(4, n_rows):
-        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,row]/sysVar.N - 1e-16), linewidth=0.00, edgecolor='gray')
+        # Initialize the vertical-offset for the stacked bar chart.
+        y_offset = np.array([0.0] * sysVar.dim)
+        spacing = np.array([1] * sysVar.dim)
+        enInt = np.abs(engies[-1,1] - engies[0,1])
+        cmapVar = plt.cm.OrRd
+        cmapVar.set_under(color='black')    
+        plt.ylim(0,n_rows)
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar((engies[:,1]-engies[0,1])/enInt), linewidth=0.005, edgecolor='gray')
         y_offset = y_offset + spacing
-    
-    plt.ylabel("tba")
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.',end='',flush=True)
-    ### Occupation number basis decomposition en detail
-    n_rows = 2 #abs**2, phase/2pi
-    n_rows += 1 #spacer
-    n_rows += sysVar.m #occupation numbers
-    
-    index = np.arange(sysVar.dim)
-    bar_width = 1
-    plt.xlim(0,sysVar.dim)
-
-    # Initialize the vertical-offset for the stacked bar chart.
-    y_offset = np.array([0.0] * sysVar.dim)
-    spacing = np.array([1] * sysVar.dim)
-    cmapVar = plt.cm.OrRd
-    cmapVar.set_under(color='black')    
-    plt.ylim(0,n_rows)
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,1]/np.amax(stfacts[:,1]) - 1e-16), linewidth=0.00, edgecolor='gray')
-    y_offset = y_offset + spacing
-    plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,2] - 1e-16), linewidth=0.00, edgecolor='gray')
-    y_offset = y_offset + spacing
-    
-    plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
-    y_offset = y_offset + np.array([1] * sysVar.dim)
-    
-    for row in range(3, n_rows):
-        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,row]/sysVar.N - 1e-16), linewidth=0.00, edgecolor='gray')
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,2]/np.amax(engies[:,2]) - 1e-16), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,3] - 1e-16), linewidth=0.00, edgecolor='gray')
+        y_offset = y_offset + spacing
+        
+        plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
+        y_offset = y_offset + np.array([1] * sysVar.dim)
+        
+        for row in range(4, n_rows):
+            plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,row]/sysVar.N - 1e-16), linewidth=0.00, edgecolor='gray')
+            y_offset = y_offset + spacing
+        
+        plt.ylabel("tba")
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
+        ### Occupation number basis decomposition en detail
+        n_rows = 2 #abs**2, phase/2pi
+        n_rows += 1 #spacer
+        n_rows += sysVar.m #occupation numbers
+        
+        index = np.arange(sysVar.dim)
+        bar_width = 1
+        plt.xlim(0,sysVar.dim)
     
-    plt.ylabel("tba")
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.',end='',flush=True)
-
+        # Initialize the vertical-offset for the stacked bar chart.
+        y_offset = np.array([0.0] * sysVar.dim)
+        spacing = np.array([1] * sysVar.dim)
+        cmapVar = plt.cm.OrRd
+        cmapVar.set_under(color='black')    
+        plt.ylim(0,n_rows)
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,1]/np.amax(stfacts[:,1]) - 1e-16), linewidth=0.00, edgecolor='gray')
+        y_offset = y_offset + spacing
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,2] - 1e-16), linewidth=0.00, edgecolor='gray')
+        y_offset = y_offset + spacing
+        
+        plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
+        y_offset = y_offset + np.array([1] * sysVar.dim)
+        
+        for row in range(3, n_rows):
+            plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,row]/sysVar.N - 1e-16), linewidth=0.00, edgecolor='gray')
+            y_offset = y_offset + spacing
+        
+        plt.ylabel("tba")
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
     ###
     pp.close()
     print(" done!")
