@@ -67,7 +67,7 @@ def plotData(sysVar):
         #en_micind = find_nearest(engies[:,1], en0)
         #print(' - |(E0 - Emicro)/E0|: %.0e - ' % (np.abs((en0 - engies[en_micind,1])/en0)), end='' )
     
-    if sysVar.boolPlotAverages:
+    if sysVar.boolPlotDiagExp:
         microexpfile = './data/diagexpect.txt'
         microexp = np.loadtxt(microexpfile)
     
@@ -101,6 +101,7 @@ def plotData(sysVar):
         if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth =avgsize, linestyle=avgstyle, color = 'black')
+        if sysVar.boolPlotDiagExp:
             plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
     
     plt.ylabel(r'Occupation number')
@@ -115,8 +116,9 @@ def plotData(sysVar):
     ### Traced out (bath) occupation numbers
     for i in sysVar.kRed:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
-        if sysVar.boolPlotAverages:
+        if sysVar.boolPlotDiagExp:
             plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
+        if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
@@ -132,8 +134,9 @@ def plotData(sysVar):
     ### Leftover (system) occupation numbers
     for i in np.arange(sysVar.m)[sysVar.mask]:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
-        if sysVar.boolPlotAverages:
+        if sysVar.boolPlotDiagExp:
             plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
+        if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
             plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
@@ -156,12 +159,16 @@ def plotData(sysVar):
     plt.plot(step_array,tmp,label="bath", linewidth =0.8, color = 'magenta')
     
     tavg = savgol_filter(tmp,fwidth,ford)
+
     if sysVar.boolPlotAverages:
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
         mictmp = 0
         for i in sysVar.kRed:
             mictmp += microexp[i,1]
+    
+    if sysVar.boolPlotDiagExp:
         plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = expectstyle)
+    
     avg = np.mean(tmp[loavgind:],dtype=np.float64)
     stddev = np.std(tmp[loavgind:],dtype=np.float64)
     fldat.write('bath_average: %.16e\n' % avg)
@@ -178,9 +185,11 @@ def plotData(sysVar):
         mictmp = 0
         for i in np.arange(sysVar.m)[sysVar.mask]:
             mictmp += microexp[i,1]
-        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = expectstyle)
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
+    if sysVar.boolPlotDiagExp:
+        plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = expectstyle)
+        
     avg = np.mean(tmp[loavgind:],dtype=np.float64)
     stddev = np.std(tmp[loavgind:],dtype=np.float64)
     fldat.write('system_average: %.16e\n' % avg)

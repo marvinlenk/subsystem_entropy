@@ -117,6 +117,7 @@ class mpSystem:
         self.boolHamilStore = configParser.getboolean('filemanagement', 'hamilstore')
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
+        self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexpstore')
         # ## calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
         self.boolTotalEnt = configParser.getboolean('calcparams', 'totalentropy')
@@ -129,6 +130,7 @@ class mpSystem:
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'plotdensred')
         self.boolPlotOccEn = configParser.getboolean('plotbools', 'plotoccen')
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'plotdecomp')
+        self.boolPlotDiagExp = configParser.getboolean('plotbools', 'plotdiagexp')
         # ## plotting variables
         self.dmFilesStepSize = configParser.getint('plotvals', 'dmstepsize')
         self.dmFilesFPS = configParser.getint('plotvals', 'dmfps')
@@ -210,7 +212,7 @@ class mpSystem:
         if self.boolHamilStore:
             storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.txt', 1)
             storeMatrix(self.evolutionMatrix, './data/evolutionmatrix.txt', 1)
-            self.evolutionMatrix = npmatrix_power(self.evolutionMatrix, self.evolStepDist)
+        self.evolutionMatrix = npmatrix_power(self.evolutionMatrix, self.evolStepDist)
         
         # Store hamiltonian eigenvalues
         if diagonalize:
@@ -267,8 +269,7 @@ class mpSystem:
         # self.stateNorm = np.real(sqrt(npeinsum('ij,ij->j',self.state,np.conjugate(self.state))))[0]
         if bool(initial) == True:
             self.stateNormAbs = 1
-            if self.boolDecompStore:
-                self.updateEigendecomposition()
+            self.updateEigendecomposition()
         if np.abs(self.stateNormAbs) > self.stateNormCheck:
             if self.stateNormCheck == 1e1:
                 print('\n' + '### WARNING! ### state norm has been normalized by more than the factor 10 now!' + '\n' + 'Check corresponding plot if behavior is expected - indicator for numerical instability!' + '\n')
@@ -302,47 +303,54 @@ class mpSystem:
     def updateEigendecomposition(self):
         if self.eigInd == False:
             self.updateEigenenergies()
-        
-        # decomposition in energy space       
-        tfil = open('./data/hamiltonian_eigvals.txt', 'w')  
-        tmpAbsSq = np.zeros(self.dim)
-        for i in range(0, self.dim):
-            tmp = np.dot(self.eigVects[:, i], self.state[:, 0])                  
-            tmpAbsSq[i] = np.abs(tmp) ** 2
-            if tmpAbsSq[i] != 0:
-                tmpPhase = np.angle(tmp) / (2 * np.pi)  # angle in complex plane in units of two pi
-            else:
-                tmpPhase = 0
-            # occupation numbers of the eigenvalues
-            tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i] , tmpPhase))
-            for j in range(0, self.m):
-                tfil.write('%.16e ' % np.real(np.einsum('i,ii->', np.abs(self.eigVects[:, i]) ** 2, self.operators[j, j].toarray())))
-            tfil.write('\n')
-        tfil.close()   
-        
-        # decomposition in fock space
-        sfil = open('./data/state.txt', 'w')
-        for i in range(0, self.dim):               
-            tmpAbsSqFck = np.abs(self.state[i, 0]) ** 2
-            if tmpAbsSqFck != 0:
-                tmpPhase = np.angle(self.state[i, 0]) / (2 * np.pi)  # angle in complex plane in units of two pi
-            else:
-                tmpPhase = 0
-            # occupation numbers of the eigenvalues
-            sfil.write('%i %.16e %.16e ' % (i, tmpAbsSqFck , tmpPhase))
-            for j in range(0, self.m):
-                sfil.write('%i ' % self.basis[i, j])
-            sfil.write('\n')
-        sfil.close()
+            
+        if self.boolDecompStore:
+            # decomposition in energy space       
+            tfil = open('./data/hamiltonian_eigvals.txt', 'w')  
+            tmpAbsSq = np.zeros(self.dim)
+            for i in range(0, self.dim):
+                tmp = np.dot(self.eigVects[:, i], self.state[:, 0])                  
+                tmpAbsSq[i] = np.abs(tmp) ** 2
+                if tmpAbsSq[i] != 0:
+                    tmpPhase = np.angle(tmp) / (2 * np.pi)  # angle in complex plane in units of two pi
+                else:
+                    tmpPhase = 0
+                # occupation numbers of the eigenvalues
+                tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i] , tmpPhase))
+                for j in range(0, self.m):
+                    tfil.write('%.16e ' % np.real(np.einsum('i,ii->', np.abs(self.eigVects[:, i]) ** 2, self.operators[j, j].toarray())))
+                tfil.write('\n')
+            tfil.close()   
+            
+            # decomposition in fock space
+            sfil = open('./data/state.txt', 'w')
+            for i in range(0, self.dim):               
+                tmpAbsSqFck = np.abs(self.state[i, 0]) ** 2
+                if tmpAbsSqFck != 0:
+                    tmpPhase = np.angle(self.state[i, 0]) / (2 * np.pi)  # angle in complex plane in units of two pi
+                else:
+                    tmpPhase = 0
+                # occupation numbers of the eigenvalues
+                sfil.write('%i %.16e %.16e ' % (i, tmpAbsSqFck , tmpPhase))
+                for j in range(0, self.m):
+                    sfil.write('%i ' % self.basis[i, j])
+                sfil.write('\n')
+            sfil.close()
         
         eivectinv = la.inv(np.matrix(self.eigVects.T))
         
         # expectation values in diagonal representation (ETH)
-        ethfil = open('./data/diagexpect.txt', 'w')
-        for i in range(0, self.m):
-            tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
-            ethfil.write('%i %.16e \n' % (i, tmpocc))
-        ethfil.close()
+        if self.boolDiagExpStore:
+            if not self.boolDecompStore:
+                tmpAbsSq = np.zeros(self.dim)
+                for i in range(0, self.dim):
+                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0])                  
+                    tmpAbsSq[i] = np.abs(tmp) ** 2
+            ethfil = open('./data/diagexpect.txt', 'w')
+            for i in range(0, self.m):
+                tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
+                ethfil.write('%i %.16e \n' % (i, tmpocc))
+            ethfil.close()
         
         if self.boolOccEnStore:
             for i in range(0, self.m):

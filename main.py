@@ -72,7 +72,7 @@ print('The Hamiltonian has been written!')
 sysVar.initEvolutionMatrix(3)
 
 #initially occupied states with relative weight (entanglement of starting state):
-initstates = [[(sysVar.N,0,0,0),1]]
+initstates = [[(sysVar.N,0,0,0,0),1]]
 
 #start with all particles in 0th state
 for el in initstates:
