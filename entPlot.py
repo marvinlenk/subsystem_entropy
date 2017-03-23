@@ -480,3 +480,63 @@ def plotOccs(sysVar):
     plt.close()
     print(" done!")
     
+def plotTimescale(sysVar):     
+    print("Plotting difference to mean.",end='',flush=True)
+    pp = PdfPages('./plots/lndiff.pdf')
+    params={
+        'mathtext.default' : 'rm' # see http://matplotlib.org/users/customizing.html
+    }
+    plt.rcParams['agg.path.chunksize']=0
+    plt.rcParams.update(params)
+    plt.rc('text', usetex=True)
+    plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
+    
+    loavgind = 100
+    
+    occfile = './data/occupation.txt'
+    occ_array = np.loadtxt(occfile)
+    #multiply step array with time scale
+    step_array = occ_array[:,0] * sysVar.plotTimeScale
+    
+    entfile = './data/entropy.txt'
+    ent_array = np.loadtxt(entfile)
+    
+    occavg = []
+    for i in range(0,sysVar.m):
+        occavg.append(np.mean(occ_array[loavgind:,i+1],dtype=np.float64))
+    
+    entavg = np.mean(ent_array[loavgind:,1],dtype=np.float64)
+    
+    odiff = []
+    for i in range(0,sysVar.m):
+        odiff.append(occ_array[:,i+1] - occavg[i])
+    
+    entdiff = ent_array[:,1] - entavg
+    
+    for i in range(0,sysVar.m):
+        plt.ylabel(r'$\Delta n_%i$' % (i))
+        plt.xlabel(r'$J\,t$')
+        plt.plot(occ_array[:,0], odiff[i])
+        pp.savefig()
+        plt.clf()
+        plt.ylabel(r'$\log | \Delta n_%i |$' % (i))
+        plt.xlabel(r'$J\,t$')
+        plt.plot(occ_array[:,0], np.log(np.abs(odiff[i])))
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
+        
+    
+    plt.ylabel(r'$\Delta S_{ss}$')
+    plt.xlabel(r'$J\,t$')
+    plt.plot(occ_array[:,0], entdiff[:])
+    pp.savefig()
+    plt.clf()
+    plt.ylabel(r'$\log | \Delta S_{ss} |$')
+    plt.xlabel(r'$J\,t$')
+    plt.plot(occ_array[:,0], np.log(np.abs(entdiff[:])))
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+    pp.close()
+    print(" done!")

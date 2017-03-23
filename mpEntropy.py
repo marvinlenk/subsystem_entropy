@@ -519,6 +519,9 @@ class mpSystem:
     def plotOccEnbasis(self):
         ep.plotOccs(self)
     
+    def plotTimescale(self):
+        ep.plotTimescale(self)
+    
     def plot(self):
         if self.boolPlotData:
             self.plotData()

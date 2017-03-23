@@ -6,12 +6,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-p","--plot", help="plot only", action="store_true")
 parser.add_argument("-pd","--plot-data", help="plot data", action="store_true")
 parser.add_argument("-pa","--plot-animation", help="plot animation", action="store_true")
+parser.add_argument("-pt","--plot-timescale", help="plot timescale", action="store_true")
 args = parser.parse_args()
 
 #coarse benchmarking for preparations
 t0 = tm.time()
 
-if args.plot or args.plot_data or args.plot_animation:
+if args.plot or args.plot_data or args.plot_animation or args.plot_timescale:
     plotBool = True
 else:
     plotBool = False
@@ -25,6 +26,10 @@ if args.plot:
 if args.plot_data:
     if sysVar.boolPlotData:
         sysVar.plotData()
+    exit()
+
+if args.plot_timescale:
+    sysVar.plotTimescale()
     exit()
 
 if args.plot_animation:
