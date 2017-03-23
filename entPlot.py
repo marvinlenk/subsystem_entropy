@@ -51,9 +51,11 @@ def plotData(sysVar):
     entfile = './data/entropy.txt'
     ent_array = np.loadtxt(entfile)
     
-    engies = np.loadtxt('./data/hamiltonian_eigvals.txt')
+    if sysVar.boolPlotEngy:
+        engies = np.loadtxt('./data/hamiltonian_eigvals.txt')
     
-    stfacts = np.loadtxt('./data/state.txt')
+    if sysVar.boolPlotDecomp:
+        stfacts = np.loadtxt('./data/state.txt')
     
     if sysVar.boolTotalEnt:
         totentfile = './data/total_entropy.txt'
@@ -257,16 +259,17 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     ### Hamiltonian eigenvalues (Eigenenergies)
-    plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
-    plt.ylabel(r'Energy')
-    plt.xlabel(r'\#')
-    plt.grid(False)
-    plt.xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.',end='',flush=True)
+    if sysVar.boolPlotDecomp:
+        plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
+        plt.ylabel(r'Energy')
+        plt.xlabel(r'\#')
+        plt.grid(False)
+        plt.xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
     if sysVar.boolPlotDecomp:
         ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
         fig, ax1 = plt.subplots()

@@ -1,5 +1,8 @@
 change log
 
+### 23.03.2017
+- added option for eigenvalue storing and plotting (not! the decomposition, this is separate)
+
 ### 17.03.2017
 - added option for diagonal expectation value plot and storing
 - fixed bug where time evolution matrix was not raised to appropriate power if hamilstore was set to false

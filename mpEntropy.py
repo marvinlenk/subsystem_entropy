@@ -116,6 +116,7 @@ class mpSystem:
         self.boolDMRedStore = configParser.getboolean('filemanagement', 'dmredstore') 
         self.boolHamilStore = configParser.getboolean('filemanagement', 'hamilstore')
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
+        self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexpstore')
         # ## calculation-parameters
@@ -129,6 +130,7 @@ class mpSystem:
         self.boolPlotDMAnimation = configParser.getboolean('plotbools', 'plotdens')
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'plotdensred')
         self.boolPlotOccEn = configParser.getboolean('plotbools', 'plotoccen')
+        self.boolPlotEngy = configParser.getboolean('plotbools', 'plotenergies')
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'plotdecomp')
         self.boolPlotDiagExp = configParser.getboolean('plotbools', 'plotdiagexp')
         # ## plotting variables
@@ -304,22 +306,26 @@ class mpSystem:
         if self.eigInd == False:
             self.updateEigenenergies()
             
-        if self.boolDecompStore:
+        if self.boolEngyStore:
             # decomposition in energy space       
             tfil = open('./data/hamiltonian_eigvals.txt', 'w')  
-            tmpAbsSq = np.zeros(self.dim)
-            for i in range(0, self.dim):
-                tmp = np.dot(self.eigVects[:, i], self.state[:, 0])                  
-                tmpAbsSq[i] = np.abs(tmp) ** 2
-                if tmpAbsSq[i] != 0:
-                    tmpPhase = np.angle(tmp) / (2 * np.pi)  # angle in complex plane in units of two pi
+            if self.boolDecompStore:
+                tmpAbsSq = np.zeros(self.dim)
+                for i in range(0, self.dim):
+                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0])                  
+                    tmpAbsSq[i] = np.abs(tmp) ** 2
+                    if tmpAbsSq[i] != 0:
+                        tmpPhase = np.angle(tmp) / (2 * np.pi)  # angle in complex plane in units of two pi
+                    else:
+                        tmpPhase = 0
+                    # occupation numbers of the eigenvalues
+                    tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i] , tmpPhase))
+                    for j in range(0, self.m):
+                        tfil.write('%.16e ' % np.real(np.einsum('i,ii->', np.abs(self.eigVects[:, i]) ** 2, self.operators[j, j].toarray())))
+                    tfil.write('\n')
                 else:
-                    tmpPhase = 0
-                # occupation numbers of the eigenvalues
-                tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i] , tmpPhase))
-                for j in range(0, self.m):
-                    tfil.write('%.16e ' % np.real(np.einsum('i,ii->', np.abs(self.eigVects[:, i]) ** 2, self.operators[j, j].toarray())))
-                tfil.write('\n')
+                    for i in range(0, self.dim):              
+                        tfil.write('%i %.16e\n' % (i, self.eigVals[i]))
             tfil.close()   
             
             # decomposition in fock space
