@@ -164,11 +164,11 @@ def plotData(sysVar):
 
     if sysVar.boolPlotAverages:
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+    
+    if sysVar.boolPlotDiagExp:
         mictmp = 0
         for i in sysVar.kRed:
             mictmp += microexp[i,1]
-    
-    if sysVar.boolPlotDiagExp:
         plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = expectstyle)
     
     avg = np.mean(tmp[loavgind:],dtype=np.float64)
@@ -184,12 +184,12 @@ def plotData(sysVar):
 
     tavg = savgol_filter(tmp,fwidth,ford)
     if sysVar.boolPlotAverages:
-        mictmp = 0
-        for i in np.arange(sysVar.m)[sysVar.mask]:
-            mictmp += microexp[i,1]
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     if sysVar.boolPlotDiagExp:
+        mictmp = 0
+        for i in np.arange(sysVar.m)[sysVar.mask]:
+            mictmp += microexp[i,1]
         plt.axhline(y=mictmp, color='purple', linewidth = expectsize, linestyle = expectstyle)
         
     avg = np.mean(tmp[loavgind:],dtype=np.float64)

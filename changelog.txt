@@ -2,6 +2,7 @@ change log
 
 ### 23.03.2017
 - added option for eigenvalue storing and plotting (not! the decomposition, this is separate)
+- fixed bug where diagonal ensemble expectation value was used even if plotdiagexp was not set
 
 ### 17.03.2017
 - added option for diagonal expectation value plot and storing
