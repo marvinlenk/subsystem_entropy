@@ -1,5 +1,8 @@
 change log
 
+### 27.03.2017
+- fixed bug where eigenenergies and decomposition were stored twice in the same file! (delete appended data if needed)
+
 ### 23.03.2017
 - added option for eigenvalue storing and plotting (not! the decomposition, this is separate)
 - fixed bug where diagonal ensemble expectation value was used even if plotdiagexp was not set

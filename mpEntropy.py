@@ -323,9 +323,9 @@ class mpSystem:
                     for j in range(0, self.m):
                         tfil.write('%.16e ' % np.real(np.einsum('i,ii->', np.abs(self.eigVects[:, i]) ** 2, self.operators[j, j].toarray())))
                     tfil.write('\n')
-                else:
-                    for i in range(0, self.dim):              
-                        tfil.write('%i %.16e\n' % (i, self.eigVals[i]))
+            else:
+                for i in range(0, self.dim):              
+                    tfil.write('%i %.16e\n' % (i, self.eigVals[i]))
             tfil.close()   
             
             # decomposition in fock space
