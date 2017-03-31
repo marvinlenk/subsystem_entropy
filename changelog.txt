@@ -1,5 +1,9 @@
 change log
 
+### 31.03.2017
+- added occupation number per level plot
+- changed averaging starting index to be fraction of total time evolution (entPlot.py)
+
 ### 27.03.2017
 - fixed bug where eigenenergies and decomposition were stored twice in the same file! (delete appended data if needed)
 

@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
+from matplotlib.pyplot import cm 
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
@@ -23,8 +24,12 @@ def plotData(sysVar):
     expectstyle = 'solid'
     expectsize = 1
     
-    loavgind = 100 #index to start at when calculating average and stddev
+    loavgpercent = 0.25 #percentage of time evolution to start averaging
+    loavgind = int(loavgpercent*sysVar.dataPoints) #index to start at when calculating average and stddev
+    loavgtime = np.round(loavgpercent * (sysVar.deltaT * sysVar.steps * sysVar.plotTimeScale),2)
     
+    if sysVar.boolPlotAverages:
+        print(' with averaging from Jt=%.2e' % loavgtime,end='')
     fwidth = sysVar.plotSavgolFrame
     ford = sysVar.plotSavgolOrder
     params={
@@ -211,9 +216,7 @@ def plotData(sysVar):
     fldat.write('ssentropy_stddev: %.16e\n' % stddev)
     fldat.write('ssentropy_rel._fluctuation: %.16e\n' % (stddev/avg))
     
-    
-    
-    fldat.close()
+    fldat.close()    
     
     plt.ylabel(r'Occupation number')
     plt.xlabel(r'$J\,t$')
@@ -224,6 +227,21 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
+    
+    #occupation number in levels against level index
+    occavg = np.loadtxt('./data/fluctuation.txt', usecols=(1,))
+    plt.xlim(-0.1,sysVar.m-0.9)
+    for l in range(0,sysVar.m):
+        plt.errorbar(l,occavg[int(7 + 3*l)]/sysVar.N,xerr=None,yerr=occavg[int(8 + 3*l)]/sysVar.N,marker='o',color=cm.Set1(0))
+    plt.ylabel(r'Relative level occupation')
+    plt.xlabel(r'Level index')
+    plt.grid()
+    plt.tight_layout()
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+    
     ### Total system energy
     if sysVar.boolTotalEnergy:
         plt.title('$E_{tot}, \; E_0$ = %.2e' % en0)
