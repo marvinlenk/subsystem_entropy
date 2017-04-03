@@ -24,12 +24,12 @@ def plotData(sysVar):
     expectstyle = 'solid'
     expectsize = 1
     
-    loavgpercent = 0.25 #percentage of time evolution to start averaging
+    loavgpercent = sysVar.plotLoAvgPerc #percentage of time evolution to start averaging
     loavgind = int(loavgpercent*sysVar.dataPoints) #index to start at when calculating average and stddev
     loavgtime = np.round(loavgpercent * (sysVar.deltaT * sysVar.steps * sysVar.plotTimeScale),2)
     
     if sysVar.boolPlotAverages:
-        print(' with averaging from Jt=%.2e' % loavgtime,end='')
+        print(' with averaging from Jt=%.2f' % loavgtime,end='')
     fwidth = sysVar.plotSavgolFrame
     ford = sysVar.plotSavgolOrder
     params={
@@ -331,16 +331,20 @@ def plotData(sysVar):
         cmapVar = plt.cm.OrRd
         cmapVar.set_under(color='black')    
         plt.ylim(0,n_rows)
-        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar((engies[:,1]-engies[0,1])/enInt), linewidth=0.005, edgecolor='gray')
+        #energy
+        plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar((engies[:,1]-engies[0,1])/enInt), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
+        #abs squared
         plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,2]/np.amax(engies[:,2]) - 1e-16), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
+        #phase / 2pi
         plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,3] - 1e-16), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
         
         plt.bar(index, spacing, bar_width, bottom=y_offset, color='white', linewidth=0)
         y_offset = y_offset + np.array([1] * sysVar.dim)
         
+        #expectation values
         for row in range(4, n_rows):
             plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(engies[:,row]/sysVar.N - 1e-16), linewidth=0.00, edgecolor='gray')
             y_offset = y_offset + spacing
@@ -366,8 +370,10 @@ def plotData(sysVar):
         cmapVar = plt.cm.OrRd
         cmapVar.set_under(color='black')    
         plt.ylim(0,n_rows)
+        # abs squared
         plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,1]/np.amax(stfacts[:,1]) - 1e-16), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
+        # phase / 2pi
         plt.bar(index, spacing , bar_width, bottom=y_offset, color=cmapVar(stfacts[:,2] - 1e-16), linewidth=0.00, edgecolor='gray')
         y_offset = y_offset + spacing
         
@@ -512,7 +518,9 @@ def plotTimescale(sysVar):
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
     
-    loavgind = 100
+    loavgpercent = sysVar.plotLoAvgPerc #percentage of time evolution to start averaging
+    loavgind = int(loavgpercent*sysVar.dataPoints) #index to start at when calculating average and stddev
+    loavgtime = np.round(loavgpercent * (sysVar.deltaT * sysVar.steps * sysVar.plotTimeScale),2)
     
     occfile = './data/occupation.txt'
     occ_array = np.loadtxt(occfile)

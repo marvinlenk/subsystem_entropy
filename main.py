@@ -17,15 +17,14 @@ if args.plot or args.plot_data or args.plot_animation or args.plot_timescale:
 else:
     plotBool = False
 
-sysVar = mpSystem("config.ini",plotOnly=plotBool)
+sysVar = mpSystem(plotOnly=plotBool)
 
 if args.plot:
     sysVar.plot()
     exit()
 
 if args.plot_data:
-    if sysVar.boolPlotData:
-        sysVar.plotData()
+    sysVar.plotData()
     exit()
 
 if args.plot_timescale:
@@ -44,13 +43,13 @@ print("Dimension of the basis:",sysVar.dim)
 #example hamiltonian with interaction
 
 # onsite energy distance
-dE = 1
+dE = 10
 
 # quadratic pre-factors
-t = 0.1
+t = 1
 
 # quartic prefactors
-u_nm = 1e-2
+u_nm = 1e-1
 u_nn = 10 * u_nm
 
 for i in range(0, sysVar.m):

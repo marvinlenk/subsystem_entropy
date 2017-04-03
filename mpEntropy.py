@@ -21,9 +21,9 @@ from scipy.special.basic import factorial
 # manyparticle system class
 class mpSystem:
     # N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
-    def __init__(self, cFile="config.ini", dtType=np.complex128, plotOnly=False):
+    def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False):
         self.confFile = cFile
-        prepFolders(0, self.confFile)
+        prepFolders(0)
         self.loadConfig()
         # mask selects only not traced out states
         self.mask = np.ones((self.m) , dtype=bool)
@@ -94,7 +94,10 @@ class mpSystem:
     
     ###### reading from config file
     def loadConfig(self):
-        configParser = configparser.RawConfigParser()  
+        configParser = configparser.RawConfigParser()
+        #read the defaults
+        configParser.read('./default.ini')  
+        #read the actual config file
         configParser.read('./' + self.confFile)
         # ## system parameters
         self.N = int(configParser.getfloat('system', 'N'))
@@ -124,15 +127,16 @@ class mpSystem:
         self.boolTotalEnt = configParser.getboolean('calcparams', 'totalentropy')
         self.boolTotalEnergy = configParser.getboolean('calcparams', 'totalenergy')
         # ## plotting booleans and parameters
-        self.boolPlotData = configParser.getboolean('plotbools', 'plotdata')
-        self.boolPlotAverages = configParser.getboolean('plotbools', 'plotavgs')
-        self.boolPlotHamiltonian = configParser.getboolean('plotbools', 'plothamiltonian')
-        self.boolPlotDMAnimation = configParser.getboolean('plotbools', 'plotdens')
-        self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'plotdensred')
-        self.boolPlotOccEn = configParser.getboolean('plotbools', 'plotoccen')
-        self.boolPlotEngy = configParser.getboolean('plotbools', 'plotenergies')
-        self.boolPlotDecomp = configParser.getboolean('plotbools', 'plotdecomp')
-        self.boolPlotDiagExp = configParser.getboolean('plotbools', 'plotdiagexp')
+        self.boolPlotData = configParser.getboolean('plotbools', 'data')
+        self.boolPlotAverages = configParser.getboolean('plotbools', 'averages')
+        self.boolPlotHamiltonian = configParser.getboolean('plotbools', 'hamiltonian')
+        self.boolPlotDMAnimation = configParser.getboolean('plotbools', 'densistymatrix')
+        self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'reducedmatrix')
+        self.boolPlotOccEn = configParser.getboolean('plotbools', 'occen')
+        self.boolPlotEngy = configParser.getboolean('plotbools', 'energies')
+        self.boolPlotDecomp = configParser.getboolean('plotbools', 'decomposition')
+        self.boolPlotDiagExp = configParser.getboolean('plotbools', 'diagexp')
+        self.boolPlotTimescale = configParser.getboolean('plotbools', 'timescale')
         # ## plotting variables
         self.dmFilesStepSize = configParser.getint('plotvals', 'dmstepsize')
         self.dmFilesFPS = configParser.getint('plotvals', 'dmfps')
@@ -140,6 +144,7 @@ class mpSystem:
         self.plotLegendSize = configParser.getint('plotvals', 'legendsize')
         self.plotSavgolFrame = configParser.getint('plotvals', 'avg_frame')
         self.plotSavgolOrder = configParser.getint('plotvals', 'avg_order')
+        self.plotLoAvgPerc = configParser.getfloat('plotvals', 'loavgperc')/100.0
         # normally some coefficient in the hamiltonian (J or t)
         self.plotTimeScale = configParser.getfloat('plotvals', 'timescale')
         
@@ -225,41 +230,58 @@ class mpSystem:
         self.state = npdot(self.evolutionMatrix, self.state)
     # end of timeStep
     
-    # approximate gaussian distribution in energy space
-    def stateEnergy(self, muperc=50, sigma=1, altSign=False, skip=0, dist='std', muoff=[0], peakamps=[1], skew=0):
+    # approximate distributions in energy space - all parameters have to be set!
+    # if skip is set to negative, the absolute value gives probability for finding a True in binomial
+    def stateEnergy(self, muperc=[50], sigma=[1], phase=['none'], skip=[0], dist=['std'], peakamps=[1], skew=[0]):
         if self.eigInd == False:
             self.updateEigenenergies()
         
-        if len(muoff) != len(peakamps):
-            peakamps = [1] * len(muoff)
-        
-        if dist == 'std':
-            dind = 1
-        elif dist == 'rect':
-            dind = 2
-        else:
-            dind = 1
-            
-        skipCount = 0
-        signPref = 1
-        signInt = 1 - int(altSign) * 2
         self.state.fill(0)
         
-        for j in range(0, len(muoff)):
-            skipCount = 0
-            signPref = peakamps[j]
-            # mu is given in percent so get mu in energy space - also offsets are taken into account
-            mu = self.eigVals[0] + ((muperc + muoff[j]) / 100) * (self.eigVals[-1] - self.eigVals[0])
-            for i in range(0, self.dim):
-                if skipCount == 0:
-                    if dind == 1:
-                        self.state[:, 0] += signPref * gaussian(self.eigVals[i], mu, sigma, norm=True, skw=skew) * self.eigVects[:, i]
-                    elif dind == 2:
-                        self.state[:, 0] += signPref * rect(self.eigVals[i], mu, sigma, norm=True) * self.eigVects[:, i]
-                    signPref *= signInt
-                    skipCount = skip + 1 
-                skipCount -= 1
+        for i in range(0,len(muperc)):
+            if dist[i] == 'std':
+                dind = 1
+            elif dist[i] == 'rect':
+                dind = 2
+            elif dist[i] == 'rand':
+                dind = 3
+                tmpdist = np.random.rand(self.dim)
+            else:
+                dind = 1
+             
+            if phase[i] == 'none':
+                phaseArray = np.zeros(self.dim)
+            elif phase[i] == 'alt':
+                phaseArray = np.zeros(self.dim)
+                phaseArray[::2] = np.pi
+            elif phase[i] == 'rnd':
+                phaseArray = np.random.rand(self.dim) * 2 * np.pi
+            elif phase[i] == 'rndreal':
+                phaseArray = np.random.binomial(1,0.5,self.dim) * np.pi
+            else:
+                phaseArray = np.zeros(self.dim)
             
+            if skip[i] < 0:
+                skipArray = np.random.binomial(1,-1*skip[i],self.dim)
+            elif skip[i] == 0:
+                skipArray = np.zeros(self.dim)        
+                skipArray[::1] = 1
+            else:
+                skipArray = np.zeros(self.dim)        
+                skipArray[::int(skip[i])] = 1
+            
+            # mu is given in percent so get mu in energy space - also offsets are taken into account
+            mu = self.eigVals[0] + (muperc[i] / 100) * (self.eigVals[-1] - self.eigVals[0])
+            for k in range(0, self.dim):
+                if skipArray[k]:
+                    if dind == 1:
+                        self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], mu, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:, k]
+                    elif dind == 2:
+                        self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], mu, sigma[i], norm=False) * self.eigVects[:, k]
+                    elif dind == 3:
+                        self.state[j, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
+        del phaseArray
+        del skipArray
         self.normalize(True)
     
     def normalize(self, initial=False):
@@ -539,13 +561,15 @@ class mpSystem:
             self.plotDMRedAnimation(self.dmFilesStepSize)
         if self.boolPlotOccEn:
             self.plotOccEnbasis()
+        if self.boolPlotTimescale:
+            self.plotTimescale()
         if self.boolClear:
             prepFolders(True)
 
     def clearDensityData(self):
         prepFolders(True)
     
-def prepFolders(clearbool=0, cFile="config.ini"):
+def prepFolders(clearbool=0):
     # create the needed folders
     if not os.path.exists("./data/"):
         os.mkdir("./data/")
@@ -559,9 +583,6 @@ def prepFolders(clearbool=0, cFile="config.ini"):
     if not os.path.exists("./plots/"):
         os.mkdir("./plots/")
         print("Creating ./plts Folder since it didn't exist")
-    if os.path.isfile("./" + cFile) == False:
-        shutil.copyfile('./config.ini', './' + cFile)
-        print('Created generic config file with name', cFile)
     # remove the old stuff
     if clearbool:
         if os.path.isfile("./data/density/densmat0.txt") == True:

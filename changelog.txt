@@ -1,5 +1,12 @@
 change log
 
+### 03.04.2017
+- finally added default settings in the default.ini
+- added timescale plotting to the normal routine
+- made energy state more modular - all parameters are now lists
+- added random phase to energy state
+- added random phase for real coefficients to energy state
+
 ### 31.03.2017
 - added occupation number per level plot
 - changed averaging starting index to be fraction of total time evolution (entPlot.py)
