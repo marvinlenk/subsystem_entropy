@@ -243,7 +243,7 @@ class mpSystem:
                 dind = 1
             elif dist[i] == 'rect':
                 dind = 2
-            elif dist[i] == 'rand':
+            elif dist[i] == 'rnd':
                 dind = 3
                 tmpdist = np.random.rand(self.dim)
             else:
@@ -279,7 +279,7 @@ class mpSystem:
                     elif dind == 2:
                         self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], mu, sigma[i], norm=False) * self.eigVects[:, k]
                     elif dind == 3:
-                        self.state[j, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
+                        self.state[k, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
         del phaseArray
         del skipArray
         self.normalize(True)

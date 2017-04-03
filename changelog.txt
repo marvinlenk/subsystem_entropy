@@ -6,6 +6,7 @@ change log
 - made energy state more modular - all parameters are now lists
 - added random phase to energy state
 - added random phase for real coefficients to energy state
+- hotfix: random distribution was not working
 
 ### 31.03.2017
 - added occupation number per level plot
