@@ -1,7 +1,8 @@
 import numpy as np
+import scipy.integrate as scint
 import matplotlib as mpl
 mpl.use('Agg')
-from matplotlib.pyplot import cm 
+from matplotlib.pyplot import cm , step
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
@@ -102,6 +103,23 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
+    '''
+    ###FFT
+    print('')
+    fourier = np.fft.rfft(ent_array[loavgind:,1])
+    print(fourier[0].real)
+    freq = np.fft.rfftfreq(np.shape(ent_array[loavgind:,1])[-1], d=step_array[1])
+    plt.plot(freq[1:],np.abs(fourier[1:]))
+    print('')
+    plt.ylabel(r'$A_{\omega}$')
+    plt.xlabel(r'$\omega$')
+    plt.grid()
+    plt.tight_layout()
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+    '''
     ### Single-level occupation numbers
     for i in range(0,sysVar.m):
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.5)
@@ -120,6 +138,26 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
+    '''
+    ###FFT
+    print('')
+    #plt.xlim(0.05,0.15)
+    for i in range(0,sysVar.m):
+        fourier = np.fft.rfft(occ_array[loavgind:,i+1])
+        print(fourier[0].real)
+        freq = np.fft.rfftfreq(np.shape(occ_array[loavgind:,i+1])[-1], d=step_array[1])
+        plt.plot(freq[1:],np.abs(fourier[1:]),label=r'$n_%i$'%i,linewidth = 0.05)
+    print('')
+    plt.ylabel(r'$A_{\omega}$')
+    plt.xlabel(r'$\omega$')
+    plt.legend(loc='upper right')
+    plt.grid()
+    plt.tight_layout()
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+    '''
     ### Traced out (bath) occupation numbers
     for i in sysVar.kRed:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
@@ -277,7 +315,7 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     ### Hamiltonian eigenvalues (Eigenenergies)
-    if sysVar.boolPlotDecomp:
+    if sysVar.boolPlotEngy:
         plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
         plt.ylabel(r'Energy')
         plt.xlabel(r'\#')
@@ -288,6 +326,26 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
+    
+        ### DOS
+    if sysVar.boolPlotDOS:
+        dos = np.zeros(sysVar.dim)
+        window = 50
+        iw = window
+        for i in range(iw,sysVar.dim-iw):
+            dos[i] = (window)*2/(engies[i+iw,1] - engies[i-iw,1])
+        dos /= (sysVar.dim-iw)
+        print(scint.simps(dos[iw:], engies[iw:,1]))
+        plt.plot(engies[:,1],dos,lw=0.005)
+        plt.ylabel(r'DOS')
+        plt.xlabel(r'E')
+        plt.grid(False)
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
+            
     if sysVar.boolPlotDecomp:
         ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
         fig, ax1 = plt.subplots()
@@ -386,6 +444,18 @@ def plotData(sysVar):
         
         plt.ylabel("tba")
         plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
+    if sysVar.boolPlotSpectralDensity:
+        ###
+        plt.title('Density matrix spectral repres. abs')
+        dabs = np.loadtxt('./data/spectral/dm.txt')
+        cmapVar = plt.cm.Reds
+        cmapVar.set_under(color='black') 
+        plt.imshow(dabs, cmap=cmapVar, interpolation='none',vmin=1e-16)
+        plt.colorbar()
         ###
         pp.savefig()
         plt.clf()

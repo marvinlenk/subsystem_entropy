@@ -83,6 +83,7 @@ class mpSystem:
                 self.offsetsRed = basisOffsets(self.N, self.mRed)
                 self.basisRed = np.zeros((self.dimRed , self.mRed) , dtype=np.int)
                 fillReducedBasis(self.basisRed, self.N, self.mRed, self.offsetsRed)
+                self.basisDictRed = basis2dict(self.basisRed, self.dimRed) #only!! neded for reduced space operators
                 self.dimRedComp = dimOfBasis (self.N , (self.mRedComp + 1))
                 self.offsetsRedComp = basisOffsets(self.N, self.mRedComp)
                 self.basisRedComp = np.zeros((self.dimRedComp , self.mRedComp) , dtype=np.int)
@@ -90,6 +91,50 @@ class mpSystem:
                 self.densityMatrixRed = np.zeros((self.dimRed , self.dimRed) , dtype=self.datType)
                 self.iteratorRed = np.zeros((0 , 4), dtype=np.int32)
                 self.initIteratorRed() 
+            
+            ### Spectral
+            if self.boolSpectral or self.boolRetgreen:
+                ## lo
+                self.specLoDim = dimOfBasis(self.N - 1, self.m)
+                self.specLoBasis = np.zeros((self.specLoDim , self.m) , dtype=np.int)
+                fillBasis(self.specLoBasis, self.N-1, self.m)
+                self.specLoBasisDict = basis2dict(self.specLoBasis, self.specLoDim)
+                self.specLoHamiltonian = coo_matrix(np.zeros((self.specLoDim, self.specLoDim)), shape=(self.specLoDim, self.specLoDim), dtype=np.float64).tocsr()
+                ## hi
+                self.specHiDim = dimOfBasis(self.N + 1, self.m)
+                self.specHiBasis = np.zeros((self.specHiDim , self.m) , dtype=np.int)
+                fillBasis(self.specHiBasis, self.N+1, self.m)
+                self.specHiBasisDict = basis2dict(self.specHiBasis, self.specHiDim)
+                self.specHiHamiltonian = coo_matrix(np.zeros((self.specHiDim, self.specHiDim)), shape=(self.specHiDim, self.specHiDim), dtype=np.float64).tocsr()
+                if self.boolRetgreen:
+                    self.initStateHiKet = []
+                    self.initStateLoBra = []
+                    self.specLoEvolutionMatrix = None
+                    self.specHiEvolutionMatrix = None
+                    self.specLowering = []
+                    self.specRaising = []
+                    #fill'em
+                    for i in range(0,self.m):
+                        #note that the lowering operator transposed is the raising op. of the lower dimension space
+                        self.specLowering.append(getLoweringSpec(self, i))
+                        # the raising operator transposed is the lowering op. of the higher dimension space
+                        self.specRaising.append(getRaisingSpec(self, i))
+                        
+                if self.boolSpectral:
+                    ## Lo
+                    # energy basis single operator matrix (k,i)
+                    self.specLoMatrix = []
+                    self.specLoEigVals = []
+                    self.specLoEigVects = []
+                    self.specLoEigInd = False
+                    self.specLoInd = False
+                    ## hi
+                    # energy basis single operator matrix (k,i)
+                    self.specHiMatrix = []
+                    self.specHiEigVals = []
+                    self.specHiEigVects = []
+                    self.specHiEigInd = False
+                    self.specHiInd = False
     # end of init
     
     ###### reading from config file
@@ -107,6 +152,11 @@ class mpSystem:
             self.kRed = []
         else:
             self.kRed = [int(el) for el in self.kRed]
+        # ## hamiltonian parameters
+        self.onsite = np.float64(configParser.getfloat('hamiltonian', 'de'))
+        self.hybrid = np.float64(configParser.getfloat('hamiltonian', 't'))
+        self.interequal = np.float64(configParser.getfloat('hamiltonian', 'ueq'))
+        self.interdiff = np.float64(configParser.getfloat('hamiltonian', 'udiff'))
         # ## iteration parameters
         self.steps = int(configParser.getfloat('iteration', 'steps'))
         self.deltaT = np.float64(configParser.getfloat('iteration', 'deltaT'))
@@ -122,6 +172,8 @@ class mpSystem:
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexpstore')
+        self.boolSpectral = configParser.getboolean('filemanagement', 'spectral')
+        self.boolRetgreen = configParser.getboolean('filemanagement', 'retgreen')
         # ## calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
         self.boolTotalEnt = configParser.getboolean('calcparams', 'totalentropy')
@@ -137,6 +189,8 @@ class mpSystem:
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'decomposition')
         self.boolPlotDiagExp = configParser.getboolean('plotbools', 'diagexp')
         self.boolPlotTimescale = configParser.getboolean('plotbools', 'timescale')
+        self.boolPlotDOS = configParser.getboolean('plotbools', 'dos')
+        self.boolPlotSpectralDensity = configParser.getboolean('plotbools', 'spectraldensity')
         # ## plotting variables
         self.dmFilesStepSize = configParser.getint('plotvals', 'dmstepsize')
         self.dmFilesFPS = configParser.getint('plotvals', 'dmfps')
@@ -202,7 +256,81 @@ class mpSystem:
             if el[0] != el[1]:
                 self.densityMatrixRed[el[1], el[0]] += self.state[el[3], 0] * stTmp[el[2], 0]
     # end of reduceDensityMatrixFromState
+
+    def reduceMatrix(self,matrx):
+        tmpret = np.zeros((self.dimRed,self.dimRed))
+        for el in self.iteratorRed:
+            tmpret[el[0], el[1]] += matrx[el[2], el[3]]
+            if el[0] != el[1]:
+                tmpret[el[1], el[0]] += matrx[el[3], el[2]]
+        return tmpret
+    
+    # hamiltonian with equal index interaction different to non equal index interaction
+    def initHamiltonian(self):
+        for i in range(0, self.m):
+            for j in range(0, self.m):
+                if i!=j:
+                    self.hamiltonian += self.hybrid * self.operators[i,j]
+                else:
+                    self.hamiltonian += (i) * (self.onsite) * self.operators[i,j]
         
+        tmp = np.matrix( np.zeros( (self.dim , self.dim) ) )
+        for i in range(0, self.m):
+            for j in range(0, self.m):
+                for k in range(0, self.m):
+                    for l in range(0, self.m):
+                        tmp = getQuartic(self,i,j,k,l)
+                        if  i==j and k==l and k==j:
+                            self.hamiltonian += (self.interequal) * tmp
+                        else:
+                            self.hamiltonian += (self.interdiff) * tmp
+                        del tmp
+    
+    def initSpecLoHamiltonian(self):
+        tmpspecops = quadraticArraySpecLo(self)
+        for i in range(0, self.m):
+            for j in range(0, self.m):
+                if i!=j:
+                    self.specLoHamiltonian += self.hybrid * tmpspecops[i,j]
+                else:
+                    self.specLoHamiltonian += (i) * (self.onsite) * tmpspecops[i,j]
+        
+        tmp = np.matrix( np.zeros( (self.specLoDim , self.specLoDim) ) )
+        for i in range(0, self.m):
+            for j in range(0, self.m):
+                for k in range(0, self.m):
+                    for l in range(0, self.m):
+                        tmp = getQuarticSpec(tmpspecops,i,j,k,l)
+                        if  i==j and k==l and k==j:
+                            self.specLoHamiltonian += (self.interequal) * tmp
+                        else:
+                            self.specLoHamiltonian += (self.interdiff) * tmp
+                        del tmp
+        del tmpspecops
+        
+    def initSpecHiHamiltonian(self):
+        tmpspecops = quadraticArraySpecHi(self)
+        for i in range(0, self.m):
+            for j in range(0, self.m):
+                if i!=j:
+                    self.specHiHamiltonian += self.hybrid * tmpspecops[i,j]
+                else:
+                    self.specHiHamiltonian += (i) * (self.onsite) * tmpspecops[i,j]
+        
+        tmp = np.matrix( np.zeros( (self.specHiDim , self.specHiDim) ) )
+        for i in range(0, self.m):
+            for j in range(0, self.m):
+                for k in range(0, self.m):
+                    for l in range(0, self.m):
+                        tmp = getQuarticSpec(tmpspecops,i,j,k,l)
+                        if  i==j and k==l and k==j:
+                            self.specHiHamiltonian += (self.interequal) * tmp
+                        else:
+                            self.specHiHamiltonian += (self.interdiff) * tmp
+                        del tmp
+        del tmpspecops
+    
+    
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     def initEvolutionMatrix(self, order=4, diagonalize=True):
@@ -224,6 +352,38 @@ class mpSystem:
         # Store hamiltonian eigenvalues
         if diagonalize:
             self.updateEigenenergies()
+    # end
+    
+    # The matrix already inherits the identity so step is just mutliplication
+    # time evolution order given by order of the exponential series
+    # this one will be only in sparse container since it is meant for sparse matrix mult.
+    def initSpecLoEvolutionMatrix(self, order=3, diagonalize=False):
+        if order == 0:
+            print('Warning - Time evolution of order 0 means no dynamics...')
+        if (not np.allclose(self.specLoHamiltonian.toarray(), np.conjugate(self.specLoHamiltonian.toarray().T))):
+            print('Warning - hamiltonian is not hermitian!')
+        self.specLoEvolutionMatrix = spidentity(self.specLoDim, dtype=self.datType, format='csr')
+        
+        for i in range(1, order + 1):
+            self.specLoEvolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.specLoHamiltonian ** i / factorial(i)
+        if diagonalize:
+            self.updateLoEigenenergies()
+    # end
+    
+    # The matrix already inherits the identity so step is just mutliplication
+    # time evolution order given by order of the exponential series
+    # this one will be only in sparse container since it is meant for sparse matrix mult.
+    def initSpecHiEvolutionMatrix(self, order=3, diagonalize=False):
+        if order == 0:
+            print('Warning - Time evolution of order 0 means no dynamics...')
+        if (not np.allclose(self.specHiHamiltonian.toarray(), np.conjugate(self.specHiHamiltonian.toarray().T))):
+            print('Warning - hamiltonian is not hermitian!')
+        self.specHiEvolutionMatrix = spidentity(self.specHiDim, dtype=self.datType, format='csr')
+        
+        for i in range(1, order + 1):
+            self.specHiEvolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.specHiHamiltonian ** i / factorial(i)
+        if diagonalize:
+            self.updateHiEigenenergies()
     # end
     
     def timeStep(self):
@@ -294,6 +454,11 @@ class mpSystem:
         if bool(initial) == True:
             self.stateNormAbs = 1
             self.updateEigendecomposition()
+            #store starting states used for green function
+            if self.boolRetgreen:
+                for i in range(0,self.m):
+                    self.initStateHiKet.append(self.specRaising[i] * self.state)
+                    self.initStateLoBra.append(self.state.T * self.specLowering[i].T)
         if np.abs(self.stateNormAbs) > self.stateNormCheck:
             if self.stateNormCheck == 1e1:
                 print('\n' + '### WARNING! ### state norm has been normalized by more than the factor 10 now!' + '\n' + 'Check corresponding plot if behavior is expected - indicator for numerical instability!' + '\n')
@@ -317,18 +482,77 @@ class mpSystem:
     
     def expectValueRed(self, operator):
         if np.shape(operator) != (self.dimRed, self.dimRed):
-            exit('Dimension of operator is', np.shape(operator), 'but', (self.dimRed, self.dimRed), 'is needed!')
+            exit('Dimension of operator is' +str(np.shape(operator)) + 'but' + str( (self.dimRed, self.dimRed) ) + 'is needed!')
         return np.trace(npdot(self.densityMatrixRed, operator))
     
     def updateEigenenergies(self):
-        self.eigVals, self.eigVects = la.eigh(self.hamiltonian.toarray())
-        self.eigInd = True
-        
-    def updateEigendecomposition(self):
-        if self.eigInd == False:
+        if not self.eigInd:
+            self.eigVals, self.eigVects = la.eigh(self.hamiltonian.toarray())
+            self.eigInd = True
+    
+    def updateLoEigenenergies(self):
+        if not self.specLoEigInd:
+            self.specLoEigVals, self.specLoEigVects = la.eigh(self.specLoHamiltonian.toarray())
+            self.specLoEigInd = True
+
+    def updateHiEigenenergies(self):
+        if not self.specHiEigInd:
+            self.specHiEigVals, self.specHiEigVects = la.eigh(self.specHiHamiltonian.toarray())
+            self.specHiEigInd = True            
+    
+    #clear will delete the hamiltonian and (even more important) the corresponding eigenvectors
+    def updateSpectralLo(self,clear=False):
+        if not self.specLoInd:
             self.updateEigenenergies()
+            self.updateLoEigenenergies()
+            for i in range(0,self.m):
+                self.specLoMatrix.append(np.dot(self.specLoEigVects.T , np.dot(getLoweringSpec(self,i).toarray(), self.eigVects)))
+            if clear:
+                del self.specLoHamiltonian
+                del self.specHiEigVects
+            self.specLoInd = True
+    
+    #clear will delete the hamiltonian and (even more important) the corresponding eigenvectors    
+    def updateSpectralHi(self,clear=False):
+        if not self.specHiInd:
+            self.updateEigenenergies()
+            self.updateHiEigenenergies()
+            for i in range(0,self.m):
+                self.specHiMatrix.append(np.dot(self.specHiEigVects.T , np.dot(getRaisingSpec(self,i).toarray(), self.eigVects)))
+            if clear:
+                del self.specHiHamiltonian
+                del self.specHiEigVects
+            self.specHiInd = True
+    
+    def storeSpectral(self,clear=False):
+        for a in range(0,self.m):
+            flo = open('./data/spectral/lo%i.txt' % (a), 'w')
+            fhi = open('./data/spectral/hi%i.txt' % (a), 'w')
+            for i in range(0,self.dim):
+                for j in range(0,self.dim):
+                    for k in range(0,self.specLoDim):
+                        en = self.specLoEigVals[k] - (self.eigVals[i] + self.eigVals[j])/2
+                        matel = self.specLoMatrix[a][k,i] * self.specLoMatrix[a][k,j]
+                        flo.write('%i %i %i %.16e %.16e \n' % (i,j,k,en,matel))
+                        en = (self.eigVals[i] + self.eigVals[j])/2 - self.specHiEigVals[k]
+                        matel = self.specHiMatrix[a][k,i] * self.specHiMatrix[a][k,j]
+                        fhi.write('%i %i %i %.16e %.16e \n' % (i,j,k,en,matel))
+            fhi.close()
+            flo.close()
+        if clear:
+            del self.specLoEigVals
+            del self.specHiEigVals
+            del self.specLoMatrix
+            del self.specHiMatrix
             
+    def storeSpectralDensityMatrix(self):
+        self.updateEigenenergies()
+        storeMatrix(np.dot(self.eigVects.T,np.dot(self.densityMatrix,self.eigVects)), './data/spectral/dm.txt', absOnly=False)
+        
+    ## will free the memory!!!
+    def updateEigendecomposition(self,clear=True):
         if self.boolEngyStore:
+            self.updateEigenenergies()
             # decomposition in energy space       
             tfil = open('./data/hamiltonian_eigvals.txt', 'w')  
             if self.boolDecompStore:
@@ -365,7 +589,9 @@ class mpSystem:
                 sfil.write('\n')
             sfil.close()
         
-        eivectinv = la.inv(np.matrix(self.eigVects.T))
+        if self.boolDiagExpStore or self.boolOccEnStore:
+            self.updateEigenenergies()
+            eivectinv = la.inv(np.matrix(self.eigVects.T))
         
         # expectation values in diagonal representation (ETH)
         if self.boolDiagExpStore:
@@ -384,14 +610,15 @@ class mpSystem:
             for i in range(0, self.m):
                 storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
         
-        # free the memory
-        del self.eigVals
-        del self.eigVects
-        self.eigInd
-        self.eigVals = []
-        self.eigVects = []
-        self.eigInd = False
-    
+        if clear:
+            # free the memory
+            del self.eigVals
+            del self.eigVects
+            self.eigInd
+            self.eigVals = []
+            self.eigVects = []
+            self.eigInd = False
+        
     def updateEntropy(self):
         self.entropy = 0
         for el in la.eigvalsh(self.densityMatrix, check_finite=False):
@@ -580,6 +807,9 @@ def prepFolders(clearbool=0):
     if not os.path.exists("./data/red_density/"):
         os.mkdir("./data/red_density/")
         print("Creating ./data/red_density Folder since it didn't exist")
+    if not os.path.exists("./data/spectral/"):
+        os.mkdir("./data/spectral/")
+        print("Creating ./data/spectral Folder since it didn't exist")
     if not os.path.exists("./plots/"):
         os.mkdir("./plots/")
         print("Creating ./plts Folder since it didn't exist")
@@ -699,6 +929,45 @@ def quadraticArray(sysVar):
         retArr[i, i] = getQuadratic(sysVar, i, i)
     return retArr
 
+# note that all the elements here are sparse matrices! one has to use .toarray() to get them done correctly
+# please also note the index shift - from low to high but without the traced out, e.g.
+# m=4 trace out 1,2 -> 0,1 of reduced array corresponds to level 0 and 4 of whole system
+def quadraticArrayRed(sysVar):
+    retArr = np.empty((sysVar.mRed , sysVar.mRed), dtype=csr_matrix)
+    # off diagonal
+    for i in range(0, sysVar.mRed):
+        for j in range(0, i):
+            retArr[i, j] = getQuadraticRed(sysVar, i, j)
+            retArr[j, i] = retArr[i, j].transpose()
+    # diagonal terms
+    for i in range(0, sysVar.mRed):
+        retArr[i, i] = getQuadraticRed(sysVar, i, i)
+    return retArr
+
+def quadraticArraySpecLo(sysVar):
+    retArr = np.empty((sysVar.m , sysVar.m), dtype=csr_matrix)
+    # off diagonal
+    for i in range(0, sysVar.m):
+        for j in range(0, i):
+            retArr[i, j] = getQuadraticSpecLo(sysVar, i, j)
+            retArr[j, i] = retArr[i, j].transpose()
+    # diagonal terms
+    for i in range(0, sysVar.m):
+        retArr[i, i] = getQuadraticSpecLo(sysVar, i, i)
+    return retArr
+
+def quadraticArraySpecHi(sysVar):
+    retArr = np.empty((sysVar.m , sysVar.m), dtype=csr_matrix)
+    # off diagonal
+    for i in range(0, sysVar.m):
+        for j in range(0, i):
+            retArr[i, j] = getQuadraticSpecHi(sysVar, i, j)
+            retArr[j, i] = retArr[i, j].transpose()
+    # diagonal terms
+    for i in range(0, sysVar.m):
+        retArr[i, i] = getQuadraticSpecHi(sysVar, i, i)
+    return retArr
+
 # quadratic term in 2nd quantization for transition from m to l -> fills zero initialized matrix
 # matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
 def getQuadratic(sysVar, l, m):
@@ -719,7 +988,65 @@ def getQuadratic(sysVar, l, m):
     del row, col, data, tmp
     return retmat
 
-# array elements are NO matrix! just numpy array!            
+# quadratic term in 2nd quantization for transition from m to l -> fills zero initialized matrix
+# matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
+def getQuadraticRed(sysVar, l, m):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros((sysVar.mRed), dtype=np.int)
+    for el in sysVar.basisRed:
+        if el[m] != 0:
+            tmp = el.copy()
+            tmp[m] -= 1
+            tmp[l] += 1
+            row = np.append(row, sysVar.basisDictRed[tuple(tmp)])
+            col = np.append(col, sysVar.basisDictRed[tuple(el)])
+            data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+            
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dimRed , sysVar.dimRed) , dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
+def getQuadraticSpecLo(sysVar, l, m):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros((sysVar.m), dtype=np.int)
+    for el in sysVar.specLoBasis:
+        if el[m] != 0:
+            tmp = el.copy()
+            tmp[m] -= 1
+            tmp[l] += 1
+            row = np.append(row, sysVar.specLoBasisDict[tuple(tmp)])
+            col = np.append(col, sysVar.specLoBasisDict[tuple(el)])
+            data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+            
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specLoDim , sysVar.specLoDim) , dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
+def getQuadraticSpecHi(sysVar, l, m):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros((sysVar.m), dtype=np.int)
+    for el in sysVar.specHiBasis:
+        if el[m] != 0:
+            tmp = el.copy()
+            tmp[m] -= 1
+            tmp[l] += 1
+            row = np.append(row, sysVar.specHiBasisDict[tuple(tmp)])
+            col = np.append(col, sysVar.specHiBasisDict[tuple(el)])
+            data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+            
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specHiDim , sysVar.specHiDim) , dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
+
+# array elements are NO matrix! just numpy array!
+# This will take very long to create and use up much memory, please consider doing it on the fly only for needed elements.           
 def quarticArray(sysVar):
     retArr = np.empty((sysVar.m , sysVar.m, sysVar.m, sysVar.m), dtype=csr_matrix)
     # TODO: use transpose property
@@ -730,12 +1057,88 @@ def quarticArray(sysVar):
                         retArr[k, l, m, n] = getQuartic(sysVar, k, l, m, n)
     return retArr
 
+# array elements are NO matrix! just numpy array!
+# This will take very long to create and use up much memory, please consider doing it on the fly only for needed elements.           
+def quarticArrayRed(sysVar):
+    retArr = np.empty((sysVar.mRed , sysVar.mRed, sysVar.mRed, sysVar.mRed), dtype=csr_matrix)
+    # TODO: use transpose property
+    for k in range(0, sysVar.mRed):
+        for l in range(0, sysVar.mRed):
+            for m in range(0, sysVar.mRed):
+                for n in range(0, sysVar.mRed):
+                        retArr[k, l, m, n] = getQuarticRed(sysVar, k, l, m, n)
+    return retArr
+
 def getQuartic(sysVar, k, l, m, n):
     if l != m:
         return (sysVar.operators[k, m] * sysVar.operators[l, n]).copy()
     else:
         return ((sysVar.operators[k, m] * sysVar.operators[l, n]) - sysVar.operators[k, n]).copy()
-    
+
+def getQuarticRed(sysVar, k, l, m, n):
+    if l != m:
+        return (getQuadraticRed(sysVar, k, m) * getQuadraticRed(sysVar, l, n)).copy()
+    else:
+        return ((getQuadraticRed(sysVar, k, m) * getQuadraticRed(sysVar, l, n)) - getQuadraticRed(sysVar, k, n)).copy()
+
+def getQuarticSpec(quadops, k, l, m, n):
+    if l != m:
+        return (quadops[k, m] * quadops[l, n]).copy()
+    else:
+        return ((quadops[k, m] * quadops[l, n]) - quadops[k, n]).copy()
+
+# destruction operator
+def getLoweringSpec(sysVar,l):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros((sysVar.m), dtype=np.int)
+    for el in sysVar.basis:
+        if el[l] != 0:
+            tmp = el.copy()
+            tmp[l] -= 1
+            row = np.append(row, sysVar.specLoBasisDict[tuple(tmp)])
+            col = np.append(col, sysVar.basisDict[tuple(el)])
+            data = np.append(data, np.float64(sqrt(el[l])))
+            
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specLoDim , sysVar.dim) , dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
+# creation operator
+def getRaisingSpec(sysVar,l):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros((sysVar.m), dtype=np.int)
+    for el in sysVar.basis:
+        tmp = el.copy()
+        tmp[l] += 1
+        row = np.append(row, sysVar.specHiBasisDict[tuple(tmp)])
+        col = np.append(col, sysVar.basisDict[tuple(el)])
+        data = np.append(data, np.float64(sqrt(tmp[l])))
+            
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specHiDim , sysVar.dim) , dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
+# inverse of creation operator (have to multiply from left...)
+def getRaisingSpecInv(sysVar,l):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros((sysVar.m), dtype=np.int)
+    for el in sysVar.basis:
+        tmp = el.copy()
+        tmp[l] += 1
+        col = np.append(col, sysVar.specHiBasisDict[tuple(tmp)])
+        row = np.append(row, sysVar.basisDict[tuple(el)])
+        data = np.append(data, np.float64(1/sqrt(tmp[l])))
+            
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.specHiDim) , dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
 def time_elapsed(t0, divider, decimals=0):
     t_el = tm.time() - t0
     if divider == 60:

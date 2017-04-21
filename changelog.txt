@@ -1,5 +1,19 @@
 change log
 
+### 21.04.2017
+- added retarded Green's function to the time evolution! (yay) (in progress - need to actually do time evolution and value storing)
+- improved eigendecomposition function and diagonalization function to be more intelligent
+- added spectral density plot option
+
+### 20.04.2017
+- finished eigenvalue and spectral function part, is obsolete because of very large dimension - keep it but do not use it!
+
+### 18.04.2017
+- more progress on lower dimension hamiltonian
+
+### 17.04.2017
+- added lower dimension hamiltonian for spectral function (work in progress)
+
 ### 03.04.2017
 - finally added default settings in the default.ini
 - added timescale plotting to the normal routine
