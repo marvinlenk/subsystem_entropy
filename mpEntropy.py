@@ -107,12 +107,14 @@ class mpSystem:
                 self.specHiBasisDict = basis2dict(self.specHiBasis, self.specHiDim)
                 self.specHiHamiltonian = coo_matrix(np.zeros((self.specHiDim, self.specHiDim)), shape=(self.specHiDim, self.specHiDim), dtype=np.float64).tocsr()
                 if self.boolRetgreen:
+                    self.green = np.zeros(self.m, dtype = self.datType)
                     self.initStateHiKet = []
                     self.initStateLoBra = []
                     self.specLoEvolutionMatrix = None
                     self.specHiEvolutionMatrix = None
                     self.specLowering = []
                     self.specRaising = []
+                    self.specLoRaInd = False
                     #fill'em
                     for i in range(0,self.m):
                         #note that the lowering operator transposed is the raising op. of the lower dimension space
@@ -160,6 +162,10 @@ class mpSystem:
         # ## iteration parameters
         self.steps = int(configParser.getfloat('iteration', 'steps'))
         self.deltaT = np.float64(configParser.getfloat('iteration', 'deltaT'))
+        self.order = int(configParser.getfloat('iteration', 'order'))
+        self.loOrder = int(configParser.getfloat('iteration', 'loorder'))
+        self.hiOrder = int(configParser.getfloat('iteration', 'hiorder'))
+
         # ## file management
         self.dataPoints = int(configParser.getfloat('filemanagement', 'datapoints'))
         self.dmFilesSkipFactor = int(configParser.getfloat('filemanagement', 'dmfile_skipfactor'))
@@ -191,6 +197,8 @@ class mpSystem:
         self.boolPlotTimescale = configParser.getboolean('plotbools', 'timescale')
         self.boolPlotDOS = configParser.getboolean('plotbools', 'dos')
         self.boolPlotSpectralDensity = configParser.getboolean('plotbools', 'spectraldensity')
+        self.boolPlotGreen = configParser.getboolean('plotbools', 'green')
+        
         # ## plotting variables
         self.dmFilesStepSize = configParser.getint('plotvals', 'dmstepsize')
         self.dmFilesFPS = configParser.getint('plotvals', 'dmfps')
@@ -333,14 +341,14 @@ class mpSystem:
     
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
-    def initEvolutionMatrix(self, order=4, diagonalize=True):
-        if order == 0:
+    def initEvolutionMatrix(self, diagonalize=True):
+        if self.order == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.hamiltonian.toarray(), np.conjugate(self.hamiltonian.toarray().T))):
             print('Warning - hamiltonian is not hermitian!')
         self.evolutionMatrix = spidentity(self.dim, dtype=self.datType, format='csr')
         
-        for i in range(1, order + 1):
+        for i in range(1, self.order + 1):
             self.evolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.hamiltonian ** i / factorial(i)
             
         self.evolutionMatrix = np.matrix(self.evolutionMatrix.toarray(), dtype=self.datType)
@@ -357,14 +365,14 @@ class mpSystem:
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initSpecLoEvolutionMatrix(self, order=3, diagonalize=False):
-        if order == 0:
+    def initSpecLoEvolutionMatrix(self, diagonalize=False):
+        if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specLoHamiltonian.toarray(), np.conjugate(self.specLoHamiltonian.toarray().T))):
             print('Warning - hamiltonian is not hermitian!')
         self.specLoEvolutionMatrix = spidentity(self.specLoDim, dtype=self.datType, format='csr')
         
-        for i in range(1, order + 1):
+        for i in range(1, self.loOrder + 1):
             self.specLoEvolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.specLoHamiltonian ** i / factorial(i)
         if diagonalize:
             self.updateLoEigenenergies()
@@ -373,14 +381,14 @@ class mpSystem:
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initSpecHiEvolutionMatrix(self, order=3, diagonalize=False):
-        if order == 0:
+    def initSpecHiEvolutionMatrix(self, diagonalize=False):
+        if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specHiHamiltonian.toarray(), np.conjugate(self.specHiHamiltonian.toarray().T))):
             print('Warning - hamiltonian is not hermitian!')
         self.specHiEvolutionMatrix = spidentity(self.specHiDim, dtype=self.datType, format='csr')
         
-        for i in range(1, order + 1):
+        for i in range(1, self.hiOrder + 1):
             self.specHiEvolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.specHiHamiltonian ** i / factorial(i)
         if diagonalize:
             self.updateHiEigenenergies()
@@ -390,6 +398,11 @@ class mpSystem:
         self.state = npdot(self.evolutionMatrix, self.state)
     # end of timeStep
     
+    def greenTimeStep(self):
+        for i in range(0,self.m):
+            self.specRaising[i] = self.specRaising[i] * self.specHiEvolutionMatrix
+            self.specLowering[i] = self.specLoEvolutionMatrix * self.specLowering[i]
+            
     # approximate distributions in energy space - all parameters have to be set!
     # if skip is set to negative, the absolute value gives probability for finding a True in binomial
     def stateEnergy(self, muperc=[50], sigma=[1], phase=['none'], skip=[0], dist=['std'], peakamps=[1], skew=[0]):
@@ -464,11 +477,7 @@ class mpSystem:
                 print('\n' + '### WARNING! ### state norm has been normalized by more than the factor 10 now!' + '\n' + 'Check corresponding plot if behavior is expected - indicator for numerical instability!' + '\n')
                 self.stateNormCheck = 1e2
             else:
-                self.filEnt.close()
-                self.filTotEnt.close()
-                self.filNorm.close()
-                self.filOcc.close()
-                self.filEnergy.close()
+                self.closeFiles()
                 self.plot()
                 exit('\n' + 'Exiting - state norm has been normalized by more than the factor 100, numerical error is very likely.')
     # end of normalize    
@@ -652,6 +661,11 @@ class mpSystem:
         self.energy = np.real(self.expectValue(self.hamiltonian.toarray()))
     # end of updateEnergy
     
+    def updateGreen(self):
+        # use dots for multithread!
+        for i in range(0,self.m):
+            self.green[i] = -1j * (np.einsum('ij,ij -> j', self.state.T.conjugate(), (self.specRaising[i] * self.initStateHiKet[i]))[0] - np.einsum('ij,ij -> j',self.initStateLoBra[i], (self.specLowering[i] * self.state))[0])
+        
     # update everything EXCEPT for total entropy and energy - they are only updated 100 times
     def updateEverything(self):
         self.evolTime += (self.evolStep - self.evolStepTmp) * self.deltaT
@@ -664,6 +678,9 @@ class mpSystem:
             self.reduceDensityMatrix()
             self.updateOccNumbers()
         
+        if self.boolRetgreen:
+            self.updateGreen()
+                    
         self.updateEntropyRed()
         
     ###### the magic of time evolution
@@ -673,14 +690,13 @@ class mpSystem:
             self.normalize(True)
         
         if self.boolDataStore:
-            self.filEnt = open('./data/entropy.txt', 'w')
-            self.filTotEnt = open('./data/total_entropy.txt', 'w')
-            self.filNorm = open('./data/norm.txt', 'w')
-            self.filOcc = open('./data/occupation.txt', 'w')
-            self.filEnergy = open('./data/energy.txt', 'w')
-            self.filProg = open('./data/progress.log', 'w')
-            self.filProg.close()
-            
+            self.openFiles()
+         
+        if self.boolRetgreen and not self.specLoRaInd:
+            for i in range(0,self.m):
+                self.specRaising[i] = self.specRaising[i].T
+                self.specLoRaInd = True 
+        
         self.evolStepTmp = self.evolStep
         stepNo = int(self.dataPoints / 100)
         dmFileFactor = self.dmFilesSkipFactor
@@ -699,27 +715,12 @@ class mpSystem:
                     if self.boolDataStore:
                         self.updateEverything()
                         
-                        if self.boolDMStore or self.boolDMRedStore:
-                            if dmFileFactor == self.dmFilesSkipFactor:
-                                dmFileFactor = 1
-                                if not self.boolOnlyRed:
-                                    if self.boolDMStore:
-                                        storeMatrix(self.densityMatrix, './data/density/densmat' + str(int(self.dmcount)) + '.txt')
-                                    if self.boolDMRedStore:
-                                        storeMatrix(self.densityMatrixRed, './data/red_density/densmat' + str(int(self.dmcount)) + '.txt')
-                                    self.dmcount += 1
-                            else:
-                                dmFileFactor += 1
-
-                        self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
-                        self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
-                        self.filOcc.write('%.16e ' % self.evolTime)
-                        for m in range(0, self.m):
-                            self.filOcc.write('%.16e ' % self.occNo[m])
-                        self.filOcc.write('\n')
-                            
+                        self.writeData()
+                        
                     # ## Time Step!
                     self.timeStep()
+                    if self.boolRetgreen:
+                        self.greenTimeStep()
                     self.evolStep += self.evolStepDist
                 
                 # calculate total entropy and energy only 100 times, it is time consuming and only a check
@@ -748,13 +749,55 @@ class mpSystem:
         print('\n' + 'Time evolution finished after', time_elapsed(t0, 60), 'with average time/step of', "%.4e" % self.tavg)
         
         if self.boolDataStore:
-            self.filEnt.close()
-            self.filTotEnt.close()
-            self.filNorm.close()
-            self.filOcc.close()
-            self.filEnergy.close()
+            self.closeFiles()
     # end
     
+    def writeData(self):
+        if self.boolDMStore or self.boolDMRedStore:
+            if dmFileFactor == self.dmFilesSkipFactor:
+                dmFileFactor = 1
+                if not self.boolOnlyRed:
+                    if self.boolDMStore:
+                        storeMatrix(self.densityMatrix, './data/density/densmat' + str(int(self.dmcount)) + '.txt')
+                    if self.boolDMRedStore:
+                        storeMatrix(self.densityMatrixRed, './data/red_density/densmat' + str(int(self.dmcount)) + '.txt')
+                    self.dmcount += 1
+            else:
+                dmFileFactor += 1
+
+        self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
+        self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
+        self.filOcc.write('%.16e ' % self.evolTime)
+        for m in range(0, self.m):
+            self.filOcc.write('%.16e ' % self.occNo[m])
+        self.filOcc.write('\n')
+        if self.boolRetgreen:
+            self.filGreen.write('%.16e ' % (self.evolTime))    
+            for ind in range(0,self.m):
+                self.filGreen.write('%.16e %.16e ' % (self.green[ind].real, self.green[ind].imag))    
+            self.filGreen.write(' \n')
+            
+    def openFiles(self):
+        self.filEnt = open('./data/entropy.txt', 'w')
+        self.filTotEnt = open('./data/total_entropy.txt', 'w')
+        self.filNorm = open('./data/norm.txt', 'w')
+        self.filOcc = open('./data/occupation.txt', 'w')
+        self.filEnergy = open('./data/energy.txt', 'w')
+        self.filProg = open('./data/progress.log', 'w')
+        self.filProg.close()
+        if self.boolRetgreen:
+            self.filGreen = open('./data/green.txt','w') #t, re, im
+
+    #close all files
+    def closeFiles(self):
+        self.filEnt.close()
+        self.filTotEnt.close()
+        self.filNorm.close()
+        self.filOcc.close()
+        self.filEnergy.close()
+        if self.boolRetgreen:
+            self.filGreen.close()
+            
     def plotDMAnimation(self, stepSize):
         ep.plotDensityMatrixAnimation(self.steps, self.deltaT , self.dmFiles , stepSize, framerate=self.dmFilesFPS)
     # end of plotDMAnimation

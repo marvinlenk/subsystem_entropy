@@ -1,12 +1,14 @@
 import numpy as np
 import scipy.integrate as scint
 import matplotlib as mpl
+from numpy.distutils.system_info import tmp
 mpl.use('Agg')
 from matplotlib.pyplot import cm , step
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
+from scipy.fftpack import fft, fftfreq
 
 #searches for closest to value element in array
 def find_nearest(array,value):
@@ -79,6 +81,10 @@ def plotData(sysVar):
         microexpfile = './data/diagexpect.txt'
         microexp = np.loadtxt(microexpfile)
     
+    if sysVar.boolPlotGreen:
+        greenfile = './data/green.txt'
+        greendat = np.loadtxt(greenfile)
+        
     #### Complete system Entropy
     if(sysVar.boolTotalEnt):
         plt.plot(totent_array[:,0]*sysVar.plotTimeScale,totent_array[:,1]*1e13, linewidth =0.6, color = 'r')
@@ -345,7 +351,38 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
+    
+    ### Greensfunction
+    if sysVar.boolPlotGreen:
+        for i in range(0,sysVar.m):
+            plt.title(r'Green function of level $%i$' % (i))
+            ind = 2*i + 1
+            plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind],lw=0.1,color='red',label='real')
+            plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind+1],lw=0.1,color='blue',label='imaginary')
+            plt.ylabel(r'$G^R(t)$')
+            plt.xlabel(r'$J\,t$')
+            plt.legend(loc='lower right')
+            plt.grid()
+            plt.tight_layout()
+            ###
+            pp.savefig()
+            plt.clf()
+            ###
+            plt.title(r'quasi Spectral function of level $%i$' % (i))
+            ind = 2*i + 1
+            tmp = greendat[:,ind] + 1j * greendat[:,ind+1]
+            hlp = -2*fft(tmp)
+            hlpfrq = fftfreq(len(hlp),d=(greendat[1,0] * sysVar.plotTimeScale))
+            plt.plot(hlpfrq,hlp.imag,color = 'red')
+            plt.ylabel(r'$A(\omega)$')
+            plt.xlabel(r'$\omega$')
+            plt.grid()
+            plt.tight_layout()
+            ###
+            pp.savefig()
+            plt.clf()
             
+        print('.',end='',flush=True)       
     if sysVar.boolPlotDecomp:
         ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
         fig, ax1 = plt.subplots()

@@ -1,5 +1,11 @@
 change log
 
+### 24.04.2017
+- added option for green function plot
+- added option for order of discrete time evolution. It is now in the .ini file and not in the function call.
+	This is a setup for reducing the actual function calls in the run script.
+- finalized time evolution for retarded Green's function
+
 ### 21.04.2017
 - added retarded Green's function to the time evolution! (yay) (in progress - need to actually do time evolution and value storing)
 - improved eigendecomposition function and diagonalization function to be more intelligent
@@ -7,6 +13,7 @@ change log
 
 ### 20.04.2017
 - finished eigenvalue and spectral function part, is obsolete because of very large dimension - keep it but do not use it!
+- moved hamiltonian generation to function call of the class. Parameters are now in the .ini
 
 ### 18.04.2017
 - more progress on lower dimension hamiltonian
