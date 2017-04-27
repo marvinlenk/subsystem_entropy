@@ -108,13 +108,12 @@ class mpSystem:
                 self.specHiHamiltonian = coo_matrix(np.zeros((self.specHiDim, self.specHiDim)), shape=(self.specHiDim, self.specHiDim), dtype=np.float64).tocsr()
                 if self.boolRetgreen:
                     self.green = np.zeros(self.m, dtype = self.datType)
-                    self.initStateHiKet = []
-                    self.initStateLoBra = []
+                    self.stateSaves = [] #append with time dep. state vector
+                    self.timeSaves = [] #append with time of saved state vector
                     self.specLoEvolutionMatrix = None
                     self.specHiEvolutionMatrix = None
                     self.specLowering = []
                     self.specRaising = []
-                    self.specLoRaInd = False
                     #fill'em
                     for i in range(0,self.m):
                         #note that the lowering operator transposed is the raising op. of the lower dimension space
@@ -365,23 +364,32 @@ class mpSystem:
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initSpecLoEvolutionMatrix(self, diagonalize=False):
+    #### IMPORTANT NOTE - complex conjugate will be needed for Green function ####
+    #### FURTHER: need only 2*delta_T for green function, so added sq=True ####
+    def initSpecLoEvolutionMatrix(self, diagonalize=False,conj=True,sq=True):
         if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specLoHamiltonian.toarray(), np.conjugate(self.specLoHamiltonian.toarray().T))):
             print('Warning - hamiltonian is not hermitian!')
         self.specLoEvolutionMatrix = spidentity(self.specLoDim, dtype=self.datType, format='csr')
         
+        if conj:
+            pre = (1j)
+        else:
+            pre = (-1j)
+            
         for i in range(1, self.loOrder + 1):
-            self.specLoEvolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.specLoHamiltonian ** i / factorial(i)
+            self.specLoEvolutionMatrix += pre ** i * (self.deltaT) ** i * self.specLoHamiltonian ** i / factorial(i)
         if diagonalize:
             self.updateLoEigenenergies()
+        if sq:
+            self.specLoEvolutionMatrix = self.specLoEvolutionMatrix ** 2
     # end
     
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initSpecHiEvolutionMatrix(self, diagonalize=False):
+    def initSpecHiEvolutionMatrix(self, diagonalize=False,sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specHiHamiltonian.toarray(), np.conjugate(self.specHiHamiltonian.toarray().T))):
@@ -392,17 +400,18 @@ class mpSystem:
             self.specHiEvolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.specHiHamiltonian ** i / factorial(i)
         if diagonalize:
             self.updateHiEigenenergies()
+        if sq:
+            self.specHiEvolutionMatrix = self.specHiEvolutionMatrix ** 2
     # end
     
     def timeStep(self):
         self.state = npdot(self.evolutionMatrix, self.state)
     # end of timeStep
     
-    def greenTimeStep(self):
-        for i in range(0,self.m):
-            self.specRaising[i] = self.specRaising[i] * self.specHiEvolutionMatrix
-            self.specLowering[i] = self.specLoEvolutionMatrix * self.specLowering[i]
-            
+    def greenStoreState(self):
+        self.stateSaves.append(self.state)
+        self.timeSaves.append(self.evolTime)
+        
     # approximate distributions in energy space - all parameters have to be set!
     # if skip is set to negative, the absolute value gives probability for finding a True in binomial
     def stateEnergy(self, muperc=[50], sigma=[1], phase=['none'], skip=[0], dist=['std'], peakamps=[1], skew=[0]):
@@ -468,10 +477,6 @@ class mpSystem:
             self.stateNormAbs = 1
             self.updateEigendecomposition()
             #store starting states used for green function
-            if self.boolRetgreen:
-                for i in range(0,self.m):
-                    self.initStateHiKet.append(self.specRaising[i] * self.state)
-                    self.initStateLoBra.append(self.state.T * self.specLowering[i].T)
         if np.abs(self.stateNormAbs) > self.stateNormCheck:
             if self.stateNormCheck == 1e1:
                 print('\n' + '### WARNING! ### state norm has been normalized by more than the factor 10 now!' + '\n' + 'Check corresponding plot if behavior is expected - indicator for numerical instability!' + '\n')
@@ -661,11 +666,44 @@ class mpSystem:
         self.energy = np.real(self.expectValue(self.hamiltonian.toarray()))
     # end of updateEnergy
     
-    def updateGreen(self):
+    def evaluateGreen(self):
         # use dots for multithread!
+        self.filGreen = open('./data/green.txt','w') #t, re, im
+        
+        tmpHiEvol = spidentity(self.specHiDim, dtype=self.datType, format='csr')
+        tmpLoEvol = spidentity(self.specLoDim, dtype=self.datType, format='csr')
+        tmpGreen = 0j
+        
+        saves = len(self.timeSaves)
+        dt = self.timeSaves[1]
+
+        #handle the i=0 case => equal time greens function is always -i:
+        self.filGreen.write('%.16e ' % (0))    
+        for ind in range(0,self.m):
+            self.filGreen.write('%.16e %.16e ' % (0, -1))    
+        self.filGreen.write(' \n')    
+    
+        for i in range(1,int(len(self.timeSaves)/2)):
+            tmpHiEvol = tmpHiEvol * self.specHiEvolutionMatrix ## they need to be the squared ones!
+            tmpLoEvol = tmpLoEvol * self.specLoEvolutionMatrix ## they need to be the squared ones!
+            self.filGreen.write('%.16e ' % (dt*i)) 
+            for m in range(0,self.m):
+                tmpGreen = (self.stateSaves[ind+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[ind-i])[0] 
+                tmpGreen -= (self.stateSaves[ind-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[ind+i])[0]
+                ''' einsum version
+                tmpGreen = np.einsum('ji,kl,lj -> j',self.stateSaves[ind+i].T.conjugate(), (self.specRaising[m].T * tmpHiEvol * self.specRaising[m]).toarray(), self.stateSaves[ind-i])[0] 
+                tmpGreen -= np.einsum('ji,kl,lj -> j',self.stateSaves[ind-i].T.conjugate(),(self.specLowering[m].T * tmpLoEvol * self.specLowering[m]).toarray(), self.stateSaves[ind+i])[0]
+                '''
+                #note that the greensfunction is multiplied by -i, which is included in the writing below!
+                #first number is real part, second imaginary
+                self.filGreen.write('%.16e %.16e ' % (tmpGreen.imag, -1*tmpGreen.real))    
+            self.filGreen.write(' \n')
+            
+        self.filGreen.close()
+        '''
         for i in range(0,self.m):
             self.green[i] = -1j * (np.einsum('ij,ij -> j', self.state.T.conjugate(), (self.specRaising[i] * self.initStateHiKet[i]))[0] - np.einsum('ij,ij -> j',self.initStateLoBra[i], (self.specLowering[i] * self.state))[0])
-        
+        '''
     # update everything EXCEPT for total entropy and energy - they are only updated 100 times
     def updateEverything(self):
         self.evolTime += (self.evolStep - self.evolStepTmp) * self.deltaT
@@ -677,9 +715,6 @@ class mpSystem:
             self.updateDensityMatrix()
             self.reduceDensityMatrix()
             self.updateOccNumbers()
-        
-        if self.boolRetgreen:
-            self.updateGreen()
                     
         self.updateEntropyRed()
         
@@ -691,11 +726,6 @@ class mpSystem:
         
         if self.boolDataStore:
             self.openFiles()
-         
-        if self.boolRetgreen and not self.specLoRaInd:
-            for i in range(0,self.m):
-                self.specRaising[i] = self.specRaising[i].T
-                self.specLoRaInd = True 
         
         self.evolStepTmp = self.evolStep
         stepNo = int(self.dataPoints / 100)
@@ -714,14 +744,18 @@ class mpSystem:
                 for j in range(0 , stepNo):
                     if self.boolDataStore:
                         self.updateEverything()
-                        
                         self.writeData()
+                    if self.boolRetgreen:
+                        self.greenStoreState()
                         
                     # ## Time Step!
                     self.timeStep()
-                    if self.boolRetgreen:
-                        self.greenTimeStep()
                     self.evolStep += self.evolStepDist
+                
+                ######### TMP TMP TMP #########
+                # store states for the greens function - temporarily only 100 times
+                #if self.boolRetgreen:
+                #    self.greenStoreState()
                 
                 # calculate total entropy and energy only 100 times, it is time consuming and only a check
                 if self.boolTotalEnt:
@@ -746,6 +780,13 @@ class mpSystem:
             self.filProg = open('./data/progress.log', 'a')
             self.filProg.write(' 1-norm: ' + str(1 - np.round(self.stateNormAbs, 2)) + ' elapsed ' + time_elapsed(t0, 60, 0) + " ###### eta: " + str(int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ")
             self.filProg.close()
+        
+        if self.boolDataStore:
+            self.updateEverything()   
+            self.writeData()
+        if self.boolRetgreen:
+            self.greenStoreState()
+        
         print('\n' + 'Time evolution finished after', time_elapsed(t0, 60), 'with average time/step of', "%.4e" % self.tavg)
         
         if self.boolDataStore:
@@ -771,11 +812,6 @@ class mpSystem:
         for m in range(0, self.m):
             self.filOcc.write('%.16e ' % self.occNo[m])
         self.filOcc.write('\n')
-        if self.boolRetgreen:
-            self.filGreen.write('%.16e ' % (self.evolTime))    
-            for ind in range(0,self.m):
-                self.filGreen.write('%.16e %.16e ' % (self.green[ind].real, self.green[ind].imag))    
-            self.filGreen.write(' \n')
             
     def openFiles(self):
         self.filEnt = open('./data/entropy.txt', 'w')
@@ -785,8 +821,6 @@ class mpSystem:
         self.filEnergy = open('./data/energy.txt', 'w')
         self.filProg = open('./data/progress.log', 'w')
         self.filProg.close()
-        if self.boolRetgreen:
-            self.filGreen = open('./data/green.txt','w') #t, re, im
 
     #close all files
     def closeFiles(self):
@@ -795,8 +829,6 @@ class mpSystem:
         self.filNorm.close()
         self.filOcc.close()
         self.filEnergy.close()
-        if self.boolRetgreen:
-            self.filGreen.close()
             
     def plotDMAnimation(self, stepSize):
         ep.plotDensityMatrixAnimation(self.steps, self.deltaT , self.dmFiles , stepSize, framerate=self.dmFilesFPS)

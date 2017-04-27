@@ -8,7 +8,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from scipy.fftpack import fft, fftfreq
+from scipy.fftpack import fft, fftfreq, fftshift
 
 #searches for closest to value element in array
 def find_nearest(array,value):
@@ -355,12 +355,12 @@ def plotData(sysVar):
     ### Greensfunction
     if sysVar.boolPlotGreen:
         for i in range(0,sysVar.m):
-            plt.title(r'Green function of level $%i$' % (i))
+            plt.title(r'two time Green function of level $%i$' % (i))
             ind = 2*i + 1
             plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind],lw=0.1,color='red',label='real')
             plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind+1],lw=0.1,color='blue',label='imaginary')
             plt.ylabel(r'$G^R(t)$')
-            plt.xlabel(r'$J\,t$')
+            plt.xlabel(r'$J\,\tau$')
             plt.legend(loc='lower right')
             plt.grid()
             plt.tight_layout()
@@ -368,14 +368,14 @@ def plotData(sysVar):
             pp.savefig()
             plt.clf()
             ###
-            plt.title(r'quasi Spectral function of level $%i$' % (i))
+            plt.title(r'Spectral function of level $%i$' % (i))
             ind = 2*i + 1
             tmp = greendat[:,ind] + 1j * greendat[:,ind+1]
-            hlp = -2*fft(tmp)
-            hlpfrq = fftfreq(len(hlp),d=(greendat[1,0] * sysVar.plotTimeScale))
+            hlp = fftshift(-2*fft(tmp))
+            hlpfrq = fftshift(fftfreq(len(hlp),d=(greendat[1,0] * sysVar.plotTimeScale)))
             plt.plot(hlpfrq,hlp.imag,color = 'red')
-            plt.ylabel(r'$A(\omega)$')
-            plt.xlabel(r'$\omega$')
+            plt.ylabel(r'$A$')
+            plt.xlabel(r'$\omega / J$')
             plt.grid()
             plt.tight_layout()
             ###
