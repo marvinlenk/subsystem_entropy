@@ -672,7 +672,7 @@ class mpSystem:
         
         tmpHiEvol = spidentity(self.specHiDim, dtype=self.datType, format='csr')
         tmpLoEvol = spidentity(self.specLoDim, dtype=self.datType, format='csr')
-        tmpGreen = 0j
+        tmpGreen = 0+0j
         
         saves = len(self.timeSaves)
         bound = int((saves-1)/2)
@@ -684,10 +684,12 @@ class mpSystem:
             self.filGreen.write('%.16e %.16e ' % (0, -1))    
         self.filGreen.write(' \n')    
     
-        for i in range(1,bound):
+        for i in range(1,bound+1):
             tmpHiEvol = tmpHiEvol * self.specHiEvolutionMatrix ## they need to be the squared ones!
             tmpLoEvol = tmpLoEvol * self.specLoEvolutionMatrix ## they need to be the squared ones!
             self.filGreen.write('%.16e ' % (dt*i)) 
+            if i >= bound:
+                print(bound - i)
             for m in range(0,self.m):
                 tmpGreen = (self.stateSaves[bound+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[bound-i])[0] 
                 tmpGreen -= (self.stateSaves[bound-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[bound+i])[0]
