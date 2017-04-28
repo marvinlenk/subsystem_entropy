@@ -1,9 +1,10 @@
 change log
 
 ### 27.04.2017
-- actually need 101 points to get the full range!!! added this partially only - work in progress
+- actually need 101 points to get the full range!!! added this partially only - work in progress (also actually need uneven points for greensfunctions to work)
 - check for data points to time steps calculation - last point is not taken but first one is... so datapoints+1 will be produced
 - two time green working but i think there is an time offset in there... check this!
+- changed index of green function to be the acual middle one
 
 ### 26.04.2017
 - started changing to general retarded two time greens function - temporarily only 100 points!

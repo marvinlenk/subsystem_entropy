@@ -675,6 +675,7 @@ class mpSystem:
         tmpGreen = 0j
         
         saves = len(self.timeSaves)
+        bound = int((saves-1)/2)
         dt = self.timeSaves[1]
 
         #handle the i=0 case => equal time greens function is always -i:
@@ -683,13 +684,13 @@ class mpSystem:
             self.filGreen.write('%.16e %.16e ' % (0, -1))    
         self.filGreen.write(' \n')    
     
-        for i in range(1,int(len(self.timeSaves)/2)):
+        for i in range(1,bound):
             tmpHiEvol = tmpHiEvol * self.specHiEvolutionMatrix ## they need to be the squared ones!
             tmpLoEvol = tmpLoEvol * self.specLoEvolutionMatrix ## they need to be the squared ones!
             self.filGreen.write('%.16e ' % (dt*i)) 
             for m in range(0,self.m):
-                tmpGreen = (self.stateSaves[ind+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[ind-i])[0] 
-                tmpGreen -= (self.stateSaves[ind-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[ind+i])[0]
+                tmpGreen = (self.stateSaves[bound+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[bound-i])[0] 
+                tmpGreen -= (self.stateSaves[bound-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[bound+i])[0]
                 ''' einsum version
                 tmpGreen = np.einsum('ji,kl,lj -> j',self.stateSaves[ind+i].T.conjugate(), (self.specRaising[m].T * tmpHiEvol * self.specRaising[m]).toarray(), self.stateSaves[ind-i])[0] 
                 tmpGreen -= np.einsum('ji,kl,lj -> j',self.stateSaves[ind-i].T.conjugate(),(self.specLowering[m].T * tmpLoEvol * self.specLowering[m]).toarray(), self.stateSaves[ind+i])[0]
