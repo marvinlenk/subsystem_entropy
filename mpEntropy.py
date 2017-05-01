@@ -366,7 +366,7 @@ class mpSystem:
     # this one will be only in sparse container since it is meant for sparse matrix mult.
     #### IMPORTANT NOTE - complex conjugate will be needed for Green function ####
     #### FURTHER: need only 2*delta_T for green function, so added sq=True ####
-    def initSpecLoEvolutionMatrix(self, diagonalize=False,conj=True,sq=True):
+    def initSpecLoEvolutionMatrix(self, diagonalize=False,conj=False,sq=True):
         if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specLoHamiltonian.toarray(), np.conjugate(self.specLoHamiltonian.toarray().T))):
@@ -379,7 +379,7 @@ class mpSystem:
             pre = (-1j)
             
         for i in range(1, self.loOrder + 1):
-            self.specLoEvolutionMatrix += pre ** i * (self.deltaT) ** i * self.specLoHamiltonian ** i / factorial(i)
+            self.specLoEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.specLoHamiltonian ** i) / factorial(i)
         if diagonalize:
             self.updateLoEigenenergies()
         if sq:
@@ -389,15 +389,20 @@ class mpSystem:
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initSpecHiEvolutionMatrix(self, diagonalize=False,sq=True):
+    def initSpecHiEvolutionMatrix(self, diagonalize=False,conj=True,sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specHiHamiltonian.toarray(), np.conjugate(self.specHiHamiltonian.toarray().T))):
             print('Warning - hamiltonian is not hermitian!')
         self.specHiEvolutionMatrix = spidentity(self.specHiDim, dtype=self.datType, format='csr')
         
+        if conj:
+            pre = (1j)
+        else:
+            pre = (-1j)
+        
         for i in range(1, self.hiOrder + 1):
-            self.specHiEvolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.specHiHamiltonian ** i / factorial(i)
+            self.specHiEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.specHiHamiltonian ** i) / factorial(i)
         if diagonalize:
             self.updateHiEigenenergies()
         if sq:
@@ -687,9 +692,7 @@ class mpSystem:
         for i in range(1,bound+1):
             tmpHiEvol = tmpHiEvol * self.specHiEvolutionMatrix ## they need to be the squared ones!
             tmpLoEvol = tmpLoEvol * self.specLoEvolutionMatrix ## they need to be the squared ones!
-            self.filGreen.write('%.16e ' % (dt*i)) 
-            if i >= bound:
-                print(bound - i)
+            self.filGreen.write('%.16e ' % (2*dt*i)) 
             for m in range(0,self.m):
                 tmpGreen = (self.stateSaves[bound+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[bound-i])[0] 
                 tmpGreen -= (self.stateSaves[bound-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[bound+i])[0]

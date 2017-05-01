@@ -352,7 +352,7 @@ def plotData(sysVar):
         plt.clf()
         print('.',end='',flush=True)
     
-    ### Greensfuncti
+    ### Greensfunction
     if sysVar.boolPlotGreen:
         for i in range(0,sysVar.m):
             plt.title(r'two time Green function of level $%i$' % (i))
@@ -378,7 +378,7 @@ def plotData(sysVar):
                 shit += hlp
             hlpfrq = fftshift(fftfreq(len(hlp),d=(greendat[1,0] * sysVar.plotTimeScale)))
             print(i,np.trapz(hlp.imag,x=hlpfrq))
-            plt.plot(hlpfrq,hlp.imag,color = 'red',lw=0.1)
+            plt.plot(hlpfrq,np.abs(hlp.imag),color = 'red',lw=0.1)
             plt.ylabel(r'$A$')
             plt.xlabel(r'$\omega / J$')
             plt.grid()
@@ -390,6 +390,7 @@ def plotData(sysVar):
         plt.title(r'Spectral function')
         ind = 2*i + 1
         plt.plot(hlpfrq,shit.imag,color = 'red',lw=0.1)
+        print(np.trapz(shit.imag,x=hlpfrq))
         plt.ylabel(r'$A$')
         plt.xlabel(r'$\omega / J$')
         plt.grid()
