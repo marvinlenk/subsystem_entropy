@@ -281,17 +281,18 @@ class mpSystem:
                 else:
                     self.hamiltonian += (i) * (self.onsite) * self.operators[i,j]
         
-        tmp = np.matrix( np.zeros( (self.dim , self.dim) ) )
-        for i in range(0, self.m):
-            for j in range(0, self.m):
-                for k in range(0, self.m):
-                    for l in range(0, self.m):
-                        tmp = getQuartic(self,i,j,k,l)
-                        if  i==j and k==l and k==j:
-                            self.hamiltonian += (self.interequal) * tmp
-                        else:
-                            self.hamiltonian += (self.interdiff) * tmp
-                        del tmp
+        if self.interequal != 0 and self.interdiff != 0:
+            tmp = np.matrix( np.zeros( (self.dim , self.dim) ) )
+            for i in range(0, self.m):
+                for j in range(0, self.m):
+                    for k in range(0, self.m):
+                        for l in range(0, self.m):
+                            tmp = getQuartic(self,i,j,k,l)
+                            if  i==j and k==l and k==j:
+                                self.hamiltonian += (self.interequal) * tmp
+                            else:
+                                self.hamiltonian += (self.interdiff) * tmp
+                            del tmp
     
     def initSpecLoHamiltonian(self):
         tmpspecops = quadraticArraySpecLo(self)
@@ -302,18 +303,19 @@ class mpSystem:
                 else:
                     self.specLoHamiltonian += (i) * (self.onsite) * tmpspecops[i,j]
         
-        tmp = np.matrix( np.zeros( (self.specLoDim , self.specLoDim) ) )
-        for i in range(0, self.m):
-            for j in range(0, self.m):
-                for k in range(0, self.m):
-                    for l in range(0, self.m):
-                        tmp = getQuarticSpec(tmpspecops,i,j,k,l)
-                        if  i==j and k==l and k==j:
-                            self.specLoHamiltonian += (self.interequal) * tmp
-                        else:
-                            self.specLoHamiltonian += (self.interdiff) * tmp
-                        del tmp
-        del tmpspecops
+        if self.interequal != 0 and self.interdiff != 0:        
+            tmp = np.matrix( np.zeros( (self.specLoDim , self.specLoDim) ) )
+            for i in range(0, self.m):
+                for j in range(0, self.m):
+                    for k in range(0, self.m):
+                        for l in range(0, self.m):
+                            tmp = getQuarticSpec(tmpspecops,i,j,k,l)
+                            if  i==j and k==l and k==j:
+                                self.specLoHamiltonian += (self.interequal) * tmp
+                            else:
+                                self.specLoHamiltonian += (self.interdiff) * tmp
+                            del tmp
+            del tmpspecops
         
     def initSpecHiHamiltonian(self):
         tmpspecops = quadraticArraySpecHi(self)
@@ -324,18 +326,19 @@ class mpSystem:
                 else:
                     self.specHiHamiltonian += (i) * (self.onsite) * tmpspecops[i,j]
         
-        tmp = np.matrix( np.zeros( (self.specHiDim , self.specHiDim) ) )
-        for i in range(0, self.m):
-            for j in range(0, self.m):
-                for k in range(0, self.m):
-                    for l in range(0, self.m):
-                        tmp = getQuarticSpec(tmpspecops,i,j,k,l)
-                        if  i==j and k==l and k==j:
-                            self.specHiHamiltonian += (self.interequal) * tmp
-                        else:
-                            self.specHiHamiltonian += (self.interdiff) * tmp
-                        del tmp
-        del tmpspecops
+        if self.interequal != 0 and self.interdiff != 0:
+            tmp = np.matrix( np.zeros( (self.specHiDim , self.specHiDim) ) )
+            for i in range(0, self.m):
+                for j in range(0, self.m):
+                    for k in range(0, self.m):
+                        for l in range(0, self.m):
+                            tmp = getQuarticSpec(tmpspecops,i,j,k,l)
+                            if  i==j and k==l and k==j:
+                                self.specHiHamiltonian += (self.interequal) * tmp
+                            else:
+                                self.specHiHamiltonian += (self.interdiff) * tmp
+                            del tmp
+            del tmpspecops
     
     
     # The matrix already inherits the identity so step is just mutliplication

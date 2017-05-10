@@ -2,6 +2,7 @@ import numpy as np
 import scipy.integrate as scint
 import matplotlib as mpl
 from numpy.distutils.system_info import tmp
+from scipy.optimize import least_squares
 mpl.use('Agg')
 from matplotlib.pyplot import cm , step
 from matplotlib.backends.backend_pdf import PdfPages
@@ -354,6 +355,10 @@ def plotData(sysVar):
     
     ### Greensfunction
     if sysVar.boolPlotGreen:
+        spec = []
+        gnorm = []
+        specnorm = []
+        print('')
         for i in range(0,sysVar.m):
             plt.title(r'two time Green function of level $%i$' % (i))
             ind = 2*i + 1
@@ -371,14 +376,17 @@ def plotData(sysVar):
             plt.title(r'Spectral function of level $%i$' % (i))
             ind = 2*i + 1
             tmp = greendat[:,ind] + 1j * greendat[:,ind+1]
-            hlp = fftshift(-2*fft(tmp))
+            gnorm.append(np.trapz(np.abs(tmp)**2,x=greendat[:,0]))
+            gffttmp = fftshift(-2*fft(tmp))
+            spec.append(gffttmp.imag)
             if i == 0:
-                shit = hlp
+                shit = spec[i]
+                hlpfrq = fftshift(fftfreq(len(spec[i]),d=(greendat[1,0] * sysVar.plotTimeScale)))
             else:
-                shit += hlp
-            hlpfrq = fftshift(fftfreq(len(hlp),d=(greendat[1,0] * sysVar.plotTimeScale)))
-            print(i,np.trapz(hlp.imag,x=hlpfrq))
-            plt.plot(hlpfrq,np.abs(hlp.imag),color = 'red',lw=0.1)
+                shit += spec[i]
+            print(i,np.trapz(spec[i],x=hlpfrq))
+            specnorm.append(np.trapz(np.abs(gffttmp)**2,x=hlpfrq))
+            plt.plot(hlpfrq,spec[i],color = 'red',lw=0.1)
             plt.ylabel(r'$A$')
             plt.xlabel(r'$\omega / J$')
             plt.grid()
@@ -386,11 +394,15 @@ def plotData(sysVar):
             ###
             pp.savefig()
             plt.clf()
-        
+        print('Greensfunction norm:')
+        print(gnorm)
+        print(np.sum(gnorm))
+        print('fft norm:')
+        print(specnorm)
         plt.title(r'Spectral function')
         ind = 2*i + 1
-        plt.plot(hlpfrq,shit.imag,color = 'red',lw=0.1)
-        print(np.trapz(shit.imag,x=hlpfrq))
+        plt.plot(hlpfrq,shit,color = 'red',lw=0.1)
+        print(np.trapz(shit,x=hlpfrq))
         plt.ylabel(r'$A$')
         plt.xlabel(r'$\omega / J$')
         plt.grid()
@@ -399,7 +411,38 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
           
-        print('.',end='',flush=True)       
+        print('.',end='',flush=True)
+        
+        for s in range(0,len(spec)):
+            print(np.average(hlpfrq,weights=spec[s])/occavg[int(7+3*s)])
+        spec = np.array(spec)/(2*np.pi)  
+        
+        def bestatd(args):
+            temp = args[0]
+            mu = args[1]
+            ret =[]
+            for i in range(0,sysVar.m):
+                ret.append(occno(spec[i],hlpfrq,temp,mu) - occavg[int(7 + 3*i)])
+            return np.array(ret)
+        
+        def bestat(args):
+            temp = args[0]
+            mu = args[1]
+            ret =[]
+            for i in range(0,sysVar.m):
+                ret.append(occno(spec[i],hlpfrq,temp,mu))
+            return np.array(ret)
+        
+        strt = np.array([10,-0.1])
+        bnds = np.array([[0.0001,-10000],[1000,100]])
+        rgs = least_squares(bestatd,x0=strt,bounds=bnds,loss='soft_l1')
+        print(rgs)
+        print(bestat(rgs.x))
+        a = []
+        for i in range(0,sysVar.m):
+            a.append(occavg[int(7+3*i)])
+        print(a)
+        
     if sysVar.boolPlotDecomp:
         ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
         fig, ax1 = plt.subplots()
@@ -693,3 +736,9 @@ def plotTimescale(sysVar):
     print('.',end='',flush=True)
     pp.close()
     print(" done!")
+    
+def occno(spec,freq,temp,mu):
+    rt = []
+    for i in range(0,len(freq)):
+        rt.append(spec[i]/(np.exp((freq[i]-mu)/temp)-1.0))
+    return np.trapz(np.array(rt), x=freq)
