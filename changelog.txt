@@ -2,6 +2,7 @@ change log
 
 ### 18.06.2017
 - added off-diagonal occupation number calculation on runtime (handle with care, rather slow)
+- removed the numpy.distutils.system_info.tmp import in entPlot, that was a mistake done far in the past
 
 ### 27.04.2017
 - actually need 101 points to get the full range!!! added this partially only - work in progress (also actually need uneven points for greensfunctions to work)

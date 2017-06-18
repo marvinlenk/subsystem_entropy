@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.integrate as scint
 import matplotlib as mpl
-from numpy.distutils.system_info import tmp
 from scipy.optimize import least_squares
 mpl.use('Agg')
 from matplotlib.pyplot import cm , step
