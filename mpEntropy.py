@@ -4,7 +4,7 @@ import numpy as np
 from numpy import dot as npdot
 import shutil
 from scipy.special import binom
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import coo_matrix, csr_matrix, issparse
 from scipy.sparse import identity as spidentity
 from scipy.special import erf
 import scipy.linalg as la
@@ -67,7 +67,14 @@ class mpSystem:
             self.mRed = self.m - len(self.kRed)
             self.mRedComp = len(self.kRed)
             self.entropyRed = 0
-    
+            
+            ###### energy eigenbasis stuff
+            if self.boolOffDiag:
+                self.offDiagMat = np.empty((self.m), dtype=object)
+                self.enState = np.zeros((self.dim,1), dtype=self.datType)
+                self.enStateBra = np.zeros((1,self.dim), dtype=self.datType)
+                self.offDiag = np.zeros((self.m), dtype=self.datType)
+            
             if self.mRedComp == 0:
                 self.dimRed = 0
                 self.offsetsRed = None
@@ -174,6 +181,7 @@ class mpSystem:
         self.boolDMRedStore = configParser.getboolean('filemanagement', 'dmredstore') 
         self.boolHamilStore = configParser.getboolean('filemanagement', 'hamilstore')
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
+        self.boolOffDiag = configParser.getboolean('filemanagement', 'offdiag')
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexpstore')
@@ -190,6 +198,7 @@ class mpSystem:
         self.boolPlotDMAnimation = configParser.getboolean('plotbools', 'densistymatrix')
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'reducedmatrix')
         self.boolPlotOccEn = configParser.getboolean('plotbools', 'occen')
+        self.boolPlotOffDiag = configParser.getboolean('plotbools', 'offdiag')
         self.boolPlotEngy = configParser.getboolean('plotbools', 'energies')
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'decomposition')
         self.boolPlotDiagExp = configParser.getboolean('plotbools', 'diagexp')
@@ -611,35 +620,65 @@ class mpSystem:
                 sfil.write('\n')
             sfil.close()
         
-        if self.boolDiagExpStore or self.boolOccEnStore:
+        if self.boolDiagExpStore or self.boolOccEnStore or self.boolOffDiag:
             self.updateEigenenergies()
             eivectinv = la.inv(np.matrix(self.eigVects.T))
         
         # expectation values in diagonal representation (ETH)
-        if self.boolDiagExpStore:
+        if self.boolDiagExpStore or self.boolOffDiag:
             if not self.boolDecompStore:
                 tmpAbsSq = np.zeros(self.dim)
                 for i in range(0, self.dim):
-                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0])                  
+                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
+                    if self.boolOffDiag:
+                        self.enState[i,0] = tmp
+                        self.enStateBra[0,i] = np.conjugate(tmp)
+                    # for the diagonals only the abs value is necessary            
                     tmpAbsSq[i] = np.abs(tmp) ** 2
             ethfil = open('./data/diagexpect.txt', 'w')
             for i in range(0, self.m):
-                tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
-                ethfil.write('%i %.16e \n' % (i, tmpocc))
+                if self.boolOffDiag:
+                    #first store everything, later delete diagonal elements
+                    self.offDiagMat[i] = np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
+                    tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
+                else:
+                    tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
+                ethfil.write('%i %.16e \n' % (i, tmpocc.real))
             ethfil.close()
         
         if self.boolOccEnStore:
             for i in range(0, self.m):
-                storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
+                if self.boolOffDiag:
+                    #note that the off diag mat still contains the diagonals right now!
+                    storeMatrix(self.offDiagMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
+                else:
+                    storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
         
+        #now we remove the diagonal elements
+        for i in range(0, self.m):
+            np.fill_diagonal(self.offDiagMat[i], 0)
+            
         if clear:
             # free the memory
             del self.eigVals
-            del self.eigVects
+            if not self.boolOccEnStore:
+                del self.eigVects
+                self.eigVects = []
             self.eigInd
             self.eigVals = []
-            self.eigVects = []
             self.eigInd = False
+    
+    def updateOffDiag(self):
+        for i in range(0, self.dim):
+            tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
+            self.enState[i,0] = tmp
+            self.enStateBra[0,i] = np.conjugate(tmp)
+            
+        offdiagfil = open('./data/offdiagonals.txt', 'w')
+        for i in range(0, self.m):
+            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
+            if self.offDiag[i].imag > 1e-6:
+                print('The offdiagonal expectation value has an imaginary part of ', self.offDiag[i].imag)
         
     def updateEntropy(self):
         self.entropy = 0
@@ -724,7 +763,9 @@ class mpSystem:
             self.updateDensityMatrix()
             self.reduceDensityMatrix()
             self.updateOccNumbers()
-                    
+        if self.boolOffDiag:
+            self.updateOffDiag()
+                 
         self.updateEntropyRed()
         
     ###### the magic of time evolution
@@ -814,13 +855,19 @@ class mpSystem:
                     self.dmcount += 1
             else:
                 dmFileFactor += 1
-
+        
+        if self.boolOffDiag:
+            self.filOffDiag.write('%.16e ' % (self.evolTime))
+            for i in range(0, self.m):
+                self.filOffDiag.write('%.16e ' % (self.offDiag[i].real))
+            self.filOffDiag.write('\n')
+        
         self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
         self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
         self.filOcc.write('%.16e ' % self.evolTime)
         for m in range(0, self.m):
             self.filOcc.write('%.16e ' % self.occNo[m])
-        self.filOcc.write('\n')
+        self.filOcc.write('\n') 
             
     def openFiles(self):
         self.filEnt = open('./data/entropy.txt', 'w')
@@ -829,6 +876,8 @@ class mpSystem:
         self.filOcc = open('./data/occupation.txt', 'w')
         self.filEnergy = open('./data/energy.txt', 'w')
         self.filProg = open('./data/progress.log', 'w')
+        if self.boolOffDiag:
+            self.filOffDiag = open('./data/offdiagonal.txt', 'w')
         self.filProg.close()
 
     #close all files
@@ -837,6 +886,8 @@ class mpSystem:
         self.filTotEnt.close()
         self.filNorm.close()
         self.filOcc.close()
+        if self.boolOffDiag:
+            self.filOffDiag.close()
         self.filEnergy.close()
             
     def plotDMAnimation(self, stepSize):

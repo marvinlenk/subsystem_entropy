@@ -1,5 +1,8 @@
 change log
 
+### 18.06.2017
+- added off-diagonal occupation number calculation on runtime (handle with care, rather slow)
+
 ### 27.04.2017
 - actually need 101 points to get the full range!!! added this partially only - work in progress (also actually need uneven points for greensfunctions to work)
 - check for data points to time steps calculation - last point is not taken but first one is... so datapoints+1 will be produced

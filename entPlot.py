@@ -82,6 +82,10 @@ def plotData(sysVar):
         microexpfile = './data/diagexpect.txt'
         microexp = np.loadtxt(microexpfile)
     
+    if sysVar.boolPlotOffDiag:
+        offdiagfile = './data/offdiagonal.txt'
+        offdiag = np.loadtxt(offdiagfile)
+    
     if sysVar.boolPlotGreen:
         greenfile = './data/green.txt'
         greendat = np.loadtxt(greenfile)
@@ -287,6 +291,21 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     
+    #sum of off diagonal elements in energy eigenbasis
+    if sysVar.boolPlotOffDiag:
+        for i in range(0,sysVar.m):
+            plt.plot(step_array,offdiag[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.5)
+            
+    plt.ylabel(r'Sum of off diagonals')
+    plt.xlabel(r'$J\,t$')
+    plt.legend(loc='upper right')
+    plt.grid()
+    plt.tight_layout()
+    ###
+    pp.savefig()
+    plt.clf()
+    print('.',end='',flush=True)
+    
     ### Total system energy
     if sysVar.boolTotalEnergy:
         plt.title('$E_{tot}, \; E_0$ = %.2e' % en0)
@@ -323,11 +342,25 @@ def plotData(sysVar):
     print('.',end='',flush=True)
     ### Hamiltonian eigenvalues (Eigenenergies)
     if sysVar.boolPlotEngy:
-        plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
-        plt.ylabel(r'Energy')
+        linearize = False
+        if linearize:
+            tap = []
+            lal = -1
+            for e in engies[:,1]:
+                if lal == -1:
+                    tap.append(e)
+                    lal += 1
+                elif np.abs(e - tap[lal]) > 1:
+                    lal += 1
+                    tap.append(e)
+            plt.plot(tap,linestyle='none',marker='o',ms=2,color='blue')
+        else:
+            plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=2,color='blue')
+        
+        plt.ylabel(r'E/J')
         plt.xlabel(r'\#')
         plt.grid(False)
-        plt.xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
+        plt.xlim(xmin=-(len(engies[:,0]) * (2.0/100) ))
         plt.tight_layout()
         ###
         pp.savefig()
@@ -412,11 +445,11 @@ def plotData(sysVar):
         plt.clf()
           
         print('.',end='',flush=True)
-        
+        '''
         for s in range(0,len(spec)):
             print(np.average(hlpfrq,weights=spec[s])/occavg[int(7+3*s)])
         spec = np.array(spec)/(2*np.pi)  
-        
+        '''
         def bestatd(args):
             temp = args[0]
             mu = args[1]
