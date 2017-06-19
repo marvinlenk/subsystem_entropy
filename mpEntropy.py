@@ -77,6 +77,8 @@ class mpSystem:
                 self.enState = np.zeros((self.dim,1), dtype=self.datType)
                 self.enStateBra = np.zeros((1,self.dim), dtype=self.datType)
                 self.offDiag = np.zeros((self.m), dtype=self.datType)
+                if self.occEnSingle > 0:
+                    self.occEnInd = np.zeros((self.m,self.occEnInd),dtype=np.int16)
             
             if self.mRedComp == 0:
                 self.dimRed = 0
@@ -184,6 +186,7 @@ class mpSystem:
         self.boolDMRedStore = configParser.getboolean('filemanagement', 'dmredstore') 
         self.boolHamilStore = configParser.getboolean('filemanagement', 'hamilstore')
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
+        self.occEnSingle = configParser.getint('filemanagement', 'occensingle')
         self.boolOffDiag = configParser.getboolean('filemanagement', 'offdiag')
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
@@ -640,7 +643,7 @@ class mpSystem:
                     tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
                     if self.boolOffDiag:
                         self.enState[i,0] = tmp
-                        self.enStateBra[0,i] = np.conjugate(tmp)
+                        self.enStateBra[0,i] = tmp.conj()
                     # for the diagonals only the abs value is necessary            
                     tmpAbsSq[i] = np.abs(tmp) ** 2
             ethfil = open('./data/diagexpect.txt', 'w')
@@ -658,6 +661,16 @@ class mpSystem:
         
         if self.boolOccEnStore:
             t0 = tm.time()
+            if self.occEnSingle:
+                #props to Warren Weckesser https://stackoverflow.com/questions/20825990/find-multiple-maximum-values-in-a-2d-array-fast
+                # Get the indices for the largest `num_largest` values.
+                num_largest = self.occEnStoreSingle
+                for i in range(0,self.m):
+                    indices = self.offDiagMat[i].argpartition(offDiagMat[i].size - num_largest, axis=None)[-num_largest:]
+                    self.occEnInds[i] = np.unravel_index(indices, offDiagMat[i].shape)
+                    
+                print("Largest elements found after " + time_elapsed(t0,60, 1))   
+                t0 = tm.time()
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #note that the off diag mat still contains the diagonals right now!
@@ -681,11 +694,10 @@ class mpSystem:
     
     def updateOffDiag(self):
         for i in range(0, self.dim):
-            tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
+            tmp = np.dot(self.eigVects[:, i], np.asarray(self.state)[:, 0]) 
             self.enState[i,0] = tmp
-            self.enStateBra[0,i] = np.conjugate(tmp)
+            self.enStateBra[0,i] = tmp.conj()
             
-        offdiagfil = open('./data/offdiagonals.txt', 'w')
         for i in range(0, self.m):
             self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
             if self.offDiag[i].imag > 1e-6:

@@ -5,6 +5,10 @@ change log
 - added some time indicators
 - added off diagonals only and absolute value to number operator in energy basis plotting
 - fixed range of colormap in the above to be variable (to the total number of particles)
+- fixed additional file "offdiagonals.txt" additionally created
+- fixed plotting of off diagonals now only if wanted
+- added cumulative integral of off-diagonals
+- !!! for some reason the state array becomes a np.matrix and the updateOffDiag routine didnt want that, added hotfix
 
 ### 18.06.2017
 - added off-diagonal occupation number calculation on runtime (handle with care, rather slow)

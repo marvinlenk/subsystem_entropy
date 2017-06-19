@@ -9,6 +9,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from scipy.fftpack import fft, fftfreq, fftshift
+from scipy.integrate import cumtrapz
 
 #searches for closest to value element in array
 def find_nearest(array,value):
@@ -294,16 +295,33 @@ def plotData(sysVar):
     if sysVar.boolPlotOffDiag:
         for i in range(0,sysVar.m):
             plt.plot(step_array,offdiag[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.5)
-            
-    plt.ylabel(r'Sum of off diagonals')
-    plt.xlabel(r'$J\,t$')
-    plt.legend(loc='upper right')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.',end='',flush=True)
+        plt.ylabel(r'Sum of off diagonals')
+        plt.xlabel(r'$J\,t$')
+        plt.legend(loc='upper right')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        
+        
+        dt = offdiag[1,0]-offdiag[0,0]
+        nrm = offdiag[:,0]/dt
+        nrm[1:] = 1/nrm[1:]
+        for i in range(0,sysVar.m):
+            tmp = cumtrapz(offdiag[:,i],offdiag[:,0],initial=offdiag[0,i])
+            tmp = np.multiply(tmp,nrm)
+            plt.plot(offdiag[:,0],tmp)
+            plt.ylabel(r'Sum of off diagonals')
+            plt.xlabel(r'$J\,t$')
+            plt.grid()
+            plt.tight_layout()
+            ###
+            pp.savefig()
+            plt.clf()
+        
+        print('.',end='',flush=True)
+    
     
     ### Total system energy
     if sysVar.boolTotalEnergy:
@@ -352,9 +370,9 @@ def plotData(sysVar):
                 elif np.abs(e - tap[lal]) > 1:
                     lal += 1
                     tap.append(e)
-            plt.plot(tap,linestyle='none',marker='o',ms=2,color='blue')
+            plt.plot(tap,linestyle='none',marker='o',ms=0.5,color='blue')
         else:
-            plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=2,color='blue')
+            plt.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.5,color='blue')
         
         plt.ylabel(r'E/J')
         plt.xlabel(r'\#')
