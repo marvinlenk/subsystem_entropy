@@ -696,12 +696,27 @@ def plotOccs(sysVar):
         plt.xlabel('column')
         plt.ylabel('row')
         cmapVar = plt.cm.seismic
-        plt.imshow(dre, cmap=cmapVar, interpolation='none',vmin=-10,vmax=10)   
+        plt.imshow(dre, cmap=cmapVar, interpolation='none')   
         cb=plt.colorbar()     
         pp.savefig()
         cb.remove()
         plt.clf
-
+    
+    # now without diagonals and abs only
+    for i in range(0,sysVar.m):
+        plt.title(r'$n_'+str(i)+'$')
+        dre = np.loadtxt('./data/occ'+str(i)+'_re.txt')
+        np.fill_diagonal(dre, 0)
+        plt.xlabel('column')
+        plt.ylabel('row')
+        cmapVar = plt.cm.Reds
+        cmapVar.set_under(color='black') 
+        plt.imshow(np.abs(dre), cmap=cmapVar, interpolation='none',vmin=1e-6)   
+        cb=plt.colorbar()     
+        pp.savefig()
+        cb.remove()
+        plt.clf
+    
     pp.close()
     plt.close()
     print(" done!")
