@@ -696,7 +696,7 @@ def plotOccs(sysVar):
         plt.xlabel('column')
         plt.ylabel('row')
         cmapVar = plt.cm.seismic
-        plt.imshow(dre, cmap=cmapVar, interpolation='none')   
+        plt.imshow(dre, cmap=cmapVar, interpolation='none', vmin=-sysVar.N, vmax=sysVar.N)   
         cb=plt.colorbar()     
         pp.savefig()
         cb.remove()
