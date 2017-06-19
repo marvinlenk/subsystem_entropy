@@ -30,6 +30,9 @@ class mpSystem:
         for k in self.kRed:
             self.mask[k] = False
         
+        ######
+        self.timtemp = 0
+        
         self.dim = dimOfBasis(self.N, self.m)  # dimension of basis
         ###### system variables
         if not plotOnly:
@@ -583,7 +586,10 @@ class mpSystem:
     ## will free the memory!!!
     def updateEigendecomposition(self,clear=True):
         if self.boolEngyStore:
+            t0 = tm.time()
             self.updateEigenenergies()
+            print("Hamiltonian diagonalized after " + time_elapsed(t0,60,0))
+            t0 = tm.time()
             # decomposition in energy space       
             tfil = open('./data/hamiltonian_eigvals.txt', 'w')  
             if self.boolDecompStore:
@@ -619,13 +625,15 @@ class mpSystem:
                     sfil.write('%i ' % self.basis[i, j])
                 sfil.write('\n')
             sfil.close()
-        
+            print("Eigendecomposition completed after " + time_elapsed(t0,60,0))
         if self.boolDiagExpStore or self.boolOccEnStore or self.boolOffDiag:
             self.updateEigenenergies()
             eivectinv = la.inv(np.matrix(self.eigVects.T))
         
         # expectation values in diagonal representation (ETH)
+        
         if self.boolDiagExpStore or self.boolOffDiag:
+            t0 = tm.time()
             if not self.boolDecompStore:
                 tmpAbsSq = np.zeros(self.dim)
                 for i in range(0, self.dim):
@@ -636,24 +644,27 @@ class mpSystem:
                     # for the diagonals only the abs value is necessary            
                     tmpAbsSq[i] = np.abs(tmp) ** 2
             ethfil = open('./data/diagexpect.txt', 'w')
+            print('starting off-diagonal calculation:')
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #first store everything, later delete diagonal elements
-                    self.offDiagMat[i] = np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
+                    self.offDiagMat[i] = np.matrix(self.eigVects.T) * self.operators[i, i].toarray() * eivectinv
                     tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
                 else:
                     tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
                 ethfil.write('%i %.16e \n' % (i, tmpocc.real))
+            print("Occupation matrices transformed " + time_elapsed(t0,60,1))
             ethfil.close()
         
         if self.boolOccEnStore:
+            t0 = tm.time()
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #note that the off diag mat still contains the diagonals right now!
                     storeMatrix(self.offDiagMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
                 else:
                     storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
-        
+            print("Occupation number matrices stored after " + time_elapsed(t0,60, 1))
         #now we remove the diagonal elements
         for i in range(0, self.m):
             np.fill_diagonal(self.offDiagMat[i], 0)
@@ -838,7 +849,7 @@ class mpSystem:
             self.greenStoreState()
         
         print('\n' + 'Time evolution finished after', time_elapsed(t0, 60), 'with average time/step of', "%.4e" % self.tavg)
-        
+        print("Occupation offdiag: " + str(self.timtemp))
         if self.boolDataStore:
             self.closeFiles()
     # end

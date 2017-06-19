@@ -1,5 +1,9 @@
 change log
 
+### 19.06.2017
+- changed matrix transformation from einsum to dot product (a lot faster)
+- added some time indicators
+
 ### 18.06.2017
 - added off-diagonal occupation number calculation on runtime (handle with care, rather slow)
 - removed the numpy.distutils.system_info.tmp import in entPlot, that was a mistake done far in the past
