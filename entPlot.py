@@ -701,6 +701,7 @@ def plotOccs(sysVar):
         pp.savefig()
         cb.remove()
         plt.clf
+        print('.',end='',flush=True)
     
     # now without diagonals and abs only
     for i in range(0,sysVar.m):
@@ -716,6 +717,7 @@ def plotOccs(sysVar):
         pp.savefig()
         cb.remove()
         plt.clf
+        print('.',end='',flush=True)
     
     pp.close()
     plt.close()
