@@ -756,22 +756,29 @@ def plotOffDiagSingles(sysVar):
     
     singlesdat = np.loadtxt('./data/offdiagsingle.txt')
     singlesinfo = np.loadtxt('./data/offdiagsingleinfo.txt')
+    
+    dt = singlesdat[1,0]-singlesdat[0,0]
+    nrm = singlesdat[:,0]/dt
+    nrm[1:] = 1/nrm[1:]
+    
     for i in range(0,sysVar.m):
         for j in range(0,sysVar.occEnSingle):
             infoind = 1+4*j+2 #so we start at the first energy
-            plt.figure(1)
-            plt.gcf().suptitle(r'$n_{%i} \; E_1=%.2e \; E_2=%.2e$' % (i, singlesinfo[i,infoind], singlesinfo[i,infoind+1]))
-            plt.subplot(211)
+            f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, sharey=False)
+            f.suptitle(r'$n_{%i} \; E_1=%.2e \; E_2=%.2e$' % (i, singlesinfo[i,infoind], singlesinfo[i,infoind+1]))
             ind = 1+2*j+(i*sysVar.occEnSingle*2)
             comp = singlesdat[:,ind] + 1j*singlesdat[:,ind+1]
-            plt.ylabel(r'$|A_{n,m}|$')
-            plt.plot(singlesdat[:,0], np.abs(comp))
-            plt.subplot(212)
-            plt.ylabel(r'arg$(A_{n,m})/\pi$')
+            ax1.set_ylabel(r'$|A_{n,m}|$')
+            ax1.plot(singlesdat[:,0], np.abs(comp))
+            tmp = cumtrapz(comp,singlesdat[:,0],initial=comp[0])
+            tmp = np.multiply(tmp,nrm)
+            ax2.set_ylabel(r'average $|A_{n,m}|$')
+            ax2.plot(singlesdat[:,0], np.abs(tmp))
+            ax3.set_ylabel(r'arg$/\pi$')
             plt.xlabel(r'$J\,t$')
-            plt.plot(singlesdat[:,0], np.angle(comp)/(np.pi))
+            ax3.plot(singlesdat[:,0], np.angle(comp)/(np.pi))
             plt.tight_layout()
-            pp.savefig(1)
+            pp.savefig(f)
             plt.clf()
         print('.',end='',flush=True)
     diagdat = np.loadtxt('./data/diagsingles.txt')
