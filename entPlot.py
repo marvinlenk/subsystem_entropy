@@ -740,7 +740,43 @@ def plotOccs(sysVar):
     pp.close()
     plt.close()
     print(" done!")
+
+def plotOffDiagSingles(sysVar):
+    print("Plotting off-diagonal singles.", end='', flush=True)
+    params={
+        'legend.fontsize': sysVar.plotLegendSize,
+        'font.size': sysVar.plotFontSize,
+        'mathtext.default' : 'rm' # see http://matplotlib.org/users/customizing.html
+    }
+    plt.rcParams['agg.path.chunksize']=0
+    plt.rcParams.update(params)
+    plt.rc('text', usetex=True)
+    plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
+    pp = PdfPages('./plots/offdiagsingles.pdf')
     
+    singlesdat = np.loadtxt('./data/offdiagsingle.txt')
+    singlesinfo = np.loadtxt('./data/offdiagsingleinfo.txt')
+    for i in range(0,sysVar.m):
+        for j in range(0,sysVar.occEnSingle):
+            infoind = 1+4*j+2 #so we start at the first energy
+            plt.figure(1)
+            plt.title(r'$n_{%i} \; E_1=%.2e \; E_2=%.2e$' % (i, singlesinfo[i,infoind], singlesinfo[i,infoind+1]))
+            plt.subplot(211)
+            ind = 1+2*j+(i*sysVar.occEnSingle*2)
+            comp = singlesdat[:,ind] + 1j*singlesdat[:,ind+1]
+            plt.ylabel(r'$|A_{n,m}|$')
+            plt.plot(singlesdat[:,0], np.abs(comp))
+            plt.subplot(212)
+            plt.ylabel(r'arg$(A_{n,m})$')
+            plt.xlabel(r'$J\,t$')
+            plt.plot(singlesdat[:,0], np.angle(comp)/(2*np.pi))
+            pp.savefig(1)
+            plt.clf()
+        print('.',end='',flush=True)
+    pp.close()
+    plt.close()
+    print(' done!')
+
 def plotTimescale(sysVar):     
     print("Plotting difference to mean.",end='',flush=True)
     pp = PdfPages('./plots/lndiff.pdf')

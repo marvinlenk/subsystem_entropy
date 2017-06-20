@@ -9,6 +9,9 @@ change log
 - fixed plotting of off diagonals now only if wanted
 - added cumulative integral of off-diagonals
 - !!! for some reason the state array becomes a np.matrix and the updateOffDiag routine didnt want that, added hotfix
+- added single off diagonal elements as well
+- fixed problem with eigenvector deletion was prevented by false bool
+- added single off diagonal plotting and config
 
 ### 18.06.2017
 - added off-diagonal occupation number calculation on runtime (handle with care, rather slow)

@@ -78,8 +78,9 @@ class mpSystem:
                 self.enStateBra = np.zeros((1,self.dim), dtype=self.datType)
                 self.offDiag = np.zeros((self.m), dtype=self.datType)
                 if self.occEnSingle > 0:
-                    self.occEnInd = np.zeros((self.m,self.occEnInd),dtype=np.int16)
-            
+                    self.occEnInds = np.zeros((self.m,2,self.occEnSingle),dtype=np.int16)
+                    self.offDiagSingles = np.zeros((self.m,self.occEnSingle),dtype=self.datType)
+                            
             if self.mRedComp == 0:
                 self.dimRed = 0
                 self.offsetsRed = None
@@ -205,6 +206,7 @@ class mpSystem:
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'reducedmatrix')
         self.boolPlotOccEn = configParser.getboolean('plotbools', 'occen')
         self.boolPlotOffDiag = configParser.getboolean('plotbools', 'offdiag')
+        self.boolPlotOffDiagSingles = configParser.getboolean('plotbools', 'offdiagsingles')
         self.boolPlotEngy = configParser.getboolean('plotbools', 'energies')
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'decomposition')
         self.boolPlotDiagExp = configParser.getboolean('plotbools', 'diagexp')
@@ -647,12 +649,11 @@ class mpSystem:
                     # for the diagonals only the abs value is necessary            
                     tmpAbsSq[i] = np.abs(tmp) ** 2
             ethfil = open('./data/diagexpect.txt', 'w')
-            print('starting off-diagonal calculation:')
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #first store everything, later delete diagonal elements
                     self.offDiagMat[i] = np.matrix(self.eigVects.T) * self.operators[i, i].toarray() * eivectinv
-                    tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
+                    tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
                 else:
                     tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
                 ethfil.write('%i %.16e \n' % (i, tmpocc.real))
@@ -660,17 +661,6 @@ class mpSystem:
             ethfil.close()
         
         if self.boolOccEnStore:
-            t0 = tm.time()
-            if self.occEnSingle:
-                #props to Warren Weckesser https://stackoverflow.com/questions/20825990/find-multiple-maximum-values-in-a-2d-array-fast
-                # Get the indices for the largest `num_largest` values.
-                num_largest = self.occEnStoreSingle
-                for i in range(0,self.m):
-                    indices = self.offDiagMat[i].argpartition(offDiagMat[i].size - num_largest, axis=None)[-num_largest:]
-                    self.occEnInds[i] = np.unravel_index(indices, offDiagMat[i].shape)
-                    
-                print("Largest elements found after " + time_elapsed(t0,60, 1))   
-                t0 = tm.time()
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #note that the off diag mat still contains the diagonals right now!
@@ -681,11 +671,29 @@ class mpSystem:
         #now we remove the diagonal elements
         for i in range(0, self.m):
             np.fill_diagonal(self.offDiagMat[i], 0)
+
+        if self.occEnSingle and self.boolOffDiag:
+            t0 = tm.time()
+            infofile = open('./data/offdiagsingleinfo.txt','w')
+            # props to Warren Weckesser https://stackoverflow.com/questions/20825990/find-multiple-maximum-values-in-a-2d-array-fast
+            # Get the indices for the largest `num_largest` values.
+            num_largest = self.occEnSingle
+            for i in range(0,self.m):
+                infofile.write('%i ' % (i))
+                #to use argpartition correctly we must treat the matrix as an array
+                indices = np.asarray(self.offDiagMat[i]).argpartition(self.offDiagMat[i].size - num_largest, axis=None)[-num_largest:]
+                self.occEnInds[i,0], self.occEnInds[i,1] = np.unravel_index(indices, self.offDiagMat[i].shape)
+                for j in range(0,self.occEnSingle):
+                    infofile.write('%i %i %.16e %16e ' % (self.occEnInds[i,0,j], self.occEnInds[i,1,j], self.eigVals[self.occEnInds[i,0,j]].real, self.eigVals[self.occEnInds[i,1,j]].real))
+                infofile.write('\n')
+            infofile.close()
+            print("Largest elements found and infos stored after " + time_elapsed(t0,60, 1))    
             
+                  
         if clear:
             # free the memory
             del self.eigVals
-            if not self.boolOccEnStore:
+            if not self.boolOffDiag:
                 del self.eigVects
                 self.eigVects = []
             self.eigInd
@@ -699,9 +707,16 @@ class mpSystem:
             self.enStateBra[0,i] = tmp.conj()
             
         for i in range(0, self.m):
-            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
+            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
             if self.offDiag[i].imag > 1e-6:
                 print('The offdiagonal expectation value has an imaginary part of ', self.offDiag[i].imag)
+        
+        if self.occEnSingle:
+            for i in range(0, self.m):
+                for j in range(0,self.occEnSingle):
+                    x = int(self.occEnInds[i,0,j])
+                    y = int(self.occEnInds[i,1,j])
+                    self.offDiagSingles[i,j] = self.enStateBra[0,x] * self.offDiagMat[i][x,y] * self.enState[y,0]
         
     def updateEntropy(self):
         self.entropy = 0
@@ -884,6 +899,12 @@ class mpSystem:
             for i in range(0, self.m):
                 self.filOffDiag.write('%.16e ' % (self.offDiag[i].real))
             self.filOffDiag.write('\n')
+            if self.occEnSingle:
+                self.filOffSingles.write('%.16e ' % (self.evolTime))
+                for i in range(0,self.m):
+                    for j in range(0, self.occEnSingle):
+                        self.filOffSingles.write('%.16e %.16e ' % (self.offDiagSingles[i,j].real , self.offDiagSingles[i,j].imag))
+                self.filOffSingles.write('\n')
         
         self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
         self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
@@ -901,6 +922,8 @@ class mpSystem:
         self.filProg = open('./data/progress.log', 'w')
         if self.boolOffDiag:
             self.filOffDiag = open('./data/offdiagonal.txt', 'w')
+            if self.occEnSingle:
+                self.filOffSingles = open('./data/offdiagsingle.txt', 'w')
         self.filProg.close()
 
     #close all files
@@ -911,6 +934,8 @@ class mpSystem:
         self.filOcc.close()
         if self.boolOffDiag:
             self.filOffDiag.close()
+            if self.occEnSingle:
+                self.filOffSingles.close()
         self.filEnergy.close()
             
     def plotDMAnimation(self, stepSize):
@@ -932,6 +957,9 @@ class mpSystem:
     def plotOccEnbasis(self):
         ep.plotOccs(self)
     
+    def plotOffDiagSingles(self):
+        ep.plotOffDiagSingles(self)
+        
     def plotTimescale(self):
         ep.plotTimescale(self)
     
@@ -948,6 +976,8 @@ class mpSystem:
             self.plotOccEnbasis()
         if self.boolPlotTimescale:
             self.plotTimescale()
+        if self.boolPlotOffDiagSingles:
+            self.plotOffDiagSingles()
         if self.boolClear:
             prepFolders(True)
 
