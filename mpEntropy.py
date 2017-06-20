@@ -595,6 +595,7 @@ class mpSystem:
             self.updateEigenenergies()
             print("Hamiltonian diagonalized after " + time_elapsed(t0,60,0))
             t0 = tm.time()
+            
             # decomposition in energy space       
             tfil = open('./data/hamiltonian_eigvals.txt', 'w')  
             if self.boolDecompStore:
@@ -639,7 +640,8 @@ class mpSystem:
         
         if self.boolDiagExpStore or self.boolOffDiag:
             t0 = tm.time()
-            if not self.boolDecompStore:
+            #the idea is to keep the memory as low as possible - this is why this strange condition arises
+            if not self.boolDecompStore and self.boolOffDiag:
                 tmpAbsSq = np.zeros(self.dim)
                 for i in range(0, self.dim):
                     tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
@@ -648,18 +650,35 @@ class mpSystem:
                         self.enStateBra[0,i] = tmp.conj()
                     # for the diagonals only the abs value is necessary            
                     tmpAbsSq[i] = np.abs(tmp) ** 2
+            elif self.boolDecompStore and self.boolOffDiag:
+                for i in range(0, self.dim):
+                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
+                    if self.boolOffDiag:
+                        self.enState[i,0] = tmp
+                        self.enStateBra[0,i] = tmp.conj()
+                        
             ethfil = open('./data/diagexpect.txt', 'w')
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #first store everything, later delete diagonal elements
                     self.offDiagMat[i] = np.matrix(self.eigVects.T) * self.operators[i, i].toarray() * eivectinv
-                    tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
+                    #tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
+                    tmpocc = np.einsum('l,lj,j', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0])
                 else:
                     tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
                 ethfil.write('%i %.16e \n' % (i, tmpocc.real))
             print("Occupation matrices transformed " + time_elapsed(t0,60,1))
             ethfil.close()
-        
+            
+            #now store the diagonals in one folder
+            if self.boolOffDiag:
+                diagfil = open('./data/diagsingles.txt', 'w')
+                for i in range(0,self.m):
+                    tmpdiag = np.einsum('l,ll,l -> l', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0]).real
+                    for j in range(0,self.dim):
+                        diagfil.write('%i %.16e %.16e \n' % (i, self.eigVals[j], tmpdiag[j]))
+                diagfil.close()
+            
         if self.boolOccEnStore:
             for i in range(0, self.m):
                 if self.boolOffDiag:
@@ -679,17 +698,20 @@ class mpSystem:
             # Get the indices for the largest `num_largest` values.
             num_largest = self.occEnSingle
             for i in range(0,self.m):
+                # this is not optimized but one has to store it as a matrix for correct searching
+                #tmpmat = np.asarray(np.einsum('kl,lj,jk -> lj', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True))
+                tmpmat = np.einsum('l,lj,j -> lj', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0])
                 infofile.write('%i ' % (i))
                 #to use argpartition correctly we must treat the matrix as an array
-                indices = np.asarray(self.offDiagMat[i]).argpartition(self.offDiagMat[i].size - num_largest, axis=None)[-num_largest:]
-                self.occEnInds[i,0], self.occEnInds[i,1] = np.unravel_index(indices, self.offDiagMat[i].shape)
+                indices = tmpmat.argpartition(tmpmat.size - num_largest, axis=None)[-num_largest:]
+                self.occEnInds[i,0], self.occEnInds[i,1] = np.unravel_index(indices, tmpmat.shape)
                 for j in range(0,self.occEnSingle):
                     infofile.write('%i %i %.16e %16e ' % (self.occEnInds[i,0,j], self.occEnInds[i,1,j], self.eigVals[self.occEnInds[i,0,j]].real, self.eigVals[self.occEnInds[i,1,j]].real))
                 infofile.write('\n')
             infofile.close()
             print("Largest elements found and infos stored after " + time_elapsed(t0,60, 1))    
             
-                  
+        del tmpmat #not sure if this is neccessary but do it regardless...
         if clear:
             # free the memory
             del self.eigVals
@@ -707,7 +729,8 @@ class mpSystem:
             self.enStateBra[0,i] = tmp.conj()
             
         for i in range(0, self.m):
-            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
+            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
+            #self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
             if self.offDiag[i].imag > 1e-6:
                 print('The offdiagonal expectation value has an imaginary part of ', self.offDiag[i].imag)
         
