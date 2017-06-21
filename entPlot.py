@@ -341,7 +341,7 @@ def plotData(sysVar):
             ax3.loglog(offdiag[:,0],np.abs(offdiag[:,i+1]),linewidth = 0.5)
             ax3.set_xlabel(r'$J\,t$')
             ax3.set_ylim(bottom=1e-2)
-            ax3.set_xlim(left=5e-1)
+            ax3.set_xlim(left=5e-2)
             ax3.grid()
             plt.tight_layout()
             ###
@@ -865,7 +865,7 @@ def plotOffDiagSingles(sysVar):
         plt.ylabel(r'$|A_{n,m}|$')
         plt.xlabel(r'$E / J$')
         #plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],linestyle='none',marker='o',ms=0.5)
-        plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],marker='o',ms=0.2)
+        plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],marker='o',ms=0.2, lw=0.2)
         plt.tight_layout()
         pp.savefig()
         plt.clf()
