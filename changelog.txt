@@ -1,5 +1,10 @@
 change log
 
+### 21.06.2016
+- changed linewidth for all the off-diagonal plots
+- added loglog plots to the single off-diagonals averaged
+- added logplots and loglog plots to the summed off-diagonals
+
 ### 20.06.2016
 - changed maximum off-diagonal element lookup to take the spectral coefficients into account
 - fixed an issue with conditions in spectral repres. storage

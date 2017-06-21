@@ -89,7 +89,9 @@ def plotData(sysVar):
     if sysVar.boolPlotGreen:
         greenfile = './data/green.txt'
         greendat = np.loadtxt(greenfile)
-        
+    
+    def complete_system_enttropy():
+        return 0    
     #### Complete system Entropy
     if(sysVar.boolTotalEnt):
         plt.plot(totent_array[:,0]*sysVar.plotTimeScale,totent_array[:,1]*1e13, linewidth =0.6, color = 'r')
@@ -102,6 +104,9 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
+    
+    def subsystem_entropy():
+        return 0    
     ### Subsystem Entropy
     plt.plot(step_array,ent_array[:,1], linewidth =0.8, color = 'r')
     plt.grid()
@@ -131,6 +136,9 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     '''
+    
+    def single_level_occ():
+        return 0    
     ### Single-level occupation numbers
     for i in range(0,sysVar.m):
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.5)
@@ -169,6 +177,8 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     '''
+    def bath_occ():
+        return 0
     ### Traced out (bath) occupation numbers
     for i in sysVar.kRed:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
@@ -187,6 +197,9 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
+    
+    def system_occ():
+        return 0    
     ### Leftover (system) occupation numbers
     for i in np.arange(sysVar.m)[sysVar.mask]:
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.6)
@@ -205,6 +218,9 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
+    
+    def subsystem_occupation():
+        return 0    
     ### Subsystems occupation numbers
     #store fluctuations in a data
     fldat = open('./data/fluctuation.txt','w')
@@ -277,6 +293,8 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     
+    def occ_distribution():
+        return 0    
     #occupation number in levels against level index
     occavg = np.loadtxt('./data/fluctuation.txt', usecols=(1,))
     plt.xlim(-0.1,sysVar.m-0.9)
@@ -291,6 +309,8 @@ def plotData(sysVar):
     plt.clf()
     print('.',end='',flush=True)
     
+    def sum_offdiagonals():
+        return 0    
     #sum of off diagonal elements in energy eigenbasis
     if sysVar.boolPlotOffDiag:
         for i in range(0,sysVar.m):
@@ -309,12 +329,39 @@ def plotData(sysVar):
         nrm = offdiag[:,0]/dt
         nrm[1:] = 1/nrm[1:]
         for i in range(0,sysVar.m):
+            ###### only sum (subsystem-thermalization)
+            f, (ax1, ax2, ax3) = plt.subplots(3, sharex=False, sharey=False)
+            ax1.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.5)
+            ax1.grid()
+            
+            ax2.semilogy(offdiag[:,0],np.abs(offdiag[:,i+1]),linewidth = 0.5)
+            ax2.set_ylim(bottom=1e-2)
+            ax2.grid()
+            
+            ax3.loglog(offdiag[:,0],np.abs(offdiag[:,i+1]),linewidth = 0.5)
+            ax3.set_xlabel(r'$J\,t$')
+            ax3.set_ylim(bottom=1e-2)
+            ax3.set_xlim(left=5e-1)
+            ax3.grid()
+            plt.tight_layout()
+            ###
+            pp.savefig()
+            plt.clf()
+            
+            ###### average (eigenstate-thermalization)
+            f, (ax1, ax2) = plt.subplots(2, sharex=False, sharey=False)
             tmp = cumtrapz(offdiag[:,i+1],offdiag[:,0],initial=offdiag[0,i+1])
             tmp = np.multiply(tmp,nrm)
-            plt.plot(offdiag[:,0],tmp)
-            plt.ylabel(r'Average of off-diagonals')
-            plt.xlabel(r'$J\,t$')
-            plt.grid()
+            ax1.plot(offdiag[:,0],tmp,linewidth = 0.5)
+            ax1.set_ylabel(r'Average of off-diagonals')
+            ax1.set_xlabel(r'$J\,t$')
+            ax1.grid()
+            
+            ax2.loglog(offdiag[:,0],np.abs(tmp),linewidth = 0.5)
+            ax2.set_ylabel(r'Average of off-diagonals')
+            ax2.set_xlabel(r'$J\,t$')
+            ax2.set_ylim(bottom=1e-4)
+            ax2.grid()
             plt.tight_layout()
             ###
             pp.savefig()
@@ -323,6 +370,8 @@ def plotData(sysVar):
         print('.',end='',flush=True)
     
     
+    def total_energy():
+        return 0    
     ### Total system energy
     if sysVar.boolTotalEnergy:
         plt.title('$E_{tot}, \; E_0$ = %.2e' % en0)
@@ -335,6 +384,9 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
+        
+    def norm_deviation():
+        return 0    
     ### Norm deviation
     plt.plot(step_array,norm_array[:,1], "ro", ms=0.5)
     plt.ylabel('norm deviation from 1')
@@ -357,6 +409,9 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
+    
+    def eigenvalues():
+        return 0    
     ### Hamiltonian eigenvalues (Eigenenergies)
     if sysVar.boolPlotEngy:
         linearize = False
@@ -384,7 +439,9 @@ def plotData(sysVar):
         plt.clf()
         print('.',end='',flush=True)
     
-        ### DOS
+    def density_of_states():
+        return 0    
+    ### DOS
     if sysVar.boolPlotDOS:
         dos = np.zeros(sysVar.dim)
         window = 50
@@ -403,6 +460,8 @@ def plotData(sysVar):
         plt.clf()
         print('.',end='',flush=True)
     
+    def greensfunction():
+        return 0    
     ### Greensfunction
     if sysVar.boolPlotGreen:
         spec = []
@@ -494,6 +553,8 @@ def plotData(sysVar):
         print(a)
         
     if sysVar.boolPlotDecomp:
+        def eigendecomposition():
+            return 0    
         ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
         fig, ax1 = plt.subplots()
         ax1.plot(engies[:,0],engies[:,1],linestyle='none',marker='o',ms=0.7,color='blue')
@@ -595,6 +656,10 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
+    
+    def densmat_spectral():
+        return 0    
+    ####### Density matrix in spectral repesentation
     if sysVar.boolPlotSpectralDensity:
         ###
         plt.title('Density matrix spectral repres. abs')
@@ -769,16 +834,27 @@ def plotOffDiagSingles(sysVar):
             ind = 1+2*j+(i*sysVar.occEnSingle*2)
             comp = singlesdat[:,ind] + 1j*singlesdat[:,ind+1]
             ax1.set_ylabel(r'$|A_{n,m}|$')
-            ax1.plot(singlesdat[:,0], np.abs(comp))
-            tmp = cumtrapz(comp,singlesdat[:,0],initial=comp[0])
+            ax1.plot(singlesdat[:,0], np.abs(comp), linewidth = 0.5)
+            tmp = cumtrapz(comp,singlesdat[:,0]/dt,initial=comp[0])
             tmp = np.multiply(tmp,nrm)
             ax2.set_ylabel(r'average $|A_{n,m}|$')
-            ax2.plot(singlesdat[:,0], np.abs(tmp))
+            ax2.plot(singlesdat[:,0], np.abs(tmp), linewidth = 0.5)
             ax3.set_ylabel(r'arg$/\pi$')
             plt.xlabel(r'$J\,t$')
-            ax3.plot(singlesdat[:,0], np.angle(comp)/(np.pi))
+            ax3.plot(singlesdat[:,0], np.angle(comp)/(np.pi), linewidth = 0.5)
             plt.tight_layout()
+            plt.subplots_adjust(top=0.9)
             pp.savefig(f)
+            plt.clf()
+            # do the double log plot
+            de = np.abs(singlesinfo[i,infoind] - singlesinfo[i,infoind+1])
+            linar = np.zeros(len(singlesdat[:,0]), dtype=np.float64)
+            linar[0] = 0
+            linar[1:] = 2/(singlesdat[1:,0] * de)
+            plt.xlabel(r'$J\,t$')
+            plt.ylabel(r'relative average $|A_{n,m}|$')
+            plt.loglog(singlesdat[1:,0], np.abs(tmp/np.abs(comp[0]))[1:], singlesdat[1:,0], linar[1:], lw=0.5)
+            pp.savefig()
             plt.clf()
         print('.',end='',flush=True)
     diagdat = np.loadtxt('./data/diagsingles.txt')
@@ -789,7 +865,7 @@ def plotOffDiagSingles(sysVar):
         plt.ylabel(r'$|A_{n,m}|$')
         plt.xlabel(r'$E / J$')
         #plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],linestyle='none',marker='o',ms=0.5)
-        plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],marker='o',ms=0.5)
+        plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],marker='o',ms=0.2)
         plt.tight_layout()
         pp.savefig()
         plt.clf()
