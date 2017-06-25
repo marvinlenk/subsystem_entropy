@@ -331,6 +331,7 @@ def plotData(sysVar):
         for i in range(0,sysVar.m):
             ###### only sum (subsystem-thermalization)
             f, (ax1, ax2, ax3) = plt.subplots(3, sharex=False, sharey=False)
+            f.text(0.06, 0.5, 'Sum of off diagonals', ha='center', va='center', rotation='vertical')
             ax1.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.5)
             ax1.grid()
             
@@ -343,25 +344,31 @@ def plotData(sysVar):
             ax3.set_ylim(bottom=1e-2)
             ax3.set_xlim(left=5e-2)
             ax3.grid()
+            plt.subplots_adjust(left=0.4)
             plt.tight_layout()
             ###
             pp.savefig()
             plt.clf()
             
             ###### average (eigenstate-thermalization)
-            f, (ax1, ax2) = plt.subplots(2, sharex=False, sharey=False)
+            f, (ax1, ax2, ax3) = plt.subplots(3, sharex=False, sharey=False)
             tmp = cumtrapz(offdiag[:,i+1],offdiag[:,0],initial=offdiag[0,i+1])
             tmp = np.multiply(tmp,nrm)
+            f.text(0.06, 0.5, 'Average of off diagonals', ha='center', va='center', rotation='vertical')
+            ax1.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
             ax1.plot(offdiag[:,0],tmp,linewidth = 0.5)
-            ax1.set_ylabel(r'Average of off-diagonals')
-            ax1.set_xlabel(r'$J\,t$')
             ax1.grid()
             
-            ax2.loglog(offdiag[:,0],np.abs(tmp),linewidth = 0.5)
-            ax2.set_ylabel(r'Average of off-diagonals')
-            ax2.set_xlabel(r'$J\,t$')
+            ax2.semilogy(offdiag[:,0],np.abs(tmp),linewidth = 0.5)
             ax2.set_ylim(bottom=1e-4)
             ax2.grid()
+            
+            ax3.loglog(offdiag[:,0],np.abs(tmp),linewidth = 0.5)
+            ax3.set_xlabel(r'$J\,t$')
+            ax3.set_ylim(bottom=1e-4)
+            ax3.grid()
+            
+            plt.subplots_adjust(left=0.4)
             plt.tight_layout()
             ###
             pp.savefig()
