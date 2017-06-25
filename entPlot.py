@@ -1,4 +1,5 @@
 import numpy as np
+import os as os
 import scipy.integrate as scint
 import matplotlib as mpl
 from scipy.optimize import least_squares
@@ -865,17 +866,74 @@ def plotOffDiagSingles(sysVar):
             plt.clf()
         print('.',end='',flush=True)
     diagdat = np.loadtxt('./data/diagsingles.txt')
+    
+    if os.path.isfile('./data/energy.txt') and os.path.isfile('./data/hamiltonian_eigvals.txt'):
+    ### look for energy - this works because the energies are sorted
+        engy = np.loadtxt('./data/energy.txt')
+        eigengy = np.loadtxt('./data/hamiltonian_eigvals.txt')
+        diff = 0
+        for l in range(0,sysVar.dim):
+            if np.abs(eigengy[l,1] - engy[0,1]) > diff and l != 0:
+                eind = l-1
+                break
+            else:
+                diff = np.abs(eigengy[l,1] - engy[0,1])
+        if eind < 15:
+            loran = 0
+        else:
+            loran = eind-15
+            
     for i in range(0,sysVar.m):
-        plt.title(r'Diagonal elements of $n_{%i}$ in spectral decomp.' % (i))
-        lo = np.int32(sysVar.dim * i)
-        hi = np.int32(lo + sysVar.dim)
-        plt.ylabel(r'$|A_{n,m}|$')
-        plt.xlabel(r'$E / J$')
-        #plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],linestyle='none',marker='o',ms=0.5)
-        plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],marker='o',ms=0.2, lw=0.2)
-        plt.tight_layout()
-        pp.savefig()
-        plt.clf()
+        if os.path.isfile('./data/energy.txt') and os.path.isfile('./data/hamiltonian_eigvals.txt'):
+            plt.title(r'Diagonal weighted elements of $n_{%i}$ in spectral decomp.' % (i))
+            lo = np.int32(sysVar.dim * i)
+            hi = np.int32(lo + sysVar.dim)
+            plt.ylabel(r'$|n%i_{E}|$' % (i))
+            plt.xlabel(r'$E / J$')
+            #plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],linestyle='none',marker='o',ms=0.5)
+            plt.plot(diagdat[lo+loran:hi,1][:30], diagdat[lo+loran:hi,2][:30] ,marker='o',ms=2) 
+            plt.axvline(x=engy[0,1], linewidth=0.8, color='red')
+            
+            ###inlay
+            a = plt.axes([0.18, 0.6, 0.28, 0.28])
+            a.plot(diagdat[lo:hi-300,1], diagdat[lo:hi-300,2],marker='o',ms=0.6, ls = 'none')
+            a.set_xticks([])
+            a.set_yticks([])
+                
+            pp.savefig()
+            plt.clf()
+            if os.path.isfile('./data/occ'+str(i)+'_re.txt'):
+                occmat = np.loadtxt('./data/occ'+str(i)+'_re.txt')
+                diags = np.zeros(sysVar.dim)
+                
+                ### large plot
+                plt.title(r'Diagonal elements of $n_{%i}$ in spectral decomposition' % (i))
+                plt.ylabel(r'$|n%i_{E}|$' % (i))
+                plt.xlabel(r'$E / J$')
+                for el in range(0,sysVar.dim):
+                    diags[el] = occmat[el,el]
+                
+                plt.plot(diagdat[lo+loran:hi,1][:30], diags[loran:][:30] ,marker='o',ms=2) 
+                plt.axvline(x=engy[0,1], linewidth=0.8, color='red')
+                ### inlay
+                a = plt.axes([0.18, 0.6, 0.28, 0.28])
+                a.plot(diagdat[lo:hi-50,1], diags[:-50] ,marker='o',ms=0.5, ls='none')
+                a.set_xticks([])
+                a.set_yticks([])
+                pp.savefig()
+                plt.clf()
+        else:
+            plt.title(r'Diagonal weighted elements of $n_{%i}$ in spectral decomp.' % (i))
+            lo = np.int32(sysVar.dim * i)
+            hi = np.int32(lo + sysVar.dim)
+            plt.ylabel(r'$|n%i_{E}|$' % (i))
+            plt.xlabel(r'$E / J$')
+            #plt.plot(diagdat[lo:hi,1], diagdat[lo:hi,2],linestyle='none',marker='o',ms=0.5)
+            plt.plot(diagdat[lo:hi-200,1], diagdat[lo:hi-200,2],marker='o',ms=0.6, ls = 'none')
+            plt.tight_layout()
+            pp.savefig()
+            plt.clf()
+           
     print('.',end='',flush=True)
     pp.close()
     plt.close()
