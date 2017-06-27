@@ -333,9 +333,10 @@ def plotData(sysVar):
             ###### only sum (subsystem-thermalization)
             plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
             # start at 10% of the whole x-axis
-            lo = (offdiag[-1,0]-offdiag[0,0])/10 + offdiag[0,0]
+            lox = (offdiag[-1,0]-offdiag[0,0])/10 + offdiag[0,0]
+            hiy = offdiag[ int(len(offdiag[:,0])/10) ] * 1.1
             plt.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.5)
-            plt.xlim(xmin=lo)
+            plt.xlim(xmin=lox)
             plt.grid()
             plt.tight_layout()
             ###inlay with the whole deal
@@ -349,7 +350,7 @@ def plotData(sysVar):
             
             plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
             plt.semilogy(offdiag[:,0],np.abs(offdiag[:,i+1]),linewidth = 0.5)
-            plt.xlim(xmin=lo)
+            plt.xlim(xmin=lox)
             plt.ylim(ymin=1e-2)
             plt.grid()
             plt.tight_layout()
