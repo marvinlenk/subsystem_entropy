@@ -3,6 +3,7 @@ change log
 ### 27.06.2017
 - changed off diagonal singles to only semilog plot and split into two plots
 - added inlays to the above
+- changed eigendecomposition linewidth again
 
 ### 26.06.2017
 - changed year in last two entrys to be correct

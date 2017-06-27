@@ -337,6 +337,7 @@ def plotData(sysVar):
             hiy = offdiag[ int(len(offdiag[:,0])/10) ] * 1.1
             plt.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.5)
             plt.xlim(xmin=lox)
+            plt.ylim(ymax=hiy)
             plt.grid()
             plt.tight_layout()
             ###inlay with the whole deal
@@ -581,7 +582,7 @@ def plotData(sysVar):
         ax1.set_ylabel(r'Energy')
         ax1.set_xlabel(r'\#')
         ax2 = ax1.twinx()
-        ax2.bar(engies[:,0], engies[:,2], alpha=0.15,color='red',width=0.02,align='center')
+        ax2.bar(engies[:,0], engies[:,2], alpha=0.8,color='red',width=0.03,align='center')
         ax2.set_ylabel(r'$|c_n|^2$')
         plt.grid(False)
         ax1.set_xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))
@@ -591,7 +592,7 @@ def plotData(sysVar):
         plt.clf()
         print('.',end='',flush=True)
         ### Eigenvalue decomposition with energy x-axis
-        plt.bar(engies[:,1], engies[:,2], alpha=0.5,color='red',width=0.01,align='center')
+        plt.bar(engies[:,1], engies[:,2], alpha=0.8,color='red',width=0.03, align='center')
         plt.xlabel(r'Energy')
         plt.ylabel(r'$|c_n|^2$')
         plt.grid(False)
