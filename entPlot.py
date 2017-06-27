@@ -334,7 +334,7 @@ def plotData(sysVar):
             plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
             # start at 10% of the whole x-axis
             lox = (offdiag[-1,0]-offdiag[0,0])/10 + offdiag[0,0]
-            hiy = offdiag[ int(len(offdiag[:,0])/10) ] * 1.1
+            hiy = offdiag[ int(len(offdiag[:,0])/10) ,0] * 1.1
             plt.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.5)
             plt.xlim(xmin=lox)
             plt.ylim(ymax=hiy)
