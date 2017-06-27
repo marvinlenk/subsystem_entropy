@@ -1,11 +1,18 @@
 change log
 
-### 21.06.2016
+### 26.06.2017
+- changed year in last two entrys to be correct
+- greensfunction changes:
+	- complex conjugate was wrong
+	- the time steps in time evolution matrix was dt not the correctly raised power
+	- fft has to be divided by number of steps to maintain norm
+
+### 21.06.2017
 - changed linewidth for all the off-diagonal plots
 - added loglog plots to the single off-diagonals averaged
 - added logplots and loglog plots to the summed off-diagonals
 
-### 20.06.2016
+### 20.06.2017
 - changed maximum off-diagonal element lookup to take the spectral coefficients into account
 - fixed an issue with conditions in spectral repres. storage
 - added weighted diagonals in spectral representation to the off-diagonal plots (how ironic)

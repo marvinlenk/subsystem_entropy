@@ -9,7 +9,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from scipy.fftpack import fft, fftfreq, fftshift
+from numpy.fft import fft, fftfreq, fftshift
 from scipy.integrate import cumtrapz
 
 #searches for closest to value element in array
@@ -475,13 +475,14 @@ def plotData(sysVar):
         spec = []
         gnorm = []
         specnorm = []
+        discpoints = len(greendat[:,0])
         print('')
         for i in range(0,sysVar.m):
             plt.title(r'two time Green function of level $%i$' % (i))
             ind = 2*i + 1
             plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind],lw=0.1,color='red',label='real')
             plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind+1],lw=0.1,color='blue',label='imaginary')
-            plt.ylabel(r'$G^R(t)$')
+            plt.ylabel(r'$G^R(\tau)$')
             plt.xlabel(r'$J\,\tau$')
             plt.legend(loc='lower right')
             plt.grid()
@@ -491,11 +492,10 @@ def plotData(sysVar):
             plt.clf()
             ###
             plt.title(r'Spectral function of level $%i$' % (i))
-            ind = 2*i + 1
             tmp = greendat[:,ind] + 1j * greendat[:,ind+1]
             gnorm.append(np.trapz(np.abs(tmp)**2,x=greendat[:,0]))
-            gffttmp = fftshift(-2*fft(tmp))
-            spec.append(gffttmp.imag)
+            gffttmp = -2*fftshift(fft(tmp).imag)/discpoints
+            spec.append(gffttmp)
             if i == 0:
                 shit = spec[i]
                 hlpfrq = fftshift(fftfreq(len(spec[i]),d=(greendat[1,0] * sysVar.plotTimeScale)))
@@ -504,9 +504,12 @@ def plotData(sysVar):
             print(i,np.trapz(spec[i],x=hlpfrq))
             specnorm.append(np.trapz(np.abs(gffttmp)**2,x=hlpfrq))
             plt.plot(hlpfrq,spec[i],color = 'red',lw=0.1)
+            #plt.xlim([-100,100])
+            plt.minorticks_on()
             plt.ylabel(r'$A$')
             plt.xlabel(r'$\omega / J$')
             plt.grid()
+            plt.grid(which='minor', color='blue', linestyle='dotted', lw=0.2)
             plt.tight_layout()
             ###
             pp.savefig()
@@ -522,6 +525,7 @@ def plotData(sysVar):
         print(np.trapz(shit,x=hlpfrq))
         plt.ylabel(r'$A$')
         plt.xlabel(r'$\omega / J$')
+        #plt.xlim([-100,100])
         plt.grid()
         plt.tight_layout()
         ###
@@ -569,7 +573,7 @@ def plotData(sysVar):
         ax1.set_ylabel(r'Energy')
         ax1.set_xlabel(r'\#')
         ax2 = ax1.twinx()
-        ax2.bar(engies[:,0], engies[:,2], alpha=0.15,color='red',width=0.01,align='center')
+        ax2.bar(engies[:,0], engies[:,2], alpha=0.15,color='red',width=0.02,align='center')
         ax2.set_ylabel(r'$|c_n|^2$')
         plt.grid(False)
         ax1.set_xlim(xmin=-(len(engies[:,0]) * (5.0/100) ))

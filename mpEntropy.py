@@ -386,7 +386,8 @@ class mpSystem:
     # this one will be only in sparse container since it is meant for sparse matrix mult.
     #### IMPORTANT NOTE - complex conjugate will be needed for Green function ####
     #### FURTHER: need only 2*delta_T for green function, so added sq=True ####
-    def initSpecLoEvolutionMatrix(self, diagonalize=False,conj=False,sq=True):
+    #### ALSO: delta_T here is actually the delta_T of time-steps, so the wide steps!!! ####
+    def initSpecLoEvolutionMatrix(self, diagonalize=False,conj=True,sq=True):
         if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specLoHamiltonian.toarray(), np.conjugate(self.specLoHamiltonian.toarray().T))):
@@ -402,6 +403,9 @@ class mpSystem:
             self.specLoEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.specLoHamiltonian ** i) / factorial(i)
         if diagonalize:
             self.updateLoEigenenergies()
+        # bring it to the same timestep distance as the state vector
+        self.specLoEvolutionMatrix = np.matrix(self.specLoEvolutionMatrix.toarray(), dtype=self.datType) 
+        self.specLoEvolutionMatrix = npmatrix_power(self.specLoEvolutionMatrix, self.evolStepDist)
         if sq:
             self.specLoEvolutionMatrix = self.specLoEvolutionMatrix ** 2
     # end
@@ -409,7 +413,7 @@ class mpSystem:
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initSpecHiEvolutionMatrix(self, diagonalize=False,conj=True,sq=True):
+    def initSpecHiEvolutionMatrix(self, diagonalize=False,conj=False,sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.specHiHamiltonian.toarray(), np.conjugate(self.specHiHamiltonian.toarray().T))):
@@ -425,6 +429,8 @@ class mpSystem:
             self.specHiEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.specHiHamiltonian ** i) / factorial(i)
         if diagonalize:
             self.updateHiEigenenergies()
+        self.specHiEvolutionMatrix = np.matrix(self.specHiEvolutionMatrix.toarray(), dtype=self.datType)    
+        self.specHiEvolutionMatrix = npmatrix_power(self.specHiEvolutionMatrix, self.evolStepDist)
         if sq:
             self.specHiEvolutionMatrix = self.specHiEvolutionMatrix ** 2
     # end
@@ -688,8 +694,9 @@ class mpSystem:
                     storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
             print("Occupation number matrices stored after " + time_elapsed(t0,60, 1))
         #now we remove the diagonal elements
-        for i in range(0, self.m):
-            np.fill_diagonal(self.offDiagMat[i], 0)
+        if self.boolOffDiag:
+            for i in range(0, self.m):
+                np.fill_diagonal(self.offDiagMat[i], 0)
 
         if self.occEnSingle and self.boolOffDiag:
             t0 = tm.time()
@@ -710,8 +717,8 @@ class mpSystem:
                 infofile.write('\n')
             infofile.close()
             print("Largest elements found and infos stored after " + time_elapsed(t0,60, 1))    
-            
-        del tmpmat #not sure if this is neccessary but do it regardless...
+            del tmpmat #not sure if this is neccessary but do it regardless...
+        
         if clear:
             # free the memory
             del self.eigVals
@@ -797,7 +804,9 @@ class mpSystem:
             tmpLoEvol = tmpLoEvol * self.specLoEvolutionMatrix ## they need to be the squared ones!
             self.filGreen.write('%.16e ' % (2*dt*i)) 
             for m in range(0,self.m):
+                #raising is the higher dimension creation operator, raising.T.c the annihilation
                 tmpGreen = (self.stateSaves[bound+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[bound-i])[0] 
+                #lowering is the lower dimension annihilation operator, raising.T.c the creation
                 tmpGreen -= (self.stateSaves[bound-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[bound+i])[0]
                 ''' einsum version
                 tmpGreen = np.einsum('ji,kl,lj -> j',self.stateSaves[ind+i].T.conjugate(), (self.specRaising[m].T * tmpHiEvol * self.specRaising[m]).toarray(), self.stateSaves[ind-i])[0] 
