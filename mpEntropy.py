@@ -191,7 +191,7 @@ class mpSystem:
         self.boolOffDiag = configParser.getboolean('filemanagement', 'offdiag')
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
-        self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexpstore')
+        self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexp')
         self.boolSpectral = configParser.getboolean('filemanagement', 'spectral')
         self.boolRetgreen = configParser.getboolean('filemanagement', 'retgreen')
         # ## calculation-parameters
@@ -493,6 +493,58 @@ class mpSystem:
                         self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], mu, sigma[i], norm=False) * self.eigVects[:, k]
                     elif dind == 3:
                         self.state[k, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
+        del phaseArray
+        del skipArray
+        self.normalize(True)
+    
+    ### This one is tailored for taking exactly one energy as the weight
+    # approximate distributions in energy space - all parameters have to be set!
+    # if skip is set to negative, the absolute value gives probability for finding a True in binomial
+    def stateEnergyMicrocan(self, avgen=0, sigma=1, phase='none', skip=0, dist='rect', peakamps=1, skew=0):
+        if self.eigInd == False:
+            self.updateEigenenergies()
+        
+        self.state.fill(0)
+        
+        if dist == 'std':
+            dind = 1
+        elif dist == 'rect':
+            dind = 2
+        elif dist == 'rnd':
+            dind = 3
+            tmpdist = np.random.rand(self.dim)
+        else:
+            dind = 1
+             
+        if phase == 'none':
+            phaseArray = np.zeros(self.dim)
+        elif phase == 'alt':
+            phaseArray = np.zeros(self.dim)
+            phaseArray[::2] = np.pi
+        elif phase == 'rnd':
+            phaseArray = np.random.rand(self.dim) * 2 * np.pi
+        elif phase == 'rndreal':
+            phaseArray = np.random.binomial(1,0.5,self.dim) * np.pi
+        else:
+            phaseArray = np.zeros(self.dim)
+        
+        if skip < 0:
+            skipArray = np.random.binomial(1,-1*skip,self.dim)
+        elif skip == 0:
+            skipArray = np.zeros(self.dim)        
+            skipArray[::1] = 1
+        else:
+            skipArray = np.zeros(self.dim)        
+            skipArray[::int(skip)] = 1
+                       
+        for k in range(0, self.dim):
+            if skipArray[k]:
+                if dind == 1:
+                    self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:, k]
+                elif dind == 2:
+                    self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], avgen, sigma[i], norm=False) * self.eigVects[:, k]
+                elif dind == 3:
+                    self.state[k, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
         del phaseArray
         del skipArray
         self.normalize(True)

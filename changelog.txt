@@ -1,11 +1,16 @@
 change log
 
+### 27.06.2017
+- changed off diagonal singles to only semilog plot and split into two plots
+- added inlays to the above
+
 ### 26.06.2017
 - changed year in last two entrys to be correct
 - greensfunction changes:
 	- complex conjugate was wrong
 	- the time steps in time evolution matrix was dt not the correctly raised power
 	- fft has to be divided by number of steps to maintain norm
+- added condition to deletion of diagonal elements of operators in updateEigendecomposition (to prevent errors because of not-set variables)
 
 ### 21.06.2017
 - changed linewidth for all the off-diagonal plots

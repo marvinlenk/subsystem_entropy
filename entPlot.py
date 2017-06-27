@@ -331,46 +331,53 @@ def plotData(sysVar):
         nrm[1:] = 1/nrm[1:]
         for i in range(0,sysVar.m):
             ###### only sum (subsystem-thermalization)
-            f, (ax1, ax2, ax3) = plt.subplots(3, sharex=False, sharey=False)
-            f.text(0.06, 0.5, 'Sum of off diagonals', ha='center', va='center', rotation='vertical')
-            ax1.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.5)
-            ax1.grid()
-            
-            ax2.semilogy(offdiag[:,0],np.abs(offdiag[:,i+1]),linewidth = 0.5)
-            ax2.set_ylim(bottom=1e-2)
-            ax2.grid()
-            
-            ax3.loglog(offdiag[:,0],np.abs(offdiag[:,i+1]),linewidth = 0.5)
-            ax3.set_xlabel(r'$J\,t$')
-            ax3.set_ylim(bottom=1e-2)
-            ax3.set_xlim(left=5e-2)
-            ax3.grid()
-            plt.subplots_adjust(left=0.4)
+            plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
+            # start at 10% of the whole x-axis
+            lo = (offdiag[-1,0]-offdiag[0,0])/10 + offdiag[0,0]
+            plt.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.5)
+            plt.xlim(xmin=lo)
+            plt.grid()
             plt.tight_layout()
+            ###inlay with the whole deal
+            a = plt.axes([0.62, 0.6, 0.28, 0.28])
+            a.plot(offdiag[:,0],offdiag[:,i+1],linewidth = 0.8)
+            a.set_xticks([])
+            a.set_yticks([])
+            ###
+            pp.savefig()
+            plt.clf()
+            
+            plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
+            plt.semilogy(offdiag[:,0],np.abs(offdiag[:,i+1]),linewidth = 0.5)
+            plt.xlim(xmin=lo)
+            plt.ylim(ymin=1e-2)
+            plt.grid()
+            plt.tight_layout()
+            ###inlay with the whole deal
+            a = plt.axes([0.62, 0.6, 0.28, 0.28])
+            a.semilogy(offdiag[:,0],offdiag[:,i+1],linewidth = 0.8)
+            a.set_ylim(ymin=1e-2)
+            a.set_xticks([])
+            a.set_yticks([])
             ###
             pp.savefig()
             plt.clf()
             
             ###### average (eigenstate-thermalization)
-            f, (ax1, ax2, ax3) = plt.subplots(3, sharex=False, sharey=False)
+            f, (ax1, ax2) = plt.subplots(2, sharex=False, sharey=False)
             tmp = cumtrapz(offdiag[:,i+1],offdiag[:,0],initial=offdiag[0,i+1])
             tmp = np.multiply(tmp,nrm)
-            f.text(0.06, 0.5, 'Average of off diagonals', ha='center', va='center', rotation='vertical')
+            f.text(0.06, 0.5, 'Average of summed off diagonals in $n^{%i}$' % (i), ha='center', va='center', rotation='vertical')
             ax1.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
             ax1.plot(offdiag[:,0],tmp,linewidth = 0.5)
             ax1.grid()
             
-            ax2.semilogy(offdiag[:,0],np.abs(tmp),linewidth = 0.5)
+            ax2.loglog(offdiag[:,0],np.abs(tmp),linewidth = 0.5)
             ax2.set_ylim(bottom=1e-4)
             ax2.grid()
             
-            ax3.loglog(offdiag[:,0],np.abs(tmp),linewidth = 0.5)
-            ax3.set_xlabel(r'$J\,t$')
-            ax3.set_ylim(bottom=1e-4)
-            ax3.grid()
-            
-            plt.subplots_adjust(left=0.4)
             plt.tight_layout()
+            plt.subplots_adjust(left=0.1)
             ###
             pp.savefig()
             plt.clf()
@@ -838,6 +845,7 @@ def plotOffDiagSingles(sysVar):
     nrm = singlesdat[:,0]/dt
     nrm[1:] = 1/nrm[1:]
     
+    '''
     for i in range(0,sysVar.m):
         for j in range(0,sysVar.occEnSingle):
             infoind = 1+4*j+2 #so we start at the first energy
@@ -855,9 +863,9 @@ def plotOffDiagSingles(sysVar):
             plt.xlabel(r'$J\,t$')
             ax3.plot(singlesdat[:,0], np.angle(comp)/(np.pi), linewidth = 0.5)
             plt.tight_layout()
-            plt.subplots_adjust(top=0.9)
+            plt.subplots_adjust(top=0.9, left=0.1)
             pp.savefig(f)
-            plt.clf()
+            f.clf()
             # do the double log plot
             de = np.abs(singlesinfo[i,infoind] - singlesinfo[i,infoind+1])
             linar = np.zeros(len(singlesdat[:,0]), dtype=np.float64)
@@ -868,6 +876,58 @@ def plotOffDiagSingles(sysVar):
             plt.loglog(singlesdat[1:,0], np.abs(tmp/np.abs(comp[0]))[1:], singlesdat[1:,0], linar[1:], lw=0.5)
             pp.savefig()
             plt.clf()
+        print('.',end='',flush=True)
+    '''
+    for i in range(0,sysVar.m):
+        for j in range(0,sysVar.occEnSingle):
+            infoind = 1+4*j+2 #so we start at the first energy
+            # fetch the exponents. if abs(ordr)==1 set to zero for more readability
+            f, (ax1, ax2) = plt.subplots(2, sharex=True, sharey=False)
+            ordr1 = int(np.log10(np.abs(singlesinfo[i,infoind])))
+            if ordr1 == 1 or ordr1 == -1:
+                ordr1 = 0
+            ordr2 = int(np.log10(np.abs(singlesinfo[i,infoind+1])))
+            if ordr2 == 1 or ordr2 == -1:
+                ordr2 = 0
+            if ordr1 == 0 and ordr2 == 0:
+                f.suptitle(r'$n_{%i} \quad E_n=%.2f \; E_m=%.2f$' % (i, singlesinfo[i,infoind], singlesinfo[i,infoind+1]))
+            elif ordr1 == 0:
+                f.suptitle(r'$n_{%i} \quad E_n=%.2f \; E_m=%.2f \cdot 10^{%i}$' % (i, singlesinfo[i,infoind], singlesinfo[i,infoind+1]/(10**ordr2), ordr2))
+            elif ordr2 == 0:
+                f.suptitle(r'$n_{%i} \quad E_n=%.2f \cdot 10^{%i} \; E_m=%.2f$' % (i, singlesinfo[i,infoind]/(10**ordr1), ordr1, singlesinfo[i,infoind+1]))
+            else:
+                f.suptitle(r'$n_{%i} \quad E_n=%.2f \cdot 10^{%i} \; E_m=%.2f \cdot 10^{%i}$' % (i, singlesinfo[i,infoind]/(10**ordr1), ordr1, singlesinfo[i,infoind+1]/(10**ordr2), ordr2))
+            #
+            ind = 1+2*j+(i*sysVar.occEnSingle*2)
+            comp = singlesdat[:,ind] + 1j*singlesdat[:,ind+1]
+            
+            # order of magnitude of the deviation
+            ordr = int(np.log10(np.abs(np.abs(comp[0]) - np.abs(comp[-1])))) - 1
+            ax1.set_ylabel(r'$|n_{n,m}^{%i}(t)| - |n_{n,m}^{%i}(0)| / 10^{%i}$' % (i,i,ordr))
+            ax1.plot(singlesdat[:,0], (np.abs(comp)-np.abs(comp[0]))/(10**ordr), linewidth = 0.5)
+            tmp = cumtrapz(comp,singlesdat[:,0]/dt,initial=comp[0])
+            tmp = np.multiply(tmp,nrm)
+            
+            # order of magnitude of the average
+            ordr = int(np.log10(np.abs(tmp[1]))) - 1
+            ax2.set_ylabel(r'$|\overline{n}_{n,m}^{%i}| / 10^{%i}$' % (i, ordr))
+            ax2.plot(singlesdat[:,0], np.abs(tmp)/(10**ordr), linewidth = 0.5)
+            ax2.set_xlabel(r'$J\,t$')
+            plt.tight_layout()
+            pp.savefig(f)
+            f.clf()
+            plt.close()
+            # do the double log plot
+            de = np.abs(singlesinfo[i,infoind] - singlesinfo[i,infoind+1])
+            linar = np.zeros(len(singlesdat[:,0]), dtype=np.float64)
+            linar[0] = 0
+            linar[1:] = 2/(singlesdat[1:,0] * de)
+            plt.xlabel(r'$J\,t$')
+            plt.ylabel(r'relative average $|n_{n,m}^{%i}|$' % (i))
+            plt.loglog(singlesdat[1:,0], np.abs(tmp/np.abs(comp[0]))[1:], singlesdat[1:,0], linar[1:], lw=0.5)
+            pp.savefig()
+            plt.clf()
+            plt.close()
         print('.',end='',flush=True)
     diagdat = np.loadtxt('./data/diagsingles.txt')
     
@@ -987,6 +1047,7 @@ def plotTimescale(sysVar):
         plt.ylabel(r'$\log | \Delta n_%i |$' % (i))
         plt.xlabel(r'$J\,t$')
         plt.plot(occ_array[:,0], np.log(np.abs(odiff[i])))
+        plt.tight_layout()
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
@@ -1000,6 +1061,7 @@ def plotTimescale(sysVar):
     plt.ylabel(r'$\log | \Delta S_{ss} |$')
     plt.xlabel(r'$J\,t$')
     plt.plot(occ_array[:,0], np.log(np.abs(entdiff[:])))
+    plt.tight_layout()
     pp.savefig()
     plt.clf()
     print('.',end='',flush=True)
