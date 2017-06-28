@@ -721,9 +721,9 @@ class mpSystem:
                     #first store everything, later delete diagonal elements
                     self.offDiagMat[i] = np.matrix(self.eigVects.T) * self.operators[i, i].toarray() * eivectinv
                     #tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
-                    tmpocc = np.einsum('l,lj,j', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0])
+                    tmpocc = np.einsum('l,lj,j', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True)
                 else:
-                    tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv)
+                    tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv, optimize=True)
                 ethfil.write('%i %.16e \n' % (i, tmpocc.real))
             print("Occupation matrices transformed " + time_elapsed(t0,60,1))
             ethfil.close()
@@ -732,7 +732,7 @@ class mpSystem:
             if self.boolOffDiag:
                 diagfil = open('./data/diagsingles.txt', 'w')
                 for i in range(0,self.m):
-                    tmpdiag = np.einsum('l,ll,l -> l', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0]).real
+                    tmpdiag = np.einsum('l,ll,l -> l', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True).real
                     for j in range(0,self.dim):
                         diagfil.write('%i %.16e %.16e \n' % (i, self.eigVals[j], tmpdiag[j]))
                 diagfil.close()
@@ -743,7 +743,7 @@ class mpSystem:
                     #note that the off diag mat still contains the diagonals right now!
                     storeMatrix(self.offDiagMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
                 else:
-                    storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
+                    storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv, optimize=True), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
             print("Occupation number matrices stored after " + time_elapsed(t0,60, 1))
         #now we remove the diagonal elements
         if self.boolOffDiag:
@@ -759,7 +759,7 @@ class mpSystem:
             for i in range(0,self.m):
                 # this is not optimized but one has to store it as a matrix for correct searching
                 #tmpmat = np.asarray(np.einsum('kl,lj,jk -> lj', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True))
-                tmpmat = np.einsum('l,lj,j -> lj', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0])
+                tmpmat = np.einsum('l,lj,j -> lj', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True)
                 infofile.write('%i ' % (i))
                 #to use argpartition correctly we must treat the matrix as an array
                 indices = tmpmat.argpartition(tmpmat.size - num_largest, axis=None)[-num_largest:]
@@ -788,7 +788,7 @@ class mpSystem:
             self.enStateBra[0,i] = tmp.conj()
             
         for i in range(0, self.m):
-            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState)
+            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
             #self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
             if self.offDiag[i].imag > 1e-6:
                 print('The offdiagonal expectation value has an imaginary part of ', self.offDiag[i].imag)
@@ -860,9 +860,11 @@ class mpSystem:
                 tmpGreen = (self.stateSaves[bound+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[bound-i])[0] 
                 #lowering is the lower dimension annihilation operator, raising.T.c the creation
                 tmpGreen -= (self.stateSaves[bound-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[bound+i])[0]
-                ''' einsum version
-                tmpGreen = np.einsum('ji,kl,lj -> j',self.stateSaves[ind+i].T.conjugate(), (self.specRaising[m].T * tmpHiEvol * self.specRaising[m]).toarray(), self.stateSaves[ind-i])[0] 
-                tmpGreen -= np.einsum('ji,kl,lj -> j',self.stateSaves[ind-i].T.conjugate(),(self.specLowering[m].T * tmpLoEvol * self.specLowering[m]).toarray(), self.stateSaves[ind+i])[0]
+                
+                #einsum version
+                '''
+                tmpGreen = np.einsum('ji,kl,lj -> j',self.stateSaves[bound+i].T.conjugate(), (self.specRaising[m].T * tmpHiEvol * self.specRaising[m]), self.stateSaves[bound-i], optimize=True)[0] 
+                tmpGreen -= np.einsum('ji,kl,lj -> j',self.stateSaves[bound-i].T.conjugate(),(self.specLowering[m].T * tmpLoEvol * self.specLowering[m]), self.stateSaves[bound+i], optimize=True)[0]
                 '''
                 #note that the greensfunction is multiplied by -i, which is included in the writing below!
                 #first number is real part, second imaginary

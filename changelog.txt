@@ -1,5 +1,9 @@
 change log
 
+### 28.06.2017
+- updated main.py to get the cool stuff
+- added optimize=true to einsum
+
 ### 27.06.2017
 - changed off diagonal singles to only semilog plot and split into two plots
 - added inlays to the above
