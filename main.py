@@ -18,7 +18,7 @@ if args.plot or args.plot_data or args.plot_animation or args.plot_occen or args
 else:
     plotBool = False
 
-sysVar = mpSystem("interact_0.ini",plotOnly=plotBool)
+sysVar = mpSystem("default.ini",plotOnly=plotBool)
 
 if args.plot:
     sysVar.plot()
@@ -37,11 +37,7 @@ if args.plot_animation:
     exit()
     
 if args.plot_occen:
-    if sysVar.boolPlotOccEn:#start with all particles in 0th state
-for el in initstates:
-    tmp = sysVar.basisDict[el[0]]
-    sysVar.state[tmp, 0] = el[1]
-sysVar.normalize(True)
+    if sysVar.boolPlotOccEn:
         sysVar.plotOccEnbasis()
     exit()
 
@@ -53,8 +49,8 @@ if args.plot_odsingles:
 print("Dimension of the basis:",sysVar.dim)
 
 #initially occupied states with relative weight (entanglement of starting state):
-initstates = [[(sysVar.N,0,0,0),1]]
-          
+initstates = [[(sysVar.N,0,0,0,0),1]]
+
 sysVar.initHamiltonian()
 if sysVar.boolRetgreen:
     sysVar.initSpecLoHamiltonian()
