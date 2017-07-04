@@ -9,7 +9,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from numpy.fft import fft, fftfreq, fftshift
+from numpy.fft import fft, fftfreq, fftshift, rfft, rfftfreq
 from scipy.integrate import cumtrapz
 
 #searches for closest to value element in array
@@ -161,21 +161,21 @@ def plotData(sysVar):
     '''
     ###FFT
     print('')
-    #plt.xlim(0.05,0.15)
     for i in range(0,sysVar.m):
-        fourier = np.fft.rfft(occ_array[loavgind:,i+1])
+        plt.xlim(xmax=30)
+        #GK = -i(2n-1)
+        fourier = (rfft(occ_array[loavgind:,i+1],norm='ortho'))*2 -1
         print(fourier[0].real)
-        freq = np.fft.rfftfreq(np.shape(occ_array[loavgind:,i+1])[-1], d=step_array[1])
-        plt.plot(freq[1:],np.abs(fourier[1:]),label=r'$n_%i$'%i,linewidth = 0.05)
-    print('')
-    plt.ylabel(r'$A_{\omega}$')
-    plt.xlabel(r'$\omega$')
-    plt.legend(loc='upper right')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
+        freq = rfftfreq(np.shape(occ_array[loavgind:,i+1])[-1], d=step_array[1])
+        plt.plot(freq,fourier.real,linewidth = 0.05)
+        plt.plot(freq,fourier.imag,linewidth = 0.05)
+        plt.ylabel(r'$G^K_{\omega}$')
+        plt.xlabel(r'$\omega$')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
     print('.',end='',flush=True)
     '''
     def bath_occ():
@@ -482,8 +482,6 @@ def plotData(sysVar):
     ### Greensfunction
     if sysVar.boolPlotGreen:
         spec = []
-        gnorm = []
-        specnorm = []
         discpoints = len(greendat[:,0])
         print('')
         for i in range(0,sysVar.m):
@@ -491,6 +489,7 @@ def plotData(sysVar):
             ind = 2*i + 1
             plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind],lw=0.1,color='red',label='real')
             plt.plot(greendat[:,0]*sysVar.plotTimeScale,greendat[:,ind+1],lw=0.1,color='blue',label='imaginary')
+            #plt.xlim(xmax=10)
             plt.ylabel(r'$G^R(\tau)$')
             plt.xlabel(r'$J\,\tau$')
             plt.legend(loc='lower right')
@@ -501,37 +500,35 @@ def plotData(sysVar):
             plt.clf()
             ###
             plt.title(r'Spectral function of level $%i$' % (i))
-            tmp = greendat[:,ind] + 1j * greendat[:,ind+1]
-            gnorm.append(np.trapz(np.abs(tmp)**2,x=greendat[:,0]))
-            gffttmp = -2*fftshift(fft(tmp).imag)/discpoints
-            spec.append(gffttmp)
+            green_ret = greendat[:,ind] - 1j * greendat[:,ind+1]
+            green_ret_freq = fft(green_ret,norm='ortho')
+            spec_tmp = 2*fftshift(green_ret_freq.imag)
             if i == 0:
-                shit = spec[i]
-                hlpfrq = fftshift(fftfreq(len(spec[i]),d=(greendat[1,0] * sysVar.plotTimeScale)))
+                spec_total = spec_tmp[:]
+                samp_spacing = greendat[1,0] * sysVar.plotTimeScale
+                # scale on x-axis is frequency
+                hlpfrq = fftshift(fftfreq(len(spec_tmp)))*(2*np.pi)/samp_spacing
             else:
-                shit += spec[i]
-            print(i,np.trapz(spec[i],x=hlpfrq))
-            specnorm.append(np.trapz(np.abs(gffttmp)**2,x=hlpfrq))
-            plt.plot(hlpfrq,spec[i],color = 'red',lw=0.1)
-            #plt.xlim([-100,100])
+                spec_total += spec_tmp
+            spec.append(np.abs(spec_tmp))
+            print(np.trapz(green_ret_freq, x = hlpfrq))
+            print(i,np.trapz(spec_tmp, x = hlpfrq))
+            #exit()
+            plt.plot(hlpfrq,spec_tmp,color = 'red',lw=0.1)
             plt.minorticks_on()
             plt.ylabel(r'$A$')
             plt.xlabel(r'$\omega / J$')
+
             plt.grid()
             plt.grid(which='minor', color='blue', linestyle='dotted', lw=0.2)
             plt.tight_layout()
             ###
             pp.savefig()
             plt.clf()
-        print('Greensfunction norm:')
-        print(gnorm)
-        print(np.sum(gnorm))
-        print('fft norm:')
-        print(specnorm)
         plt.title(r'Spectral function')
         ind = 2*i + 1
-        plt.plot(hlpfrq,shit,color = 'red',lw=0.1)
-        print(np.trapz(shit,x=hlpfrq))
+        plt.plot(hlpfrq,spec_total,color = 'red',lw=0.1)
+        print(np.trapz(spec_total,x=hlpfrq)/(2*np.pi))
         plt.ylabel(r'$A$')
         plt.xlabel(r'$\omega / J$')
         #plt.xlim([-100,100])
@@ -542,10 +539,12 @@ def plotData(sysVar):
         plt.clf()
           
         print('.',end='',flush=True)
-        '''
+        
+        print()
         for s in range(0,len(spec)):
-            print(np.average(hlpfrq,weights=spec[s])/occavg[int(7+3*s)])
-        spec = np.array(spec)/(2*np.pi)  
+            print(np.average(hlpfrq,weights=spec[s]))
+ 
+        
         '''
         def bestatd(args):
             temp = args[0]
@@ -572,7 +571,7 @@ def plotData(sysVar):
         for i in range(0,sysVar.m):
             a.append(occavg[int(7+3*i)])
         print(a)
-        
+        '''
     if sysVar.boolPlotDecomp:
         def eigendecomposition():
             return 0    

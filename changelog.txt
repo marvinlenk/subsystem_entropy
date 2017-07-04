@@ -1,5 +1,11 @@
 change log
 
+### 03.07.2017
+- Changed all the asterisks in the greensfunction evaluation to multi_dot because it was shit and didnt give the correct results
+- Changed green store to store flattened array because multidot is actually intelligent enough to deal with normal vectors
+- Added many debugging message returns to the greensfunction part, please remove later!
+- Somehow the energy is still negative, there is a problem somewhere.
+
 ### 28.06.2017
 - updated main.py to get the cool stuff
 - added optimize=true to einsum

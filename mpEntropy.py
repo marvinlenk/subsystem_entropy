@@ -8,6 +8,7 @@ from scipy.sparse import coo_matrix, csr_matrix, issparse
 from scipy.sparse import identity as spidentity
 from scipy.special import erf
 import scipy.linalg as la
+from numpy.linalg import multi_dot
 from numpy import einsum as npeinsum
 import time as tm
 import os, configparser
@@ -29,9 +30,6 @@ class mpSystem:
         self.mask = np.ones((self.m) , dtype=bool)
         for k in self.kRed:
             self.mask[k] = False
-        
-        ######
-        self.timtemp = 0
         
         self.dim = dimOfBasis(self.N, self.m)  # dimension of basis
         ###### system variables
@@ -106,7 +104,7 @@ class mpSystem:
                 self.initIteratorRed() 
             
             ### Spectral
-            if self.boolSpectral or self.boolRetgreen:
+            if self.boolRetgreen:
                 ## lo
                 self.specLoDim = dimOfBasis(self.N - 1, self.m)
                 self.specLoBasis = np.zeros((self.specLoDim , self.m) , dtype=np.int)
@@ -134,21 +132,6 @@ class mpSystem:
                         # the raising operator transposed is the lowering op. of the higher dimension space
                         self.specRaising.append(getRaisingSpec(self, i))
                         
-                if self.boolSpectral:
-                    ## Lo
-                    # energy basis single operator matrix (k,i)
-                    self.specLoMatrix = []
-                    self.specLoEigVals = []
-                    self.specLoEigVects = []
-                    self.specLoEigInd = False
-                    self.specLoInd = False
-                    ## hi
-                    # energy basis single operator matrix (k,i)
-                    self.specHiMatrix = []
-                    self.specHiEigVals = []
-                    self.specHiEigVects = []
-                    self.specHiEigInd = False
-                    self.specHiInd = False
     # end of init
     
     ###### reading from config file
@@ -192,7 +175,6 @@ class mpSystem:
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexp')
-        self.boolSpectral = configParser.getboolean('filemanagement', 'spectral')
         self.boolRetgreen = configParser.getboolean('filemanagement', 'retgreen')
         # ## calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
@@ -440,7 +422,7 @@ class mpSystem:
     # end of timeStep
     
     def greenStoreState(self):
-        self.stateSaves.append(self.state)
+        self.stateSaves.append(np.array(self.state)[:,0])
         self.timeSaves.append(self.evolTime)
         
     # approximate distributions in energy space - all parameters have to be set!
@@ -837,9 +819,9 @@ class mpSystem:
         # use dots for multithread!
         self.filGreen = open('./data/green.txt','w') #t, re, im
         
-        tmpHiEvol = spidentity(self.specHiDim, dtype=self.datType, format='csr')
-        tmpLoEvol = spidentity(self.specLoDim, dtype=self.datType, format='csr')
-        tmpGreen = 0+0j
+        tmpHiEvol = np.identity(self.specHiDim, dtype=self.datType)
+        tmpLoEvol = np.identity(self.specLoDim, dtype=self.datType)
+        tmpGreen = np.complex128(0)
         
         saves = len(self.timeSaves)
         bound = int((saves-1)/2)
@@ -848,7 +830,17 @@ class mpSystem:
         #handle the i=0 case => equal time greens function is always -i:
         self.filGreen.write('%.16e ' % (0))    
         for ind in range(0,self.m):
-            self.filGreen.write('%.16e %.16e ' % (0, -1))    
+            self.filGreen.write('%.16e %.16e ' % (0, -1))
+            '''
+            #raising is the higher dimension creation operator, raising.T.c the annihilation
+            tmpGreen = (self.stateSaves[bound].T.conjugate() * (self.specRaising[ind].T * tmpHiEvol * self.specRaising[ind]) * self.stateSaves[bound])[0,0]
+            #lowering is the lower dimension annihilation operator, raising.T.c the creation
+            tmpGreen -= (self.stateSaves[bound].T.conjugate() * (self.specLowering[ind].T * tmpLoEvol * self.specLowering[ind]) * self.stateSaves[bound])[0,0]    
+            tmpGreen = np.dot(self.stateSaves[bound].T.conjugate() , self.stateSaves[bound])[0,0] - (self.stateSaves[bound].T.conjugate() @ self.stateSaves[bound])[0,0]
+            #tmpGreen = np.real(np.sqrt(npeinsum('ij,ij->j', self.stateSaves[bound], np.conjugate(self.stateSaves[bound])),dtype=np.complex128))[0]
+            print(tmpGreen)
+            print(type(self.stateSaves[bound]))
+            '''
         self.filGreen.write(' \n')    
     
         for i in range(1,bound+1):
@@ -857,20 +849,13 @@ class mpSystem:
             self.filGreen.write('%.16e ' % (2*dt*i)) 
             for m in range(0,self.m):
                 #raising is the higher dimension creation operator, raising.T.c the annihilation
-                tmpGreen = (self.stateSaves[bound+i].T.conjugate() * self.specRaising[m].T * tmpHiEvol * self.specRaising[m] * self.stateSaves[bound-i])[0] 
+                tmpGreen = multi_dot([self.stateSaves[bound+i].T.conjugate() , self.specRaising[m].T.toarray() , tmpHiEvol , self.specRaising[m].toarray() , self.stateSaves[bound-i]])
                 #lowering is the lower dimension annihilation operator, raising.T.c the creation
-                tmpGreen -= (self.stateSaves[bound-i].T.conjugate() * self.specLowering[m].T * tmpLoEvol * self.specLowering[m] * self.stateSaves[bound+i])[0]
-                
-                #einsum version
-                '''
-                tmpGreen = np.einsum('ji,kl,lj -> j',self.stateSaves[bound+i].T.conjugate(), (self.specRaising[m].T * tmpHiEvol * self.specRaising[m]), self.stateSaves[bound-i], optimize=True)[0] 
-                tmpGreen -= np.einsum('ji,kl,lj -> j',self.stateSaves[bound-i].T.conjugate(),(self.specLowering[m].T * tmpLoEvol * self.specLowering[m]), self.stateSaves[bound+i], optimize=True)[0]
-                '''
+                tmpGreen -= multi_dot([self.stateSaves[bound-i].T.conjugate() , self.specLowering[m].T.toarray() , tmpLoEvol , self.specLowering[m].toarray() , self.stateSaves[bound+i]])
                 #note that the greensfunction is multiplied by -i, which is included in the writing below!
                 #first number is real part, second imaginary
                 self.filGreen.write('%.16e %.16e ' % (tmpGreen.imag, -1*tmpGreen.real))    
             self.filGreen.write(' \n')
-            
         self.filGreen.close()
         '''
         for i in range(0,self.m):
@@ -955,6 +940,7 @@ class mpSystem:
             self.filProg.write(' 1-norm: ' + str(1 - np.round(self.stateNormAbs, 2)) + ' elapsed ' + time_elapsed(t0, 60, 0) + " ###### eta: " + str(int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ")
             self.filProg.close()
         
+        #so we have datapoints+1 points!
         if self.boolDataStore:
             self.updateEverything()   
             self.writeData()
@@ -962,7 +948,6 @@ class mpSystem:
             self.greenStoreState()
         
         print('\n' + 'Time evolution finished after', time_elapsed(t0, 60), 'with average time/step of', "%.4e" % self.tavg)
-        print("Occupation offdiag: " + str(self.timtemp))
         if self.boolDataStore:
             self.closeFiles()
     # end
@@ -1361,7 +1346,8 @@ def getQuarticSpec(quadops, k, l, m, n):
     else:
         return ((quadops[k, m] * quadops[l, n]) - quadops[k, n]).copy()
 
-# destruction operator
+# destruction operator (N -> N-1)
+# adjoint of this is creation on N-1
 def getLoweringSpec(sysVar,l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
@@ -1373,13 +1359,14 @@ def getLoweringSpec(sysVar,l):
             tmp[l] -= 1
             row = np.append(row, sysVar.specLoBasisDict[tuple(tmp)])
             col = np.append(col, sysVar.basisDict[tuple(el)])
-            data = np.append(data, np.float64(sqrt(el[l])))
+            data = np.append(data, np.sqrt(el[l], dtype = np.float64))
             
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.specLoDim , sysVar.dim) , dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
-# creation operator
+# creation operator (N -> N+1)
+# adjoint of this is annihilation on N+1
 def getRaisingSpec(sysVar,l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
@@ -1390,11 +1377,30 @@ def getRaisingSpec(sysVar,l):
         tmp[l] += 1
         row = np.append(row, sysVar.specHiBasisDict[tuple(tmp)])
         col = np.append(col, sysVar.basisDict[tuple(el)])
-        data = np.append(data, np.float64(sqrt(tmp[l])))
+        data = np.append(data, np.sqrt(tmp[l],dtype = np.float64))
             
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.specHiDim , sysVar.dim) , dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
+
+# annihilation operator on N+1
+def getRaisingSpecAdj(sysVar,l):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros((sysVar.m), dtype=np.int)
+    for el in sysVar.specHiBasis:
+        if el[l] != 0:
+            tmp = el.copy()
+            tmp[l] -= 1
+            col = np.append(col, sysVar.specHiBasisDict[tuple(el)])
+            row = np.append(row, sysVar.basisDict[tuple(tmp)])
+            data = np.append(data, np.float64(sqrt(el[l])))
+            
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim , sysVar.specHiDim) , dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
 
 # inverse of creation operator (have to multiply from left...)
 def getRaisingSpecInv(sysVar,l):
