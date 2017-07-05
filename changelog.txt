@@ -1,5 +1,9 @@
 change log
 
+### 05.07.2017
+- added hanning filter to fft for nicer results
+- added fitting of weights
+
 ### 03.07.2017
 - Changed all the asterisks in the greensfunction evaluation to multi_dot because it was shit and didnt give the correct results
 - Changed green store to store flattened array because multidot is actually intelligent enough to deal with normal vectors

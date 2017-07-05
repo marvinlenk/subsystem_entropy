@@ -481,8 +481,13 @@ def plotData(sysVar):
         return 0    
     ### Greensfunction
     if sysVar.boolPlotGreen:
+        gd = greendat
+        '''
+        gd = np.zeros((np.shape(greendat)[0]*2,np.shape(greendat)[1]))
+        gd[int(np.shape(greendat)[0]/2):-int(np.shape(greendat)[0]/2 + np.shape(greendat)[0]%2)] = greendat[:,:].copy()
+        '''
         spec = []
-        discpoints = len(greendat[:,0])
+        discpoints = len(gd[:,0])
         print('')
         for i in range(0,sysVar.m):
             plt.title(r'two time Green function of level $%i$' % (i))
@@ -500,19 +505,21 @@ def plotData(sysVar):
             plt.clf()
             ###
             plt.title(r'Spectral function of level $%i$' % (i))
-            green_ret = greendat[:,ind] - 1j * greendat[:,ind+1]
-            green_ret_freq = fft(green_ret,norm='ortho')
-            spec_tmp = 2*fftshift(green_ret_freq.imag)
+            green_ret = gd[:,ind] + 1j * gd[:,ind+1]
+            green_ret_freq = fft(np.hanning(len(green_ret))*green_ret,norm='ortho')
+            spec_tmp = -2*fftshift(green_ret_freq.imag)
+            if i == 0:
+                samp_spacing = sysVar.deltaT * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
+                hlpfrq = fftshift(fftfreq(len(spec_tmp)))*(2*np.pi)/samp_spacing
+            ### !!! normalize by hand! this might be strange but is necessary here
+            spec_tmp /= (np.trapz(spec_tmp,x=hlpfrq)/(2*np.pi))
             if i == 0:
                 spec_total = spec_tmp[:]
-                samp_spacing = greendat[1,0] * sysVar.plotTimeScale
                 # scale on x-axis is frequency
-                hlpfrq = fftshift(fftfreq(len(spec_tmp)))*(2*np.pi)/samp_spacing
             else:
                 spec_total += spec_tmp
-            spec.append(np.abs(spec_tmp))
-            print(np.trapz(green_ret_freq, x = hlpfrq))
-            print(i,np.trapz(spec_tmp, x = hlpfrq))
+            spec.append(spec_tmp)
+            print(i,np.trapz(spec_tmp, x = hlpfrq)/(2*np.pi))
             #exit()
             plt.plot(hlpfrq,spec_tmp,color = 'red',lw=0.1)
             plt.minorticks_on()
@@ -526,10 +533,17 @@ def plotData(sysVar):
             pp.savefig()
             plt.clf()
         plt.title(r'Spectral function')
-        ind = 2*i + 1
         plt.plot(hlpfrq,spec_total,color = 'red',lw=0.1)
-        print(np.trapz(spec_total,x=hlpfrq)/(2*np.pi))
         plt.ylabel(r'$A$')
+        plt.xlabel(r'$\omega / J$')
+        #plt.xlim([-100,100])
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        plt.plot(hlpfrq,np.abs(spec_total),color = 'red',lw=0.1)
+        plt.ylabel(r'$|A|$')
         plt.xlabel(r'$\omega / J$')
         #plt.xlim([-100,100])
         plt.grid()
@@ -541,17 +555,30 @@ def plotData(sysVar):
         print('.',end='',flush=True)
         
         print()
+        weights = np.zeros(len(spec))
         for s in range(0,len(spec)):
-            print(np.average(hlpfrq,weights=spec[s]))
- 
+            print(np.average(hlpfrq,weights=spec[s]), np.average(hlpfrq,weights=np.abs(spec[s])))
+            weights[s] = np.abs(np.average(hlpfrq,weights=np.abs(spec[s])))
         
+        print('')
         '''
+        # the integrated version
+        def occno(spec,freq,temp,mu):
+            rt = []
+            for i in range(0,len(freq)):
+                rt.append(spec[i]/(np.exp((freq[i]-mu)/temp)-1.0))
+            return np.trapz(np.array(rt), x=freq)
+        '''
+        # the averaged version
+        def occno(freq,temp,mu):
+                return (1/(np.exp((freq-mu)/temp)-1.0))
+            
         def bestatd(args):
             temp = args[0]
             mu = args[1]
             ret =[]
             for i in range(0,sysVar.m):
-                ret.append(occno(spec[i],hlpfrq,temp,mu) - occavg[int(7 + 3*i)])
+                ret.append(occno(weights[i],temp,mu) - occavg[int(7 + 3*i)])
             return np.array(ret)
         
         def bestat(args):
@@ -559,19 +586,39 @@ def plotData(sysVar):
             mu = args[1]
             ret =[]
             for i in range(0,sysVar.m):
-                ret.append(occno(spec[i],hlpfrq,temp,mu))
+                ret.append(occno(weights[i],temp,mu))
             return np.array(ret)
         
         strt = np.array([10,-0.1])
-        bnds = np.array([[0.0001,-10000],[1000,100]])
+        bnds = np.array([[0.0001,-500],[1000,weights[0]]])
         rgs = least_squares(bestatd,x0=strt,bounds=bnds,loss='soft_l1')
         print(rgs)
+        print(rgs.x)
         print(bestat(rgs.x))
         a = []
         for i in range(0,sysVar.m):
             a.append(occavg[int(7+3*i)])
         print(a)
-        '''
+        
+        #occupation number in levels against renormalized energy
+        plt.title('Bose-Einstein distribution fit')
+        lo = weights[0]-weights[0]/100
+        hi = weights[-1]+weights[-1]/100
+        plt.xlim(lo,hi)
+        xvals = np.linspace(lo, hi, 1e3)
+        yvals = occno(xvals, rgs.x[0], rgs.x[1]) / sysVar.N
+        for l in range(0,sysVar.m):
+            plt.errorbar(weights[l],occavg[int(7 + 3*l)]/sysVar.N,xerr=None,yerr=occavg[int(8 + 3*l)]/sysVar.N,marker='o',color=cm.Set1(0))
+        plt.plot(xvals,yvals,color='blue',lw=0.4)
+        plt.ylabel(r'Relative level occupation')
+        plt.xlabel(r'energy')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.',end='',flush=True)
+        
     if sysVar.boolPlotDecomp:
         def eigendecomposition():
             return 0    
@@ -1068,9 +1115,3 @@ def plotTimescale(sysVar):
     print('.',end='',flush=True)
     pp.close()
     print(" done!")
-    
-def occno(spec,freq,temp,mu):
-    rt = []
-    for i in range(0,len(freq)):
-        rt.append(spec[i]/(np.exp((freq[i]-mu)/temp)-1.0))
-    return np.trapz(np.array(rt), x=freq)

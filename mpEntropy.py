@@ -350,7 +350,7 @@ class mpSystem:
         self.evolutionMatrix = spidentity(self.dim, dtype=self.datType, format='csr')
         
         for i in range(1, self.order + 1):
-            self.evolutionMatrix += (-1j) ** i * (self.deltaT) ** i * self.hamiltonian ** i / factorial(i)
+            self.evolutionMatrix += ((-1j) ** i) * (self.deltaT ** i) * (self.hamiltonian ** i) / factorial(i)
             
         self.evolutionMatrix = np.matrix(self.evolutionMatrix.toarray(), dtype=self.datType)
         if self.boolHamilStore:
@@ -389,7 +389,7 @@ class mpSystem:
         self.specLoEvolutionMatrix = np.matrix(self.specLoEvolutionMatrix.toarray(), dtype=self.datType) 
         self.specLoEvolutionMatrix = npmatrix_power(self.specLoEvolutionMatrix, self.evolStepDist)
         if sq:
-            self.specLoEvolutionMatrix = self.specLoEvolutionMatrix ** 2
+            self.specLoEvolutionMatrix = npmatrix_power(self.specLoEvolutionMatrix , 2)
     # end
     
     # The matrix already inherits the identity so step is just mutliplication
@@ -414,7 +414,7 @@ class mpSystem:
         self.specHiEvolutionMatrix = np.matrix(self.specHiEvolutionMatrix.toarray(), dtype=self.datType)    
         self.specHiEvolutionMatrix = npmatrix_power(self.specHiEvolutionMatrix, self.evolStepDist)
         if sq:
-            self.specHiEvolutionMatrix = self.specHiEvolutionMatrix ** 2
+            self.specHiEvolutionMatrix = npmatrix_power(self.specHiEvolutionMatrix , 2)
     # end
     
     def timeStep(self):
@@ -579,55 +579,6 @@ class mpSystem:
             self.specHiEigVals, self.specHiEigVects = la.eigh(self.specHiHamiltonian.toarray())
             self.specHiEigInd = True            
     
-    #clear will delete the hamiltonian and (even more important) the corresponding eigenvectors
-    def updateSpectralLo(self,clear=False):
-        if not self.specLoInd:
-            self.updateEigenenergies()
-            self.updateLoEigenenergies()
-            for i in range(0,self.m):
-                self.specLoMatrix.append(np.dot(self.specLoEigVects.T , np.dot(getLoweringSpec(self,i).toarray(), self.eigVects)))
-            if clear:
-                del self.specLoHamiltonian
-                del self.specHiEigVects
-            self.specLoInd = True
-    
-    #clear will delete the hamiltonian and (even more important) the corresponding eigenvectors    
-    def updateSpectralHi(self,clear=False):
-        if not self.specHiInd:
-            self.updateEigenenergies()
-            self.updateHiEigenenergies()
-            for i in range(0,self.m):
-                self.specHiMatrix.append(np.dot(self.specHiEigVects.T , np.dot(getRaisingSpec(self,i).toarray(), self.eigVects)))
-            if clear:
-                del self.specHiHamiltonian
-                del self.specHiEigVects
-            self.specHiInd = True
-    
-    def storeSpectral(self,clear=False):
-        for a in range(0,self.m):
-            flo = open('./data/spectral/lo%i.txt' % (a), 'w')
-            fhi = open('./data/spectral/hi%i.txt' % (a), 'w')
-            for i in range(0,self.dim):
-                for j in range(0,self.dim):
-                    for k in range(0,self.specLoDim):
-                        en = self.specLoEigVals[k] - (self.eigVals[i] + self.eigVals[j])/2
-                        matel = self.specLoMatrix[a][k,i] * self.specLoMatrix[a][k,j]
-                        flo.write('%i %i %i %.16e %.16e \n' % (i,j,k,en,matel))
-                        en = (self.eigVals[i] + self.eigVals[j])/2 - self.specHiEigVals[k]
-                        matel = self.specHiMatrix[a][k,i] * self.specHiMatrix[a][k,j]
-                        fhi.write('%i %i %i %.16e %.16e \n' % (i,j,k,en,matel))
-            fhi.close()
-            flo.close()
-        if clear:
-            del self.specLoEigVals
-            del self.specHiEigVals
-            del self.specLoMatrix
-            del self.specHiMatrix
-            
-    def storeSpectralDensityMatrix(self):
-        self.updateEigenenergies()
-        storeMatrix(np.dot(self.eigVects.T,np.dot(self.densityMatrix,self.eigVects)), './data/spectral/dm.txt', absOnly=False)
-        
     ## will free the memory!!!
     def updateEigendecomposition(self,clear=True):
         if self.boolEngyStore:
@@ -701,7 +652,7 @@ class mpSystem:
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #first store everything, later delete diagonal elements
-                    self.offDiagMat[i] = np.matrix(self.eigVects.T) * self.operators[i, i].toarray() * eivectinv
+                    self.offDiagMat[i] = multi_dot(np.matrix(self.eigVects.T) , self.operators[i, i].toarray() , eivectinv)
                     #tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
                     tmpocc = np.einsum('l,lj,j', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True)
                 else:
@@ -780,7 +731,7 @@ class mpSystem:
                 for j in range(0,self.occEnSingle):
                     x = int(self.occEnInds[i,0,j])
                     y = int(self.occEnInds[i,1,j])
-                    self.offDiagSingles[i,j] = self.enStateBra[0,x] * self.offDiagMat[i][x,y] * self.enState[y,0]
+                    self.offDiagSingles[i,j] = multi_dot(self.enStateBra[0,x] , self.offDiagMat[i][x,y] , self.enState[y,0])
         
     def updateEntropy(self):
         self.entropy = 0
@@ -844,8 +795,8 @@ class mpSystem:
         self.filGreen.write(' \n')    
     
         for i in range(1,bound+1):
-            tmpHiEvol = tmpHiEvol * self.specHiEvolutionMatrix ## they need to be the squared ones!
-            tmpLoEvol = tmpLoEvol * self.specLoEvolutionMatrix ## they need to be the squared ones!
+            tmpHiEvol = np.dot(tmpHiEvol , self.specHiEvolutionMatrix) ## they need to be the squared ones!
+            tmpLoEvol = np.dot(tmpLoEvol , self.specLoEvolutionMatrix) ## they need to be the squared ones!
             self.filGreen.write('%.16e ' % (2*dt*i)) 
             for m in range(0,self.m):
                 #raising is the higher dimension creation operator, raising.T.c the annihilation
