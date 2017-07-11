@@ -1062,6 +1062,12 @@ def plotTimescale(sysVar):
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
     
+    ### get the characteristic energy difference of the system
+    if sysVar.boolEngyStore:
+        engys = np.loadtxt('./data/hamiltonian_eigvals.txt')
+        enscale = np.abs(engys[0,1] - engys[-1,1])/sysVar.dim
+        del engys
+    
     loavgpercent = sysVar.plotLoAvgPerc #percentage of time evolution to start averaging
     loavgind = int(loavgpercent*sysVar.dataPoints) #index to start at when calculating average and stddev
     loavgtime = np.round(loavgpercent * (sysVar.deltaT * sysVar.steps * sysVar.plotTimeScale),2)
@@ -1089,12 +1095,17 @@ def plotTimescale(sysVar):
     for i in range(0,sysVar.m):
         plt.ylabel(r'$\Delta n_%i$' % (i))
         plt.xlabel(r'$J\,t$')
-        plt.plot(occ_array[:,0], odiff[i])
+        plt.plot(occ_array[:,0], odiff[i], lw=0.5)
+        if sysVar.boolEngyStore:
+            plt.axvline(enscale,color='red',lw=0.5)
         pp.savefig()
         plt.clf()
-        plt.ylabel(r'$\log | \Delta n_%i |$' % (i))
+        plt.ylabel(r'$| \Delta n_%i |$' % (i))
         plt.xlabel(r'$J\,t$')
-        plt.plot(occ_array[:,0], np.log(np.abs(odiff[i])))
+        plt.ylim(ymin=1e-3)
+        plt.semilogy(occ_array[:,0], np.abs(odiff[i]),lw=0.5)
+        if sysVar.boolEngyStore:
+            plt.axvline(enscale,color='red',lw=0.5)
         plt.tight_layout()
         pp.savefig()
         plt.clf()
@@ -1103,12 +1114,17 @@ def plotTimescale(sysVar):
     
     plt.ylabel(r'$\Delta S_{ss}$')
     plt.xlabel(r'$J\,t$')
-    plt.plot(occ_array[:,0], entdiff[:])
+    plt.plot(occ_array[:,0], entdiff[:],lw=0.5)
+    if sysVar.boolEngyStore:
+            plt.axvline(enscale,color='red',lw=0.5)
     pp.savefig()
     plt.clf()
-    plt.ylabel(r'$\log | \Delta S_{ss} |$')
+    plt.ylabel(r'$| \Delta S_{ss} |$')
     plt.xlabel(r'$J\,t$')
-    plt.plot(occ_array[:,0], np.log(np.abs(entdiff[:])))
+    plt.ylim(ymin=1e-3)
+    plt.semilogy(occ_array[:,0], np.abs(entdiff[:]),lw=0.5)
+    if sysVar.boolEngyStore:
+            plt.axvline(enscale,color='red',lw=0.5)
     plt.tight_layout()
     pp.savefig()
     plt.clf()

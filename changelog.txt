@@ -1,5 +1,9 @@
 change log
 
+### 11.07.2017
+- changed timescale plot to be base 10 logarithmic
+- added typical energy difference to timescale plot
+
 ### 05.07.2017
 - added hanning filter to fft for nicer results
 - added fitting of weights
