@@ -507,7 +507,7 @@ def plotData(sysVar):
             plt.title(r'Spectral function of level $%i$' % (i))
             green_ret = gd[:,ind] + 1j * gd[:,ind+1]
             green_ret_freq = fft(np.hanning(len(green_ret))*green_ret,norm='ortho')
-            spec_tmp = -2*fftshift(green_ret_freq.imag)
+            spec_tmp = np.abs(-2*fftshift(green_ret_freq.imag))[::-1]
             if i == 0:
                 samp_spacing = sysVar.deltaT * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
                 hlpfrq = fftshift(fftfreq(len(spec_tmp)))*(2*np.pi)/samp_spacing
@@ -559,7 +559,6 @@ def plotData(sysVar):
         for s in range(0,len(spec)):
             print(np.average(hlpfrq,weights=spec[s]), np.average(hlpfrq,weights=np.abs(spec[s])))
             weights[s] = np.abs(np.average(hlpfrq,weights=np.abs(spec[s])))
-        
         print('')
         '''
         # the integrated version
@@ -602,8 +601,9 @@ def plotData(sysVar):
         
         #occupation number in levels against renormalized energy
         plt.title('Bose-Einstein distribution fit')
-        lo = weights[0]-weights[0]/100
-        hi = weights[-1]+weights[-1]/100
+        ws = np.sort(weights)
+        lo = ws[0]-ws[0]/100
+        hi = ws[-1]+ws[-1]/100
         plt.xlim(lo,hi)
         xvals = np.linspace(lo, hi, 1e3)
         yvals = occno(xvals, rgs.x[0], rgs.x[1]) / sysVar.N

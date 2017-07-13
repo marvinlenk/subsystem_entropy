@@ -652,7 +652,7 @@ class mpSystem:
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     #first store everything, later delete diagonal elements
-                    self.offDiagMat[i] = multi_dot(np.matrix(self.eigVects.T) , self.operators[i, i].toarray() , eivectinv)
+                    self.offDiagMat[i] = multi_dot([self.eigVects.T , self.operators[i, i].toarray() , eivectinv])
                     #tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
                     tmpocc = np.einsum('l,lj,j', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True)
                 else:
@@ -731,7 +731,7 @@ class mpSystem:
                 for j in range(0,self.occEnSingle):
                     x = int(self.occEnInds[i,0,j])
                     y = int(self.occEnInds[i,1,j])
-                    self.offDiagSingles[i,j] = multi_dot(self.enStateBra[0,x] , self.offDiagMat[i][x,y] , self.enState[y,0])
+                    self.offDiagSingles[i,j] = self.enStateBra[0,x] * self.offDiagMat[i][x,y] * self.enState[y,0]
         
     def updateEntropy(self):
         self.entropy = 0

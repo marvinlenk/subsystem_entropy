@@ -1,5 +1,9 @@
 change log
 
+### 13.07.2017
+- bugfix in offdiagonals where an occurance of multidot had a wrong input type
+- bugfix in offdiagsingles where multidot was used for a scalar multiplication (exchanged with *)
+
 ### 11.07.2017
 - changed timescale plot to be base 10 logarithmic
 - added typical energy difference to timescale plot
