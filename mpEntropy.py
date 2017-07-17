@@ -72,8 +72,8 @@ class mpSystem:
             ###### energy eigenbasis stuff
             if self.boolOffDiag:
                 self.offDiagMat = np.empty((self.m), dtype=object)
-                self.enState = np.zeros((self.dim,1), dtype=self.datType)
-                self.enStateBra = np.zeros((1,self.dim), dtype=self.datType)
+                self.enState = np.zeros((self.dim), dtype=self.datType)
+                self.enStateBra = np.zeros((self.dim), dtype=self.datType)
                 self.offDiag = np.zeros((self.m), dtype=self.datType)
                 if self.occEnSingle > 0:
                     self.occEnInds = np.zeros((self.m,2,self.occEnSingle),dtype=np.int16)
@@ -253,14 +253,13 @@ class mpSystem:
                 self.densityMatrixRed[el[1], el[0]] += self.densityMatrix[el[3], el[2]]
     
     def reduceDensityMatrixFromState(self):
-        stTmp = np.conjugate(self.state)
         if self.densityMatrixRed is None:
             return
         self.densityMatrixRed.fill(0)
         for el in self.iteratorRed:
-            self.densityMatrixRed[el[0], el[1]] += self.densityMatrix[el[2], el[3]]
+            self.densityMatrixRed[el[0], el[1]] += self.state[el[2],0] * np.conjugate(self.state[el[3],0])
             if el[0] != el[1]:
-                self.densityMatrixRed[el[1], el[0]] += self.state[el[3], 0] * stTmp[el[2], 0]
+                self.densityMatrixRed[el[1], el[0]] += self.state[el[3], 0] * np.conjugate(self.state[el[2], 0])
     # end of reduceDensityMatrixFromState
 
     def reduceMatrix(self,matrx):
@@ -553,11 +552,20 @@ class mpSystem:
     # end of normalize    
     
     # note that - in principle - the expectation value can be complex! (though it shouldn't be)
+    # this one explicitly uses the state vector
     def expectValue(self, operator):
         if np.shape(operator) != (self.dim, self.dim):
             exit('Dimension of operator is', np.shape(operator), 'but', (self.dim, self.dim), 'is needed!')
         # will compute only the diagonal elements!
+        return multi_dot([np.conjugate(np.array(self.state)[:,0]), operator, np.array(self.state)[:,0]])
+    
+    # note that - in principle - the expectation value can be complex! (though it shouldn't be)
+    def expectValueDM(self, operator):
+        if np.shape(operator) != (self.dim, self.dim):
+            exit('Dimension of operator is', np.shape(operator), 'but', (self.dim, self.dim), 'is needed!')
+        # will compute only the diagonal elements!
         return np.einsum('ij,ji->', self.densityMatrix, operator)
+    
     
     def expectValueRed(self, operator):
         if np.shape(operator) != (self.dimRed, self.dimRed):
@@ -637,16 +645,16 @@ class mpSystem:
                 for i in range(0, self.dim):
                     tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
                     if self.boolOffDiag:
-                        self.enState[i,0] = tmp
-                        self.enStateBra[0,i] = tmp.conj()
+                        self.enState[i] = tmp
+                        self.enStateBra[i] = tmp.conj()
                     # for the diagonals only the abs value is necessary            
                     tmpAbsSq[i] = np.abs(tmp) ** 2
             elif self.boolDecompStore and self.boolOffDiag:
                 for i in range(0, self.dim):
                     tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
                     if self.boolOffDiag:
-                        self.enState[i,0] = tmp
-                        self.enStateBra[0,i] = tmp.conj()
+                        self.enState[i] = tmp
+                        self.enStateBra[i] = tmp.conj()
                         
             ethfil = open('./data/diagexpect.txt', 'w')
             for i in range(0, self.m):
@@ -654,9 +662,9 @@ class mpSystem:
                     #first store everything, later delete diagonal elements
                     self.offDiagMat[i] = multi_dot([self.eigVects.T , self.operators[i, i].toarray() , eivectinv])
                     #tmpocc = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
-                    tmpocc = np.einsum('l,lj,j', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True)
+                    tmpocc = multi_dot([self.enStateBra, self.offDiagMat[i], self.enState])
                 else:
-                    tmpocc = np.einsum('l,lj,jk,kl', tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv, optimize=True)
+                    tmpocc = multi_dot([tmpAbsSq, self.eigVects.T, self.operators[i, i].toarray(), eivectinv])
                 ethfil.write('%i %.16e \n' % (i, tmpocc.real))
             print("Occupation matrices transformed " + time_elapsed(t0,60,1))
             ethfil.close()
@@ -665,7 +673,7 @@ class mpSystem:
             if self.boolOffDiag:
                 diagfil = open('./data/diagsingles.txt', 'w')
                 for i in range(0,self.m):
-                    tmpdiag = np.einsum('l,ll,l -> l', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True).real
+                    tmpdiag = np.einsum('l,ll,l -> l', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True).real
                     for j in range(0,self.dim):
                         diagfil.write('%i %.16e %.16e \n' % (i, self.eigVals[j], tmpdiag[j]))
                 diagfil.close()
@@ -676,7 +684,7 @@ class mpSystem:
                     #note that the off diag mat still contains the diagonals right now!
                     storeMatrix(self.offDiagMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
                 else:
-                    storeMatrix(np.einsum('lj,jk,km -> lm', self.eigVects.T, self.operators[i, i].toarray(), eivectinv, optimize=True), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
+                    storeMatrix(multi_dot([self.eigVects.T, self.operators[i, i].toarray(), eivectinv]), './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
             print("Occupation number matrices stored after " + time_elapsed(t0,60, 1))
         #now we remove the diagonal elements
         if self.boolOffDiag:
@@ -692,7 +700,7 @@ class mpSystem:
             for i in range(0,self.m):
                 # this is not optimized but one has to store it as a matrix for correct searching
                 #tmpmat = np.asarray(np.einsum('kl,lj,jk -> lj', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True))
-                tmpmat = np.einsum('l,lj,j -> lj', self.enStateBra[0,:], self.offDiagMat[i], self.enState[:,0], optimize=True)
+                tmpmat = np.outer(self.enStateBra, np.dot(self.offDiagMat[i], self.enState))
                 infofile.write('%i ' % (i))
                 #to use argpartition correctly we must treat the matrix as an array
                 indices = tmpmat.argpartition(tmpmat.size - num_largest, axis=None)[-num_largest:]
@@ -717,11 +725,11 @@ class mpSystem:
     def updateOffDiag(self):
         for i in range(0, self.dim):
             tmp = np.dot(self.eigVects[:, i], np.asarray(self.state)[:, 0]) 
-            self.enState[i,0] = tmp
-            self.enStateBra[0,i] = tmp.conj()
+            self.enState[i] = tmp
+            self.enStateBra[i] = tmp.conj()
             
         for i in range(0, self.m):
-            self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
+            self.offDiag[i] = multi_dot([self.enStateBra, self.offDiagMat[i], self.enState])
             #self.offDiag[i] = np.einsum('kl,lj,jk', self.enStateBra, self.offDiagMat[i], self.enState, optimize=True)
             if self.offDiag[i].imag > 1e-6:
                 print('The offdiagonal expectation value has an imaginary part of ', self.offDiag[i].imag)
@@ -731,7 +739,7 @@ class mpSystem:
                 for j in range(0,self.occEnSingle):
                     x = int(self.occEnInds[i,0,j])
                     y = int(self.occEnInds[i,1,j])
-                    self.offDiagSingles[i,j] = self.enStateBra[0,x] * self.offDiagMat[i][x,y] * self.enState[y,0]
+                    self.offDiagSingles[i,j] = self.enStateBra[x] * self.offDiagMat[i][x,y] * self.enState[y]
         
     def updateEntropy(self):
         self.entropy = 0
