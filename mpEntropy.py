@@ -532,7 +532,7 @@ class mpSystem:
     
     def normalize(self, initial=False):
         # note that the shape of the state vector is (dim,1) for reasons of matrix multiplication in numpy
-        self.stateNorm = np.real(sqrt(npeinsum('ij,ij->j', self.state, np.conjugate(self.state))))[0]
+        self.stateNorm = (sqrt(npeinsum('ij,ij->j', self.state, np.conjugate(self.state)))).real[0]
         self.stateNormAbs *= self.stateNorm
         self.state /= self.stateNorm
         # do not store the new state norm - it is defined to be 1 so just store last norm value!
@@ -609,7 +609,7 @@ class mpSystem:
                     # occupation numbers of the eigenvalues
                     tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i] , tmpPhase))
                     for j in range(0, self.m):
-                        tfil.write('%.16e ' % np.real(np.einsum('i,ii->', np.abs(self.eigVects[:, i]) ** 2, self.operators[j, j].toarray())))
+                        tfil.write('%.16e ' % (np.einsum('i,ii->', np.abs(self.eigVects[:, i]) ** 2, self.operators[j, j].toarray())).real)
                     tfil.write('\n')
             else:
                 for i in range(0, self.dim):              
@@ -744,11 +744,11 @@ class mpSystem:
     def updateEntropy(self):
         self.entropy = 0
         for el in la.eigvalsh(self.densityMatrix, check_finite=False):
-            if np.imag(el) != 0:
-                print('There is an Eigenvalue of the density matrix with imaginary part', np.imag(el))
-            if np.real(el) > 0:
-                self.entropy -= np.real(el) * nplog(np.real(el))
-            if np.real(el) < -1e-7:
+            if el.imag != 0:
+                print('There is an Eigenvalue of the density matrix with imaginary part', el.imag)
+            if el.real > 0:
+                self.entropy -= el.real * nplog(el.real)
+            if el.real < -1e-7:
                 print('Oh god, there is a negative eigenvalue smaller than 1e-7 ! Namely:', el)
     # end of updateEntropy
     
@@ -757,21 +757,21 @@ class mpSystem:
             return
         self.entropyRed = 0
         for el in la.eigvalsh(self.densityMatrixRed, check_finite=False):
-            if np.imag(el) != 0:
-                print('There is an Eigenvalue of the density matrix with imaginary part', np.imag(el))
-            if np.real(el) > 0:
-                self.entropyRed -= np.real(el) * nplog(np.real(el))
-            if np.real(el) < 0 and np.abs(el) > 1e-7:
+            if el.imag != 0:
+                print('There is an Eigenvalue of the density matrix with imaginary part', el.imag)
+            if el.real > 0:
+                self.entropyRed -= el.real * nplog(el.real)
+            if el.real < 0 and np.abs(el) > 1e-7:
                 print('Oh god, there is a negative eigenvalue smaller than 1e-7 ! Namely:', el)
     # end of updateEntropyRed
     
     def updateOccNumbers(self):
         for m in range(0, self.m):
-            self.occNo[m] = np.real(self.expectValue(self.operators[m, m].toarray()))
+            self.occNo[m] = (self.expectValue(self.operators[m, m].toarray())).real
     # end of updateOccNumbers
     
     def updateEnergy(self):
-        self.energy = np.real(self.expectValue(self.hamiltonian.toarray()))
+        self.energy = (self.expectValue(self.hamiltonian.toarray())).real
     # end of updateEnergy
     
     def evaluateGreen(self):
@@ -1406,15 +1406,15 @@ def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
                 if stabs:
                     f.write('%.16e ' % np.abs(mat[(n, nn)]))
                 if stim:
-                    fimag.write('%.16e ' % np.imag(mat[(n, nn)]))
+                    fimag.write('%.16e ' % (mat[(n, nn)]).imag)
                 if stre:
-                    freal.write('%.16e ' % np.real(mat[(n, nn)]))
+                    freal.write('%.16e ' % (mat[(n, nn)]).real)
             if stabs:
                 f.write('%.16e\n' % np.abs(mat[(n, matDim - 1)]))
             if stim:
-                fimag.write('%.16e\n' % np.imag(mat[(n, matDim - 1)]))
+                fimag.write('%.16e\n' % (mat[(n, matDim - 1)]).imag)
             if stre:
-                freal.write('%.16e\n' % np.real(mat[(n, matDim - 1)]))
+                freal.write('%.16e\n' %(mat[(n, matDim - 1)]).real)
         if stabs:
             f.close()
         if stim:
