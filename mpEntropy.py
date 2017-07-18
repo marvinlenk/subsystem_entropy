@@ -256,9 +256,9 @@ class mpSystem:
             return
         self.densityMatrixRed.fill(0)
         for el in self.iteratorRed:
-            self.densityMatrixRed[el[0], el[1]] += self.state[el[2]] * np.conjugate(self.state[el[3]])
+            self.densityMatrixRed[el[0], el[1]] += self.state[el[2]] * self.state[el[3]].conj()
             if el[0] != el[1]:
-                self.densityMatrixRed[el[1], el[0]] += self.state[el[3]] * np.conjugate(self.state[el[2]])
+                self.densityMatrixRed[el[1], el[0]] += self.state[el[3]] * self.state[el[2]].conj()
     # end of reduceDensityMatrixFromState
 
     def reduceMatrix(self,matrx):
@@ -343,7 +343,7 @@ class mpSystem:
     def initEvolutionMatrix(self, diagonalize=True):
         if self.order == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if (not np.allclose(self.hamiltonian.toarray(), np.conjugate(self.hamiltonian.toarray().T))):
+        if (not np.allclose(self.hamiltonian.toarray(), self.hamiltonian.toarray().T.conjugate())):
             print('Warning - hamiltonian is not hermitian!')
         self.evolutionMatrix = spidentity(self.dim, dtype=self.datType, format='csr')
         
@@ -369,7 +369,7 @@ class mpSystem:
     def initSpecLoEvolutionMatrix(self, diagonalize=False,conj=True,sq=True):
         if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if (not np.allclose(self.specLoHamiltonian.toarray(), np.conjugate(self.specLoHamiltonian.toarray().T))):
+        if (not np.allclose(self.specLoHamiltonian.toarray(), self.specLoHamiltonian.toarray().T.conj())):
             print('Warning - hamiltonian is not hermitian!')
         self.specLoEvolutionMatrix = spidentity(self.specLoDim, dtype=self.datType, format='csr')
         
@@ -395,7 +395,7 @@ class mpSystem:
     def initSpecHiEvolutionMatrix(self, diagonalize=False,conj=False,sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if (not np.allclose(self.specHiHamiltonian.toarray(), np.conjugate(self.specHiHamiltonian.toarray().T))):
+        if (not np.allclose(self.specHiHamiltonian.toarray(), self.specHiHamiltonian.toarray().T.conj())):
             print('Warning - hamiltonian is not hermitian!')
         self.specHiEvolutionMatrix = spidentity(self.specHiDim, dtype=self.datType, format='csr')
         

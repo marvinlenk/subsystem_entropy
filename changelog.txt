@@ -6,6 +6,8 @@ change log
 - MAJOR major speedup by exploiting sparseness of the occupation number matrices
 - finally found the additional dimension problem in the time step - the evolution matrix was a np.matrix which caused self.state to be one as well
 - changed norm back to la.norm
+- additionally changed some occasions of np.conjugate
+- updated main.py
 
 ### 13.07.2017
 - bugfix in offdiagonals where an occurance of multidot had a wrong input type
