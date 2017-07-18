@@ -1,7 +1,6 @@
 # This program is explicitly written for PYTHON3.X and will not work under Python2.X
 
 import numpy as np
-from numpy import dot as npdot
 import shutil
 from scipy.special import binom
 from scipy.sparse import coo_matrix, csr_matrix, issparse
@@ -39,7 +38,7 @@ class mpSystem:
             fillBasis(self.basis, self.N, self.m)
             self.basisDict = basis2dict(self.basis, self.dim)
             # note that there is an additional dimension there! needed for fast multiplication algorithm
-            self.state = np.zeros((self.dim, 1) , dtype=self.datType)
+            self.state = np.zeros((self.dim,) , dtype=self.datType)
             # parameter for storing in file
             self.stateNorm = 0
             self.stateNormAbs = 0
@@ -226,7 +225,7 @@ class mpSystem:
             self.densityMatrix = np.zeros((self.dim , self.dim) , dtype=self.datType)
             self.densMatrixInd = True
             
-        self.densityMatrix = np.outer(self.state[:, 0], np.conjugate(self.state[:, 0]))
+        self.densityMatrix = np.outer(self.state, self.state.conj())
     # end of updateDensityMatrix
     
     def initIteratorRed(self):
@@ -257,9 +256,9 @@ class mpSystem:
             return
         self.densityMatrixRed.fill(0)
         for el in self.iteratorRed:
-            self.densityMatrixRed[el[0], el[1]] += self.state[el[2],0] * np.conjugate(self.state[el[3],0])
+            self.densityMatrixRed[el[0], el[1]] += self.state[el[2]] * np.conjugate(self.state[el[3]])
             if el[0] != el[1]:
-                self.densityMatrixRed[el[1], el[0]] += self.state[el[3], 0] * np.conjugate(self.state[el[2], 0])
+                self.densityMatrixRed[el[1], el[0]] += self.state[el[3]] * np.conjugate(self.state[el[2]])
     # end of reduceDensityMatrixFromState
 
     def reduceMatrix(self,matrx):
@@ -351,12 +350,11 @@ class mpSystem:
         for i in range(1, self.order + 1):
             self.evolutionMatrix += ((-1j) ** i) * (self.deltaT ** i) * (self.hamiltonian ** i) / factorial(i)
             
-        self.evolutionMatrix = np.matrix(self.evolutionMatrix.toarray(), dtype=self.datType)
+        self.evolutionMatrix = self.evolutionMatrix.toarray()
         if self.boolHamilStore:
             storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.txt', 1)
             storeMatrix(self.evolutionMatrix, './data/evolutionmatrix.txt', 1)
         self.evolutionMatrix = npmatrix_power(self.evolutionMatrix, self.evolStepDist)
-        
         # Store hamiltonian eigenvalues
         if diagonalize:
             self.updateEigenenergies()
@@ -385,7 +383,7 @@ class mpSystem:
         if diagonalize:
             self.updateLoEigenenergies()
         # bring it to the same timestep distance as the state vector
-        self.specLoEvolutionMatrix = np.matrix(self.specLoEvolutionMatrix.toarray(), dtype=self.datType) 
+        self.specLoEvolutionMatrix = self.specLoEvolutionMatrix.toarray()
         self.specLoEvolutionMatrix = npmatrix_power(self.specLoEvolutionMatrix, self.evolStepDist)
         if sq:
             self.specLoEvolutionMatrix = npmatrix_power(self.specLoEvolutionMatrix , 2)
@@ -410,18 +408,18 @@ class mpSystem:
             self.specHiEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.specHiHamiltonian ** i) / factorial(i)
         if diagonalize:
             self.updateHiEigenenergies()
-        self.specHiEvolutionMatrix = np.matrix(self.specHiEvolutionMatrix.toarray(), dtype=self.datType)    
+        self.specHiEvolutionMatrix = self.specHiEvolutionMatrix.toarray()    
         self.specHiEvolutionMatrix = npmatrix_power(self.specHiEvolutionMatrix, self.evolStepDist)
         if sq:
             self.specHiEvolutionMatrix = npmatrix_power(self.specHiEvolutionMatrix , 2)
     # end
     
     def timeStep(self):
-        self.state = npdot(self.evolutionMatrix, self.state)
+        self.state = self.evolutionMatrix.dot(self.state)
     # end of timeStep
     
     def greenStoreState(self):
-        self.stateSaves.append(np.array(self.state)[:,0])
+        self.stateSaves.append(self.state)
         self.timeSaves.append(self.evolTime)
         
     # approximate distributions in energy space - all parameters have to be set!
@@ -469,11 +467,11 @@ class mpSystem:
             for k in range(0, self.dim):
                 if skipArray[k]:
                     if dind == 1:
-                        self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], mu, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:, k]
+                        self.state += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], mu, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:, k]
                     elif dind == 2:
-                        self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], mu, sigma[i], norm=False) * self.eigVects[:, k]
+                        self.state += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], mu, sigma[i], norm=False) * self.eigVects[:, k]
                     elif dind == 3:
-                        self.state[k, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
+                        self.state[k] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
         del phaseArray
         del skipArray
         self.normalize(True)
@@ -521,18 +519,18 @@ class mpSystem:
         for k in range(0, self.dim):
             if skipArray[k]:
                 if dind == 1:
-                    self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:, k]
+                    self.state[:] += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:, k]
                 elif dind == 2:
-                    self.state[:, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], avgen, sigma[i], norm=False) * self.eigVects[:, k]
+                    self.state[:] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], avgen, sigma[i], norm=False) * self.eigVects[:, k]
                 elif dind == 3:
-                    self.state[k, 0] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
+                    self.state[k] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
         del phaseArray
         del skipArray
         self.normalize(True)
     
     def normalize(self, initial=False):
         # note that the shape of the state vector is (dim,1) for reasons of matrix multiplication in numpy
-        self.stateNorm = (sqrt(npeinsum('ij,ij->j', self.state, np.conjugate(self.state)))).real[0]
+        self.stateNorm = la.norm(self.state)
         self.stateNormAbs *= self.stateNorm
         self.state /= self.stateNorm
         # do not store the new state norm - it is defined to be 1 so just store last norm value!
@@ -552,25 +550,26 @@ class mpSystem:
     # end of normalize    
     
     # note that - in principle - the expectation value can be complex! (though it shouldn't be)
-    # this one explicitly uses the state vector
+    # this one explicitly uses the state vector - note that this also works with sparse matrices!
     def expectValue(self, operator):
-        if np.shape(operator) != (self.dim, self.dim):
+        if operator.shape != (self.dim, self.dim):
             exit('Dimension of operator is', np.shape(operator), 'but', (self.dim, self.dim), 'is needed!')
-        # will compute only the diagonal elements!
-        return multi_dot([np.conjugate(np.array(self.state)[:,0]), operator, np.array(self.state)[:,0]])
+        #return multi_dot([np.conjugate(np.array(self.state)[:,0]), operator, np.array(self.state)[:,0]])
+        return np.vdot(self.state, operator.dot(self.state))
+    
     
     # note that - in principle - the expectation value can be complex! (though it shouldn't be)
     def expectValueDM(self, operator):
-        if np.shape(operator) != (self.dim, self.dim):
+        if operator.shape != (self.dim, self.dim):
             exit('Dimension of operator is', np.shape(operator), 'but', (self.dim, self.dim), 'is needed!')
         # will compute only the diagonal elements!
         return np.einsum('ij,ji->', self.densityMatrix, operator)
     
     
     def expectValueRed(self, operator):
-        if np.shape(operator) != (self.dimRed, self.dimRed):
+        if operator.shape != (self.dimRed, self.dimRed):
             exit('Dimension of operator is' +str(np.shape(operator)) + 'but' + str( (self.dimRed, self.dimRed) ) + 'is needed!')
-        return np.trace(npdot(self.densityMatrixRed, operator))
+        return np.trace(self.densityMatrixRed.dot(operator))
     
     def updateEigenenergies(self):
         if not self.eigInd:
@@ -600,7 +599,7 @@ class mpSystem:
             if self.boolDecompStore:
                 tmpAbsSq = np.zeros(self.dim)
                 for i in range(0, self.dim):
-                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0])                  
+                    tmp = np.dot(self.eigVects[:, i], self.state)                  
                     tmpAbsSq[i] = np.abs(tmp) ** 2
                     if tmpAbsSq[i] != 0:
                         tmpPhase = np.angle(tmp) / (2 * np.pi)  # angle in complex plane in units of two pi
@@ -619,9 +618,9 @@ class mpSystem:
             # decomposition in fock space
             sfil = open('./data/state.txt', 'w')
             for i in range(0, self.dim):               
-                tmpAbsSqFck = np.abs(self.state[i, 0]) ** 2
+                tmpAbsSqFck = np.abs(self.state[i]) ** 2
                 if tmpAbsSqFck != 0:
-                    tmpPhase = np.angle(self.state[i, 0]) / (2 * np.pi)  # angle in complex plane in units of two pi
+                    tmpPhase = np.angle(self.state[i]) / (2 * np.pi)  # angle in complex plane in units of two pi
                 else:
                     tmpPhase = 0
                 # occupation numbers of the eigenvalues
@@ -643,7 +642,7 @@ class mpSystem:
             if not self.boolDecompStore and self.boolOffDiag:
                 tmpAbsSq = np.zeros(self.dim)
                 for i in range(0, self.dim):
-                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
+                    tmp = np.dot(self.eigVects[:, i], self.state) 
                     if self.boolOffDiag:
                         self.enState[i] = tmp
                         self.enStateBra[i] = tmp.conj()
@@ -651,7 +650,7 @@ class mpSystem:
                     tmpAbsSq[i] = np.abs(tmp) ** 2
             elif self.boolDecompStore and self.boolOffDiag:
                 for i in range(0, self.dim):
-                    tmp = np.dot(self.eigVects[:, i], self.state[:, 0]) 
+                    tmp = np.dot(self.eigVects[:, i], self.state) 
                     if self.boolOffDiag:
                         self.enState[i] = tmp
                         self.enStateBra[i] = tmp.conj()
@@ -724,7 +723,7 @@ class mpSystem:
     
     def updateOffDiag(self):
         for i in range(0, self.dim):
-            tmp = np.dot(self.eigVects[:, i], np.asarray(self.state)[:, 0]) 
+            tmp = np.dot(self.eigVects[:, i], self.state) 
             self.enState[i] = tmp
             self.enStateBra[i] = tmp.conj()
             
@@ -767,7 +766,7 @@ class mpSystem:
     
     def updateOccNumbers(self):
         for m in range(0, self.m):
-            self.occNo[m] = (self.expectValue(self.operators[m, m].toarray())).real
+            self.occNo[m] = (self.expectValue(self.operators[m, m])).real
     # end of updateOccNumbers
     
     def updateEnergy(self):
