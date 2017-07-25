@@ -230,10 +230,9 @@ def plotData(sysVar):
     for i in sysVar.kRed:
         tmp += occ_array[:,i+1]
     plt.plot(step_array,tmp,label="bath", linewidth =0.8, color = 'magenta')
-    
-    tavg = savgol_filter(tmp,fwidth,ford)
 
     if sysVar.boolPlotAverages:
+        tavg = savgol_filter(tmp,fwidth,ford)
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     if sysVar.boolPlotDiagExp:
@@ -253,8 +252,8 @@ def plotData(sysVar):
         tmp += occ_array[:,i+1]
     plt.plot(step_array,tmp,label="system", linewidth =0.8, color = 'darkgreen')
 
-    tavg = savgol_filter(tmp,fwidth,ford)
     if sysVar.boolPlotAverages:
+        tavg = savgol_filter(tmp,fwidth,ford)
         plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     if sysVar.boolPlotDiagExp:
@@ -369,7 +368,7 @@ def plotData(sysVar):
             f, (ax1, ax2) = plt.subplots(2, sharex=False, sharey=False)
             tmp = cumtrapz(offdiag[:,i+1],offdiag[:,0],initial=offdiag[0,i+1])
             tmp = np.multiply(tmp,nrm)
-            f.text(0.06, 0.5, 'Average of summed off diagonals in $n^{%i}$' % (i), ha='center', va='center', rotation='vertical')
+            f.text(0.03, 0.5, 'Average of summed off diagonals in $n^{%i}$' % (i), ha='center', va='center', rotation='vertical')
             ax1.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
             ax1.plot(offdiag[:,0],tmp,linewidth = 0.5)
             ax1.grid()
@@ -379,7 +378,7 @@ def plotData(sysVar):
             ax2.grid()
             
             plt.tight_layout()
-            plt.subplots_adjust(left=0.1)
+            plt.subplots_adjust(left=0.12)
             ###
             pp.savefig()
             plt.clf()
@@ -648,6 +647,8 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
+        # omit this in general
+        '''
         ### Eigenvalue decomposition en detail
         n_rows = 3 #abs**2, phase/2pi, energy on a range from 0 to 1 
         n_rows += 1 #spacer
@@ -723,7 +724,7 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.',end='',flush=True)
-    
+        '''
     def densmat_spectral():
         return 0    
     ####### Density matrix in spectral repesentation
@@ -950,14 +951,20 @@ def plotOffDiagSingles(sysVar):
             comp = singlesdat[:,ind] + 1j*singlesdat[:,ind+1]
             
             # order of magnitude of the deviation
-            ordr = int(np.log10(np.abs(np.abs(comp[0]) - np.abs(comp[-1])))) - 1
+            if not (np.abs(np.abs(comp[0]) - np.abs(comp[-1])) == 0):
+                ordr = int(np.log10(np.abs(np.abs(comp[0]) - np.abs(comp[-1])))) - 1
+            else:
+                ordr = 0
             ax1.set_ylabel(r'$|n_{n,m}^{%i}(t)| - |n_{n,m}^{%i}(0)| / 10^{%i}$' % (i,i,ordr))
             ax1.plot(singlesdat[:,0], (np.abs(comp)-np.abs(comp[0]))/(10**ordr), linewidth = 0.5)
             tmp = cumtrapz(comp,singlesdat[:,0]/dt,initial=comp[0])
             tmp = np.multiply(tmp,nrm)
             
             # order of magnitude of the average
-            ordr = int(np.log10(np.abs(tmp[1]))) - 1
+            if not (np.abs(tmp[1]) == 0):
+                ordr = int(np.log10(np.abs(tmp[1]))) - 1
+            else:
+                ordr = 0
             ax2.set_ylabel(r'$|\overline{n}_{n,m}^{%i}| / 10^{%i}$' % (i, ordr))
             ax2.plot(singlesdat[:,0], np.abs(tmp)/(10**ordr), linewidth = 0.5)
             ax2.set_xlabel(r'$J\,t$')

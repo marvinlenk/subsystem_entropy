@@ -1,5 +1,26 @@
 change log
 
+### 25.07.2017
+- speedup of off-diagonals calculation by avoidance of small steps and utilization of multithread
+- gotten rid of enStateBra since it really is not needed to be stored separately
+- there was an unnecessary statement at the end of updateEigendecomposition
+- off diagonal matrix calculation a lot faster due to correct use of dot (same as in the other cases with sparse matrices)
+- biased multidot in greensfunction part a bit but it is now faster (due to sparseness .dot)
+- removed all leftover occurences of .toarray() which are avoidable
+- off diagonal plot can now handle zero elements
+- sum of off diagonals plot text alignment
+- finding of largest off diagonals did not work anymore - overthink outer product algorithm!
+
+### 24.07.2017
+- averages for plotting are now only calculated when needed
+- incredible speedup in eigendecomposition due to avoidance of small steps, utilization of multithread and sparseness of occupation number operators
+
+### 19.07.2017
+- changed state init from (self.dim,) to (self.dim)
+
+### 18.07.2017
+- omitting check for imaginary eigenvalues of the density matrix (eigvalsh should already do this)
+
 ### 17.07.2017
 - changed (almost) every occasion of einsum to the apropriate multi_dot or outer with dot -> should make more mutithread usage now
 - hardcore profiling showed a major slowdown in the usage of np.real and np.imag - replaced those with .real and .imag
