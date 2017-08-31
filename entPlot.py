@@ -87,6 +87,10 @@ def plotData(sysVar):
         offdiagfile = './data/offdiagonal.txt'
         offdiag = np.loadtxt(offdiagfile)
     
+    if sysVar.boolPlotOffDiagDens:
+        offdiagdensfile = './data/offdiagonaldens.txt'
+        offdiagdens = np.loadtxt(offdiagdensfile)
+    
     if sysVar.boolPlotGreen:
         greenfile = './data/green.txt'
         greendat = np.loadtxt(greenfile)
@@ -385,6 +389,17 @@ def plotData(sysVar):
         
         print('.',end='',flush=True)
     
+    def sum_offdiagonalsdens():
+        return 0
+    if sysVar.boolPlotOffDiagDens:
+        plt.plot(step_array,offdiagdens[:,1], linewidth =0.5)
+        plt.ylabel(r'Sum of off diagonals (red. dens. mat.)')
+        plt.xlabel(r'$J\,t$')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
     
     def total_energy():
         return 0    

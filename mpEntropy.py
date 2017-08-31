@@ -79,7 +79,10 @@ class mpSystem:
                 if self.occEnSingle > 0:
                     self.occEnInds = np.zeros((self.m, 2, self.occEnSingle), dtype=np.int16)
                     self.offDiagSingles = np.zeros((self.m, self.occEnSingle), dtype=self.datType)
-
+                    
+            if self.boolOffDiagDens:
+                self.offDiagDens = 0
+            
             if self.mRedComp == 0:
                 self.dimRed = 0
                 self.offsetsRed = None
@@ -173,6 +176,7 @@ class mpSystem:
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
         self.occEnSingle = configParser.getint('filemanagement', 'occensingle')
         self.boolOffDiag = configParser.getboolean('filemanagement', 'offdiag')
+        self.boolOffDiagDens = configParser.getboolean('filemanagement', 'offdiagdens')
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexp')
@@ -190,6 +194,7 @@ class mpSystem:
         self.boolPlotOccEn = configParser.getboolean('plotbools', 'occen')
         self.boolPlotOffDiag = configParser.getboolean('plotbools', 'offdiag')
         self.boolPlotOffDiagSingles = configParser.getboolean('plotbools', 'offdiagsingles')
+        self.boolPlotOffDiagDens = configParser.getboolean('plotbools', 'offdiagdens')
         self.boolPlotEngy = configParser.getboolean('plotbools', 'energies')
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'decomposition')
         self.boolPlotDiagExp = configParser.getboolean('plotbools', 'diagexp')
@@ -773,6 +778,13 @@ class mpSystem:
                     y = int(self.occEnInds[i, 1, j])
                     self.offDiagSingles[i, j] = self.enState[x].conj() * self.offDiagMat[i][x, y] * self.enState[y]
 
+    def updateOffDiagDens(self):
+        tmp = 0 + 0j
+        for i in range(0,self.dimRed):
+            for j in range(0,self.dimRed):
+                tmp += self.densityMatrixRed[i,j]  
+        self.offDiagDens = np.abs(tmp - np.trace(self.densityMatrixRed))
+        
     def updateEntropy(self):
         self.entropy = 0
         for el in la.eigvalsh(self.densityMatrix, check_finite=False):
@@ -870,7 +882,8 @@ class mpSystem:
             self.updateOccNumbers()
         if self.boolOffDiag:
             self.updateOffDiag()
-
+        if self.boolOffDiagDens:
+            self.updateOffDiagDens()
         self.updateEntropyRed()
 
     ###### the magic of time evolution
@@ -990,6 +1003,9 @@ class mpSystem:
         for m in range(0, self.m):
             self.filOcc.write('%.16e ' % self.occNo[m])
         self.filOcc.write('\n')
+        
+        if self.boolOffDiagDens:
+            self.filOffDiagDens.write('%.16e %.16e \n' % (self.evolTime, self.offDiagDens))
 
     def openFiles(self):
         self.filEnt = open('./data/entropy.txt', 'w')
@@ -1004,6 +1020,8 @@ class mpSystem:
             self.filOffDiag = open('./data/offdiagonal.txt', 'w')
             if self.occEnSingle:
                 self.filOffSingles = open('./data/offdiagsingle.txt', 'w')
+        if self.boolOffDiagDens:
+            self.filOffDiagDens = open('./data/offdiagonaldens.txt', 'w')
         self.filProg.close()
 
     # close all files
@@ -1019,6 +1037,8 @@ class mpSystem:
             self.filOffDiag.close()
             if self.occEnSingle:
                 self.filOffSingles.close()
+        if self.boolOffDiagDens:
+            self.filOffDiagDens.close()
 
     def plotDMAnimation(self, stepSize):
         ep.plotDensityMatrixAnimation(self.steps, self.deltaT, self.dmFiles, stepSize, framerate=self.dmFilesFPS)

@@ -1,5 +1,9 @@
 change log
 
+### 31.08.2017
+- added off-diagonal elements sum of reduced density matrix
+- added plotting of the above
+
 ### 25.07.2017
 - speedup of off-diagonals calculation by avoidance of small steps and utilization of multithread
 - gotten rid of enStateBra since it really is not needed to be stored separately
