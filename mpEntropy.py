@@ -25,7 +25,8 @@ class mpSystem:
     # N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
     def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False):
         self.confFile = cFile
-        prepFolders(0)
+        if not plotOnly:
+            prepFolders(0)
         self.loadConfig()
         # mask selects only not traced out states
         self.mask = np.ones((self.m), dtype=bool)
@@ -59,12 +60,14 @@ class mpSystem:
             self.eigVals = []
             self.eigVects = []
             self.eigInd = False
+
             # iteration step
             self.evolStep = 0
             self.evolStepTmp = 0
             self.evolTime = 0
             self.tavg = 0  # needed for estimation of remaining time
             self.dmcount = 0  # needed for numbering of density matrix files
+            self.dmFileFactor = 0   # counting value for density matrix storage
             ###### variables for the partial trace algorithm
             self.mRed = self.m - len(self.kRed)
             self.mRedComp = len(self.kRed)
@@ -141,8 +144,13 @@ class mpSystem:
     ###### reading from config file
     def loadConfig(self):
         configParser = configparser.RawConfigParser()
-        # read the defaults
-        configParser.read('./default.ini')
+        # read the defaults and look for it in existing folder or parent folder
+        if os.path.isfile('./default.ini'):
+            configParser.read('./default.ini')
+        elif os.path.isfile('../default.ini'):
+            configParser.read('../default.ini')
+        else:
+            exit('Unable to read default.ini')
         # read the actual config file
         configParser.read('./' + self.confFile)
         # ## system parameters
@@ -534,11 +542,11 @@ class mpSystem:
         for k in range(0, self.dim):
             if skipArray[k]:
                 if dind == 1:
-                    self.state[:] += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:,k]
+                    self.state[:] += peakamps * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma, norm=True, skw=skew) * self.eigVects[:,k]
                 elif dind == 2:
-                    self.state[:] += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], avgen, sigma[i], norm=False) * self.eigVects[:, k]
+                    self.state[:] += peakamps * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], avgen, sigma, norm=False) * self.eigVects[:, k]
                 elif dind == 3:
-                    self.state[k] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
+                    self.state[k] += peakamps * np.exp(1j * phaseArray[k]) * tmpdist[k]
         del phaseArray
         del skipArray
         self.normalize(True)
@@ -779,11 +787,7 @@ class mpSystem:
                     self.offDiagSingles[i, j] = self.enState[x].conj() * self.offDiagMat[i][x, y] * self.enState[y]
 
     def updateOffDiagDens(self):
-        tmp = 0 + 0j
-        for i in range(0,self.dimRed):
-            for j in range(0,self.dimRed):
-                tmp += self.densityMatrixRed[i,j]  
-        self.offDiagDens = np.abs(tmp - np.trace(self.densityMatrixRed))
+        self.offDiagDens = (multi_dot([np.ones(self.dimRed), self.densityMatrixRed, np.ones(self.dimRed)]) - np.trace(self.densityMatrixRed)).real
         
     def updateEntropy(self):
         self.entropy = 0
@@ -972,8 +976,8 @@ class mpSystem:
 
     def writeData(self):
         if self.boolDMStore or self.boolDMRedStore:
-            if dmFileFactor == self.dmFilesSkipFactor:
-                dmFileFactor = 1
+            if self.dmFileFactor == self.dmFilesSkipFactor or self.dmFileFactor == 0:
+                self.dmFileFactor = 1
                 if not self.boolOnlyRed:
                     if self.boolDMStore:
                         storeMatrix(self.densityMatrix, './data/density/densmat' + str(int(self.dmcount)) + '.txt')
@@ -982,7 +986,7 @@ class mpSystem:
                                     './data/red_density/densmat' + str(int(self.dmcount)) + '.txt')
                     self.dmcount += 1
             else:
-                dmFileFactor += 1
+                self.dmFileFactor += 1
 
         if self.boolOffDiag:
             self.filOffDiag.write('%.16e ' % (self.evolTime))
