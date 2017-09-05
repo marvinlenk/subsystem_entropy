@@ -117,7 +117,7 @@ def plotData(sysVar):
     plt.grid()
     if sysVar.boolPlotAverages:
         tavg = savgol_filter(ent_array[:,1],fwidth,ford)
-        plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+        plt.plot(step_array[loavgind:],tavg[loavgind:], linewidth = avgsize, linestyle=avgstyle, color = 'black')
     plt.xlabel(r'$J\,t$')
     plt.ylabel('Subsystem entropy')
     plt.tight_layout()
@@ -149,7 +149,7 @@ def plotData(sysVar):
         plt.plot(step_array,occ_array[:,i+1],label=r'$n_'+str(i)+'$', linewidth =0.5)
         if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
-            plt.plot(step_array,tavg, linewidth =avgsize, linestyle=avgstyle, color = 'black')
+            plt.plot(step_array[loavgind:],tavg[loavgind:], linewidth =avgsize, linestyle=avgstyle, color = 'black')
         if sysVar.boolPlotDiagExp:
             plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
     
@@ -191,7 +191,7 @@ def plotData(sysVar):
             plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
         if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
-            plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+            plt.plot(step_array[loavgind:],tavg[loavgind:], linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     plt.ylabel(r'Occupation number')
     plt.xlabel(r'$J\,t$')
@@ -212,7 +212,7 @@ def plotData(sysVar):
             plt.axhline(y=microexp[i,1], color='purple', linewidth = expectsize, linestyle = expectstyle)
         if sysVar.boolPlotAverages:
             tavg = savgol_filter(occ_array[:,i+1],fwidth,ford)
-            plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+            plt.plot(step_array[loavgind:],tavg[loavgind:], linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     plt.ylabel(r'Occupation number')
     plt.xlabel(r'$J\,t$')
@@ -237,7 +237,7 @@ def plotData(sysVar):
 
     if sysVar.boolPlotAverages:
         tavg = savgol_filter(tmp,fwidth,ford)
-        plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+        plt.plot(step_array[loavgind:],tavg[loavgind:], linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     if sysVar.boolPlotDiagExp:
         mictmp = 0
@@ -258,7 +258,7 @@ def plotData(sysVar):
 
     if sysVar.boolPlotAverages:
         tavg = savgol_filter(tmp,fwidth,ford)
-        plt.plot(step_array,tavg, linewidth = avgsize, linestyle=avgstyle, color = 'black')
+        plt.plot(step_array[loavgind:],tavg[loavgind:], linewidth = avgsize, linestyle=avgstyle, color = 'black')
     
     if sysVar.boolPlotDiagExp:
         mictmp = 0
