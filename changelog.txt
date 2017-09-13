@@ -1,5 +1,9 @@
 change log
 
+### 13.09.2017
+- reformatted via PyCharm
+- fixed unassigned string variable in plotDensityMatrixAnimation
+
 ### 05.09.2017
 - changed plotted averages to start only at designated averaging point
 

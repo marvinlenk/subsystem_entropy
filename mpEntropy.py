@@ -53,7 +53,8 @@ class mpSystem:
             self.operators = quadraticArray(self)
             self.occNo = np.zeros(self.m, dtype=np.float64)
             # hamiltonian - initialized with zeros (note - datatype is not! complex)
-            self.hamiltonian = coo_matrix(np.zeros((self.dim, self.dim)), shape=(self.dim, self.dim), dtype=np.float64).tocsr()
+            self.hamiltonian = coo_matrix(np.zeros((self.dim, self.dim)), shape=(self.dim, self.dim),
+                                          dtype=np.float64).tocsr()
             # matrix for time evolution - initially empty
             self.evolutionMatrix = None
             # eigenvalue and vectors
@@ -67,7 +68,7 @@ class mpSystem:
             self.evolTime = 0
             self.tavg = 0  # needed for estimation of remaining time
             self.dmcount = 0  # needed for numbering of density matrix files
-            self.dmFileFactor = 0   # counting value for density matrix storage
+            self.dmFileFactor = 0  # counting value for density matrix storage
             ###### variables for the partial trace algorithm
             self.mRed = self.m - len(self.kRed)
             self.mRedComp = len(self.kRed)
@@ -82,10 +83,10 @@ class mpSystem:
                 if self.occEnSingle > 0:
                     self.occEnInds = np.zeros((self.m, 2, self.occEnSingle), dtype=np.int16)
                     self.offDiagSingles = np.zeros((self.m, self.occEnSingle), dtype=self.datType)
-                    
+
             if self.boolOffDiagDens:
                 self.offDiagDens = 0
-            
+
             if self.mRedComp == 0:
                 self.dimRed = 0
                 self.offsetsRed = None
@@ -117,13 +118,15 @@ class mpSystem:
                 self.specLoBasis = np.zeros((self.specLoDim, self.m), dtype=np.int)
                 fillBasis(self.specLoBasis, self.N - 1, self.m)
                 self.specLoBasisDict = basis2dict(self.specLoBasis, self.specLoDim)
-                self.specLoHamiltonian = coo_matrix(np.zeros((self.specLoDim, self.specLoDim)), shape=(self.specLoDim, self.specLoDim), dtype=np.float64).tocsr()
+                self.specLoHamiltonian = coo_matrix(np.zeros((self.specLoDim, self.specLoDim)),
+                                                    shape=(self.specLoDim, self.specLoDim), dtype=np.float64).tocsr()
                 ## hi
                 self.specHiDim = dimOfBasis(self.N + 1, self.m)
                 self.specHiBasis = np.zeros((self.specHiDim, self.m), dtype=np.int)
                 fillBasis(self.specHiBasis, self.N + 1, self.m)
                 self.specHiBasisDict = basis2dict(self.specHiBasis, self.specHiDim)
-                self.specHiHamiltonian = coo_matrix(np.zeros((self.specHiDim, self.specHiDim)), shape=(self.specHiDim, self.specHiDim), dtype=np.float64).tocsr()
+                self.specHiHamiltonian = coo_matrix(np.zeros((self.specHiDim, self.specHiDim)),
+                                                    shape=(self.specHiDim, self.specHiDim), dtype=np.float64).tocsr()
                 if self.boolRetgreen:
                     self.green = np.zeros(self.m, dtype=self.datType)
                     self.stateSaves = []  # append with time dep. state vector
@@ -257,7 +260,9 @@ class mpSystem:
                         el1[~self.mask] = self.basisRedComp[k]
                         el2[self.mask] = self.basisRed[jj]
                         el2[~self.mask] = self.basisRedComp[k]
-                        self.iteratorRed = np.append(self.iteratorRed, [[j, jj, self.basisDict[tuple(el1)], self.basisDict[tuple(el2)]]], axis=0)
+                        self.iteratorRed = np.append(self.iteratorRed,
+                                                     [[j, jj, self.basisDict[tuple(el1)], self.basisDict[tuple(el2)]]],
+                                                     axis=0)
 
     # end of initTest
 
@@ -490,9 +495,13 @@ class mpSystem:
             for k in range(0, self.dim):
                 if skipArray[k]:
                     if dind == 1:
-                        self.state += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], mu, sigma[i], norm=True, skw=skew[i]) * self.eigVects[:, k]
+                        self.state += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], mu, sigma[i],
+                                                                                          norm=True,
+                                                                                          skw=skew[i]) * self.eigVects[
+                                                                                                         :, k]
                     elif dind == 2:
-                        self.state += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], mu, sigma[i], norm=False) * self.eigVects[:, k]
+                        self.state += peakamps[i] * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], mu, sigma[i],
+                                                                                      norm=False) * self.eigVects[:, k]
                     elif dind == 3:
                         self.state[k] += peakamps[i] * np.exp(1j * phaseArray[k]) * tmpdist[k]
         del phaseArray
@@ -542,9 +551,12 @@ class mpSystem:
         for k in range(0, self.dim):
             if skipArray[k]:
                 if dind == 1:
-                    self.state[:] += peakamps * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma, norm=True, skw=skew) * self.eigVects[:,k]
+                    self.state[:] += peakamps * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma,
+                                                                                      norm=True,
+                                                                                      skw=skew) * self.eigVects[:, k]
                 elif dind == 2:
-                    self.state[:] += peakamps * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], avgen, sigma, norm=False) * self.eigVects[:, k]
+                    self.state[:] += peakamps * np.exp(1j * phaseArray[k]) * rect(self.eigVals[k], avgen, sigma,
+                                                                                  norm=False) * self.eigVects[:, k]
                 elif dind == 3:
                     self.state[k] += peakamps * np.exp(1j * phaseArray[k]) * tmpdist[k]
         del phaseArray
@@ -570,7 +582,8 @@ class mpSystem:
             else:
                 self.closeFiles()
                 self.plot()
-                exit('\n' + 'Exiting - state norm has been normalized by more than the factor 100, numerical error is very likely.')
+                exit(
+                    '\n' + 'Exiting - state norm has been normalized by more than the factor 100, numerical error is very likely.')
 
     # end of normalize
 
@@ -618,7 +631,7 @@ class mpSystem:
             self.updateEigenenergies()
             print("Hamiltonian diagonalized after " + time_elapsed(t0, 60, 0))
             t0 = tm.time()
-            
+
             # decomposition in energy space       
             tfil = open('./data/hamiltonian_eigvals.txt', 'w')
             if self.boolDecompStore:
@@ -627,12 +640,12 @@ class mpSystem:
                 # generate all overlaps at once
                 # note that conj() is optional since the vectors can be chosen to be real
                 tmp = np.dot(self.eigVects.T.conj(), self.state)
-                
+
                 # also calculate all occupation numbers at once
                 enoccs = np.zeros((self.m, self.dim))
                 for j in range(0, self.m):
-                    enoccs[j] = np.diag( np.dot(self.eigVects.T.conj(), self.operators[j,j].dot(self.eigVects)) ).real
-                
+                    enoccs[j] = np.diag(np.dot(self.eigVects.T.conj(), self.operators[j, j].dot(self.eigVects))).real
+
                 for i in range(0, self.dim):
                     # absolute value of overlap
                     tmpAbsSq[i] = np.abs(tmp[i]) ** 2
@@ -641,17 +654,17 @@ class mpSystem:
                         tmpPhase = np.angle(tmp[i]) / (2 * np.pi)
                     else:
                         tmpPhase = 0
-                        
+
                     # occupation numbers of the eigenvalues
                     tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i], tmpPhase))
                     for j in range(0, self.m):
-                        tfil.write('%.16e ' % (enoccs[j,i]))
+                        tfil.write('%.16e ' % (enoccs[j, i]))
                     tfil.write('\n')
             else:
                 for i in range(0, self.dim):
                     tfil.write('%i %.16e\n' % (i, self.eigVals[i]))
             tfil.close()
-            
+
             # decomposition in fock space
             sfil = open('./data/state.txt', 'w')
             for i in range(0, self.dim):
@@ -682,7 +695,7 @@ class mpSystem:
                 # generate all overlaps at once
                 # note that conj() is optional since the vectors can be chosen to be real
                 self.enState = np.dot(self.eigVects.T.conj(), self.state)
-            
+
             if self.boolDiagExpStore:
                 # diagonals in expectation value    
                 ethfil = open('./data/diagexpect.txt', 'w')
@@ -690,9 +703,10 @@ class mpSystem:
                     if self.boolOffDiag:
                         # first store everything, later delete diagonal elements
                         self.offDiagMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
-                        tmpocc = np.dot(np.abs(self.enState)**2, np.diag(self.offDiagMat[i])).real
+                        tmpocc = np.dot(np.abs(self.enState) ** 2, np.diag(self.offDiagMat[i])).real
                     else:
-                        tmpocc = multi_dot([self.enState.conj(), self.eigVects.T, self.operators[i, i].dot(eivectinv), self.enState]).real
+                        tmpocc = multi_dot([self.enState.conj(), self.eigVects.T, self.operators[i, i].dot(eivectinv),
+                                            self.enState]).real
                     ethfil.write('%i %.16e \n' % (i, tmpocc))
                 print("Occupation matrices transformed " + time_elapsed(t0, 60, 1))
                 ethfil.close()
@@ -701,13 +715,14 @@ class mpSystem:
             if self.boolOffDiag:
                 diagfil = open('./data/diagsingles.txt', 'w')
                 for i in range(0, self.m):
-                    #if the matrices have not yet been constructed - do this
+                    # if the matrices have not yet been constructed - do this
                     if not self.boolDiagExpStore:
                         # first store everything, later delete diagonal elements
                         self.offDiagMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
-                    
-                    #now get the single off diagonals
-                    tmpdiag = np.einsum('l,ll,l -> l', self.enState.conj(), self.offDiagMat[i], self.enState, optimize=True).real
+
+                    # now get the single off diagonals
+                    tmpdiag = np.einsum('l,ll,l -> l', self.enState.conj(), self.offDiagMat[i], self.enState,
+                                        optimize=True).real
                     for j in range(0, self.dim):
                         diagfil.write('%i %.16e %.16e \n' % (i, self.eigVals[j], tmpdiag[j]))
                 diagfil.close()
@@ -717,12 +732,13 @@ class mpSystem:
             for i in range(0, self.m):
                 if self.boolOffDiag:
                     # note that the off diag mat still contains the diagonals right now!
-                    storeMatrix(self.offDiagMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
+                    storeMatrix(self.offDiagMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False,
+                                stabs=False)
                 else:
                     storeMatrix(np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv)),
                                 './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
             print("Occupation number matrices stored after " + time_elapsed(t0, 60, 1))
-            
+
         # now we remove the diagonal elements
         if self.boolOffDiag:
             for i in range(0, self.m):
@@ -738,22 +754,22 @@ class mpSystem:
                     # generate all overlaps at once
                     # note that conj() is optional since the vectors can be chosen to be real
                     self.enState = np.dot(self.eigVects.T.conj(), self.state)
-            
+
             # props to Warren Weckesser https://stackoverflow.com/questions/20825990/find-multiple-maximum-values-in-a-2d-array-fast
             # Get the indices for the largest `num_largest` values.
             num_largest = self.occEnSingle
             for i in range(0, self.m):
                 # this is not optimized but one has to store it as a matrix for correct searching
                 tmpmat = np.einsum('l,lj,j -> lj', self.enState.conj(), self.offDiagMat[i], self.enState, optimize=True)
-                #tmpmat = np.outer(self.enState.conj(), np.dot(self.offDiagMat[i], self.enState))
+                # tmpmat = np.outer(self.enState.conj(), np.dot(self.offDiagMat[i], self.enState))
                 infofile.write('%i ' % (i))
                 # to use argpartition correctly we must treat the matrix as an array
                 indices = tmpmat.argpartition(tmpmat.size - num_largest, axis=None)[-num_largest:]
                 self.occEnInds[i, 0], self.occEnInds[i, 1] = np.unravel_index(indices, tmpmat.shape)
                 for j in range(0, self.occEnSingle):
                     infofile.write('%i %i %.16e %16e ' % (
-                    self.occEnInds[i, 0, j], self.occEnInds[i, 1, j], self.eigVals[self.occEnInds[i, 0, j]].real,
-                    self.eigVals[self.occEnInds[i, 1, j]].real))
+                        self.occEnInds[i, 0, j], self.occEnInds[i, 1, j], self.eigVals[self.occEnInds[i, 0, j]].real,
+                        self.eigVals[self.occEnInds[i, 1, j]].real))
                 infofile.write('\n')
             infofile.close()
             print("Largest elements found and infos stored after " + time_elapsed(t0, 60, 1))
@@ -774,7 +790,7 @@ class mpSystem:
 
         for i in range(0, self.m):
             self.offDiag[i] = np.vdot(self.enState, self.offDiagMat[i].dot(self.enState))
-            
+
             # check for imaginary part -> would give an indication for errors
             if self.offDiag[i].imag > 1e-6:
                 print('The offdiagonal expectation value has an imaginary part of ', self.offDiag[i].imag)
@@ -787,8 +803,9 @@ class mpSystem:
                     self.offDiagSingles[i, j] = self.enState[x].conj() * self.offDiagMat[i][x, y] * self.enState[y]
 
     def updateOffDiagDens(self):
-        self.offDiagDens = (multi_dot([np.ones(self.dimRed), self.densityMatrixRed, np.ones(self.dimRed)]) - np.trace(self.densityMatrixRed)).real
-        
+        self.offDiagDens = (multi_dot([np.ones(self.dimRed), self.densityMatrixRed, np.ones(self.dimRed)]) - np.trace(
+            self.densityMatrixRed)).real
+
     def updateEntropy(self):
         self.entropy = 0
         for el in la.eigvalsh(self.densityMatrix, check_finite=False):
@@ -1007,7 +1024,7 @@ class mpSystem:
         for m in range(0, self.m):
             self.filOcc.write('%.16e ' % self.occNo[m])
         self.filOcc.write('\n')
-        
+
         if self.boolOffDiagDens:
             self.filOffDiagDens.write('%.16e %.16e \n' % (self.evolTime, self.offDiagDens))
 
