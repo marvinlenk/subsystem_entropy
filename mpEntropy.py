@@ -1035,7 +1035,7 @@ class mpSystem:
         if self.boolTotalEnt:
             self.filTotEnt = open('./data/total_entropy.txt', 'w')
         if self.boolTotalEnergy:
-            self.filEnergy = open('./data/energy.txt', 'w')
+            self.filEnergy = open('./data/total_energy.txt', 'w')
         self.filProg = open('./data/progress.log', 'w')
         if self.boolOffDiag:
             self.filOffDiag = open('./data/offdiagonal.txt', 'w')

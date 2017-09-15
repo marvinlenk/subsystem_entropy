@@ -77,7 +77,7 @@ def plotData(sysVar):
         totent_array = np.loadtxt(totentfile)
 
     if sysVar.boolTotalEnergy:
-        energyfile = './data/energy.txt'
+        energyfile = './data/total_energy.txt'
         en_array = np.loadtxt(energyfile)
         en0 = en_array[0, 1]
         en_array[:, 1] -= en0
@@ -479,8 +479,8 @@ def plotData(sysVar):
         else:
             plt.plot(engies[:, 0], engies[:, 1], linestyle='none', marker='o', ms=0.5, color='blue')
 
-        plt.ylabel(r'E/J')
-        plt.xlabel(r'\#')
+        plt.ylabel(r'Energy / J')
+        plt.xlabel(r'\Eigenvalue Index')
         plt.grid(False)
         plt.xlim(xmin=-(len(engies[:, 0]) * (2.0 / 100)))
         plt.tight_layout()
@@ -502,8 +502,8 @@ def plotData(sysVar):
         dos /= (sysVar.dim - iw)
         print(scint.simps(dos[iw:], engies[iw:, 1]))
         plt.plot(engies[:, 1], dos, lw=0.005)
-        plt.ylabel(r'DOS')
-        plt.xlabel(r'E')
+        plt.ylabel(r'Density of states')
+        plt.xlabel(r'Energy / J')
         plt.grid(False)
         plt.tight_layout()
         ###
@@ -663,9 +663,14 @@ def plotData(sysVar):
             ### Hamiltonian eigenvalues (Eigenenergies) with decomposition
 
         fig, ax1 = plt.subplots()
-        ax1.plot(engies[:, 0], engies[:, 1], linestyle='none', marker='o', ms=0.7, color='blue')
-        ax1.set_ylabel(r'Energy')
-        ax1.set_xlabel(r'\#')
+        energy_markersize = 0.7
+        energy_barsize = 0.06
+        if sysVar.dim != 1:
+            energy_markersize *= (2.0 / np.log10(sysVar.dim))
+            energy_barsize *= (4.0 / np.log10(sysVar.dim))
+        ax1.plot(engies[:, 0], engies[:, 1], linestyle='none', marker='o', ms=energy_markersize, color='blue')
+        ax1.set_ylabel(r'Energy / J')
+        ax1.set_xlabel(r'Eigenvalue index n')
         ax2 = ax1.twinx()
         ax2.bar(engies[:, 0], engies[:, 2], alpha=0.8, color='red', width=0.03, align='center')
         ax2.set_ylabel(r'$|c_n|^2$')
@@ -677,9 +682,9 @@ def plotData(sysVar):
         plt.clf()
         print('.', end='', flush=True)
         ### Eigenvalue decomposition with energy x-axis
-        plt.bar(engies[:, 1], engies[:, 2], alpha=0.8, color='red', width=0.03, align='center')
-        plt.xlabel(r'Energy')
-        plt.ylabel(r'$|c_n|^2$')
+        plt.bar(engies[:, 1], engies[:, 2], alpha=0.8, color='red', width=energy_barsize, align='center')
+        plt.xlabel(r'Energy / J')
+        plt.ylabel(r'$|c_E|^2$')
         plt.grid(False)
         plt.xlim(xmin=-(np.abs(engies[0, 1] - engies[-1, 1]) * (5.0 / 100)))
         plt.tight_layout()
