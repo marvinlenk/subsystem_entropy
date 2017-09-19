@@ -85,16 +85,20 @@ def plotData(sysVar):
         # print(' - |(E0 - Emicro)/E0|: %.0e - ' % (np.abs((en0 - engies[en_micind,1])/en0)), end='' )
 
     if sysVar.boolPlotDiagExp:
-        microexpfile = './data/diagexpect.txt'
+        microexpfile = './data/diagoccexpect.txt'
         microexp = np.loadtxt(microexpfile)
 
-    if sysVar.boolPlotOffDiag:
-        offdiagfile = './data/offdiagonal.txt'
-        offdiag = np.loadtxt(offdiagfile)
+    if sysVar.boolPlotOffDiagOcc:
+        offdiagoccfile = './data/offdiagocc.txt'
+        offdiagocc = np.loadtxt(offdiagoccfile)
 
     if sysVar.boolPlotOffDiagDens:
-        offdiagdensfile = './data/offdiagonaldens.txt'
+        offdiagdensfile = './data/offdiagdens.txt'
         offdiagdens = np.loadtxt(offdiagdensfile)
+
+    if sysVar.boolPlotOffDiagDensRed:
+        offdiagdensredfile = './data/offdiagdensred.txt'
+        offdiagdensred = np.loadtxt(offdiagdensredfile)
 
     if sysVar.boolPlotGreen:
         greenfile = './data/green.txt'
@@ -331,9 +335,9 @@ def plotData(sysVar):
         return 0
         # sum of off diagonal elements in energy eigenbasis
 
-    if sysVar.boolPlotOffDiag:
+    if sysVar.boolPlotOffDiagOcc:
         for i in range(0, sysVar.m):
-            plt.plot(step_array, offdiag[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.5)
+            plt.plot(step_array, offdiagocc[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.5)
         plt.ylabel(r'Sum of off diagonals')
         plt.xlabel(r'$J\,t$')
         plt.legend(loc='upper right')
@@ -343,23 +347,23 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
 
-        dt = offdiag[1, 0] - offdiag[0, 0]
-        nrm = offdiag[:, 0] / dt
+        dt = offdiagocc[1, 0] - offdiagocc[0, 0]
+        nrm = offdiagocc[:, 0] / dt
         nrm[1:] = 1 / nrm[1:]
         for i in range(0, sysVar.m):
             ###### only sum (subsystem-thermalization)
             plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
             # start at 10% of the whole x-axis
-            lox = (offdiag[-1, 0] - offdiag[0, 0]) / 10 + offdiag[0, 0]
-            hiy = offdiag[int(len(offdiag[:, 0]) / 10), 0] * 1.1
-            plt.plot(offdiag[:, 0], offdiag[:, i + 1], linewidth=0.5)
+            lox = (offdiagocc[-1, 0] - offdiagocc[0, 0]) / 10 + offdiagocc[0, 0]
+            hiy = offdiagocc[int(len(offdiagocc[:, 0]) / 10), 0] * 1.1
+            plt.plot(offdiagocc[:, 0], offdiagocc[:, i + 1], linewidth=0.5)
             plt.xlim(xmin=lox)
             plt.ylim(ymax=hiy)
             plt.grid()
             plt.tight_layout()
             ###inlay with the whole deal
             a = plt.axes([0.62, 0.6, 0.28, 0.28])
-            a.plot(offdiag[:, 0], offdiag[:, i + 1], linewidth=0.8)
+            a.plot(offdiagocc[:, 0], offdiagocc[:, i + 1], linewidth=0.8)
             a.set_xticks([])
             a.set_yticks([])
             ###
@@ -367,14 +371,14 @@ def plotData(sysVar):
             plt.clf()
 
             plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
-            plt.semilogy(offdiag[:, 0], np.abs(offdiag[:, i + 1]), linewidth=0.5)
+            plt.semilogy(offdiagocc[:, 0], np.abs(offdiagocc[:, i + 1]), linewidth=0.5)
             plt.xlim(xmin=lox)
             plt.ylim(ymin=1e-2)
             plt.grid()
             plt.tight_layout()
             ###inlay with the whole deal
             a = plt.axes([0.62, 0.6, 0.28, 0.28])
-            a.semilogy(offdiag[:, 0], offdiag[:, i + 1], linewidth=0.8)
+            a.semilogy(offdiagocc[:, 0], offdiagocc[:, i + 1], linewidth=0.8)
             a.set_ylim(ymin=1e-2)
             a.set_xticks([])
             a.set_yticks([])
@@ -384,15 +388,15 @@ def plotData(sysVar):
 
             ###### average (eigenstate-thermalization)
             f, (ax1, ax2) = plt.subplots(2, sharex=False, sharey=False)
-            tmp = cumtrapz(offdiag[:, i + 1], offdiag[:, 0], initial=offdiag[0, i + 1])
+            tmp = cumtrapz(offdiagocc[:, i + 1], offdiagocc[:, 0], initial=offdiagocc[0, i + 1])
             tmp = np.multiply(tmp, nrm)
             f.text(0.03, 0.5, 'Average of summed off diagonals in $n^{%i}$' % (i), ha='center', va='center',
                    rotation='vertical')
             ax1.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-            ax1.plot(offdiag[:, 0], tmp, linewidth=0.5)
+            ax1.plot(offdiagocc[:, 0], tmp, linewidth=0.5)
             ax1.grid()
 
-            ax2.loglog(offdiag[:, 0], np.abs(tmp), linewidth=0.5)
+            ax2.loglog(offdiagocc[:, 0], np.abs(tmp), linewidth=0.5)
             ax2.set_ylim(bottom=1e-4)
             ax2.grid()
 
@@ -409,6 +413,19 @@ def plotData(sysVar):
 
     if sysVar.boolPlotOffDiagDens:
         plt.plot(step_array, offdiagdens[:, 1], linewidth=0.5)
+        plt.ylabel(r'Sum of off diagonals (dens. mat.)')
+        plt.xlabel(r'$J\,t$')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+
+    def sum_offdiagonalsdensred():
+        return 0
+
+    if sysVar.boolPlotOffDiagDensRed:
+        plt.plot(step_array, offdiagdensred[:, 1], linewidth=0.5)
         plt.ylabel(r'Sum of off diagonals (red. dens. mat.)')
         plt.xlabel(r'$J\,t$')
         plt.grid()
@@ -926,7 +943,7 @@ def plotOccs(sysVar):
     print(" done!")
 
 
-def plotOffDiagSingles(sysVar):
+def plotOffDiagOccSingles(sysVar):
     print("Plotting off-diagonal singles.", end='', flush=True)
     params = {
         'legend.fontsize': sysVar.plotLegendSize,

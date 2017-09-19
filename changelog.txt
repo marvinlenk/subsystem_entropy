@@ -1,5 +1,28 @@
 change log
 
+### 19.09.2017
+- changed offdiag config parameter to offdiagocc
+- renamed occensingles config parameter to offdiagoccsingles
+- renamed files:
+    offdiagonal to offdiagocc
+    offdiagsingles to offdiagoccsingles
+    offdiagsingleinfo to offdiagoccsinglesinfo
+    diagsingles to diagoccsingles
+    diagexpect to diagoccexpect
+
+- renamed plotting of offdiagonals from plotOffDiagSingles to plotOffDiagOccSingles
+- in entPlot.py renamed plotOffDiagSingles to plotOffDiagOccSingles
+- added the same procedure for offdiagdens and offdiagdensred
+    this includes calculation, hamiltonian initialization for the reduced space and plotting
+- removed unused tmp declaration in al initHamiltonian like methods
+- changed problem where typecasting of the dimension in dimOfBasis was not recognized properly
+    actually removed typecasting completely since it is not supported for scipy.special.binom
+- changed expectValueDM and expectValueRed to be able to handle sparse matrices
+- added energy of the subsystem calculation (in the config as reducedenergy) and plotting
+- added method to init all needed hamiltonians
+- added method to init all needed evolution matrices
+- changed updateEnergy to updateTotalEnergy
+
 ### 15.09.2017
 - added dynamic point and bar scaling in eigendecomposition/eigenenergy plot
 - changed filename for total energy from energy.txt to total_energy.txt

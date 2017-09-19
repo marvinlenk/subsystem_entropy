@@ -50,6 +50,8 @@ class mpSystem:
             self.densityMatrixInd = False
             self.entropy = 0
             self.energy = 0
+            if self.boolReducedEnergy:
+                self.energyRed = 0
             self.operators = quadraticArray(self)
             self.occNo = np.zeros(self.m, dtype=np.float64)
             # hamiltonian - initialized with zeros (note - datatype is not! complex)
@@ -75,17 +77,18 @@ class mpSystem:
             self.entropyRed = 0
 
             ###### energy eigenbasis stuff
-            if self.boolOffDiag or self.boolDiagExpStore:
+            if self.boolOffDiagOcc or self.boolDiagExpStore:
                 self.enState = np.zeros((self.dim), dtype=self.datType)
-            if self.boolOffDiag:
-                self.offDiagMat = np.empty((self.m), dtype=object)
-                self.offDiag = np.zeros((self.m), dtype=self.datType)
+            if self.boolOffDiagOcc:
+                self.offDiagOccMat = np.empty((self.m), dtype=object)
+                self.offDiagOcc = np.zeros((self.m), dtype=self.datType)
                 if self.occEnSingle > 0:
                     self.occEnInds = np.zeros((self.m, 2, self.occEnSingle), dtype=np.int16)
                     self.offDiagSingles = np.zeros((self.m, self.occEnSingle), dtype=self.datType)
 
             if self.boolOffDiagDens:
                 self.offDiagDens = 0
+            # NOTE reduced density matrix offdiagonal stuff is initiated AFTER the reduced basis is created!
 
             if self.mRedComp == 0:
                 self.dimRed = 0
@@ -102,7 +105,7 @@ class mpSystem:
                 self.offsetsRed = basisOffsets(self.N, self.mRed)
                 self.basisRed = np.zeros((self.dimRed, self.mRed), dtype=np.int)
                 fillReducedBasis(self.basisRed, self.N, self.mRed, self.offsetsRed)
-                self.basisDictRed = basis2dict(self.basisRed, self.dimRed)  # only!! neded for reduced space operators
+                self.basisDictRed = basis2dict(self.basisRed, self.dimRed)  # only!! needed for reduced space operators
                 self.dimRedComp = dimOfBasis(self.N, (self.mRedComp + 1))
                 self.offsetsRedComp = basisOffsets(self.N, self.mRedComp)
                 self.basisRedComp = np.zeros((self.dimRedComp, self.mRedComp), dtype=np.int)
@@ -111,7 +114,19 @@ class mpSystem:
                 self.iteratorRed = np.zeros((0, 4), dtype=np.int32)
                 self.initIteratorRed()
 
-                ### Spectral
+            # NOTE here it is
+            if self.boolOffDiagDensRed:
+                self.offDiagDensRed = 0
+                self.hamiltonianRed = coo_matrix(np.zeros((self.dimRed, self.dimRed)),
+                                                 shape=(self.dimRed, self.dimRed),
+                                                 dtype=np.float64).tocsr()
+                self.operatorsRed = quadraticArrayRed(self)
+                self.eigValsRed = []
+                self.eigVectsRed = []
+                self.eigInvRed = []
+                self.eigIndRed = False
+
+            ### Spectral
             if self.boolRetgreen:
                 ## lo
                 self.specLoDim = dimOfBasis(self.N - 1, self.m)
@@ -185,9 +200,10 @@ class mpSystem:
         self.boolDMRedStore = configParser.getboolean('filemanagement', 'dmredstore')
         self.boolHamilStore = configParser.getboolean('filemanagement', 'hamilstore')
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
-        self.occEnSingle = configParser.getint('filemanagement', 'occensingle')
-        self.boolOffDiag = configParser.getboolean('filemanagement', 'offdiag')
+        self.occEnSingle = configParser.getint('filemanagement', 'offdiagoccsingles')
+        self.boolOffDiagOcc = configParser.getboolean('filemanagement', 'offdiagocc')
         self.boolOffDiagDens = configParser.getboolean('filemanagement', 'offdiagdens')
+        self.boolOffDiagDensRed = configParser.getboolean('filemanagement', 'offdiagdensred')
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexp')
@@ -196,6 +212,7 @@ class mpSystem:
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
         self.boolTotalEnt = configParser.getboolean('calcparams', 'totalentropy')
         self.boolTotalEnergy = configParser.getboolean('calcparams', 'totalenergy')
+        self.boolReducedEnergy = configParser.getboolean('calcparams', 'reducedenergy')
         # ## plotting booleans and parameters
         self.boolPlotData = configParser.getboolean('plotbools', 'data')
         self.boolPlotAverages = configParser.getboolean('plotbools', 'averages')
@@ -203,9 +220,10 @@ class mpSystem:
         self.boolPlotDMAnimation = configParser.getboolean('plotbools', 'densistymatrix')
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'reducedmatrix')
         self.boolPlotOccEn = configParser.getboolean('plotbools', 'occen')
-        self.boolPlotOffDiag = configParser.getboolean('plotbools', 'offdiag')
-        self.boolPlotOffDiagSingles = configParser.getboolean('plotbools', 'offdiagsingles')
+        self.boolPlotOffDiagOcc = configParser.getboolean('plotbools', 'offdiagocc')
+        self.boolPlotOffDiagOccSingles = configParser.getboolean('plotbools', 'offdiagoccsingles')
         self.boolPlotOffDiagDens = configParser.getboolean('plotbools', 'offdiagdens')
+        self.boolPlotOffDiagDensRed = configParser.getboolean('plotbools', 'offdiagdensred')
         self.boolPlotEngy = configParser.getboolean('plotbools', 'energies')
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'decomposition')
         self.boolPlotDiagExp = configParser.getboolean('plotbools', 'diagexp')
@@ -294,6 +312,14 @@ class mpSystem:
                 tmpret[el[1], el[0]] += matrx[el[3], el[2]]
         return tmpret
 
+    def initAllHamiltonians(self):
+        self.initHamiltonian()
+        if self.boolOffDiagDensRed or self.boolReducedEnergy:
+            self.initHamiltonianRed()
+        if self.boolRetgreen:
+            self.initSpecLoHamiltonian()
+            self.initSpecHiHamiltonian()
+
     # hamiltonian with equal index interaction different to non equal index interaction
     def initHamiltonian(self):
         for i in range(0, self.m):
@@ -304,7 +330,6 @@ class mpSystem:
                     self.hamiltonian += (i) * (self.onsite) * self.operators[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
-            tmp = np.matrix(np.zeros((self.dim, self.dim)))
             for i in range(0, self.m):
                 for j in range(0, self.m):
                     for k in range(0, self.m):
@@ -314,6 +339,26 @@ class mpSystem:
                                 self.hamiltonian += (self.interequal) * tmp
                             else:
                                 self.hamiltonian += (self.interdiff) * tmp
+                            del tmp
+
+    def initHamiltonianRed(self):
+        for i in range(0, self.mRed):
+            for j in range(0, self.mRed):
+                if i != j:
+                    self.hamiltonianRed += self.hybrid * self.operatorsRed[i, j]
+                else:
+                    self.hamiltonianRed += (i) * (self.onsite) * self.operatorsRed[i, j]
+
+        if self.interequal != 0 and self.interdiff != 0:
+            for i in range(0, self.mRed):
+                for j in range(0, self.mRed):
+                    for k in range(0, self.mRed):
+                        for l in range(0, self.mRed):
+                            tmp = getQuarticRed(self, i, j, k, l)
+                            if i == j and k == l and k == j:
+                                self.hamiltonianRed += (self.interequal) * tmp
+                            else:
+                                self.hamiltonianRed += (self.interdiff) * tmp
                             del tmp
 
     def initSpecLoHamiltonian(self):
@@ -326,7 +371,6 @@ class mpSystem:
                     self.specLoHamiltonian += (i) * (self.onsite) * tmpspecops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
-            tmp = np.matrix(np.zeros((self.specLoDim, self.specLoDim)))
             for i in range(0, self.m):
                 for j in range(0, self.m):
                     for k in range(0, self.m):
@@ -349,7 +393,6 @@ class mpSystem:
                     self.specHiHamiltonian += (i) * (self.onsite) * tmpspecops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
-            tmp = np.matrix(np.zeros((self.specHiDim, self.specHiDim)))
             for i in range(0, self.m):
                 for j in range(0, self.m):
                     for k in range(0, self.m):
@@ -361,6 +404,12 @@ class mpSystem:
                                 self.specHiHamiltonian += (self.interdiff) * tmp
                             del tmp
             del tmpspecops
+
+    def initAllEvolutionMatrices(self):
+        self.initEvolutionMatrix()
+        if self.boolRetgreen:
+            self.initSpecLoEvolutionMatrix()
+            self.initSpecHiEvolutionMatrix()
 
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
@@ -599,19 +648,31 @@ class mpSystem:
     def expectValueDM(self, operator):
         if operator.shape != (self.dim, self.dim):
             exit('Dimension of operator is', np.shape(operator), 'but', (self.dim, self.dim), 'is needed!')
-        # will compute only the diagonal elements!
-        return np.einsum('ij,ji->', self.densityMatrix, operator)
+        # this order is needed for sparse matrices - still works because of cyclic invariance
+        return np.trace(operator.dot(self.densityMatrix))
 
     def expectValueRed(self, operator):
         if operator.shape != (self.dimRed, self.dimRed):
             exit('Dimension of operator is' + str(np.shape(operator)) + 'but' + str(
                 (self.dimRed, self.dimRed)) + 'is needed!')
-        return np.trace(self.densityMatrixRed.dot(operator))
+        # this order is needed for sparse matrices - still works because of cyclic invariance
+        return np.trace(operator.dot(self.densityMatrixRed))
 
     def updateEigenenergies(self):
         if not self.eigInd:
             self.eigVals, self.eigVects = la.eigh(self.hamiltonian.toarray())
             self.eigInd = True
+
+    def updateEigenenergiesRed(self):
+        if not self.eigIndRed:
+            self.eigValsRed, self.eigVectsRed = la.eigh(self.hamiltonianRed.toarray())
+            self.eigInvRed = la.inv(np.matrix(self.eigVectsRed.T))
+            self.eigIndRed = True
+            # TMP TMP TMP
+            tmpfil=open('./data/eigenvaluesRed.txt','w')
+            for i in range(0,self.dimRed):
+                tmpfil.write("%i %.16e\n" % (i, self.eigValsRed[i]))
+            tmpfil.close()
 
     def updateLoEigenenergies(self):
         if not self.specLoEigInd:
@@ -680,13 +741,13 @@ class mpSystem:
                 sfil.write('\n')
             sfil.close()
             print("Eigendecomposition completed after " + time_elapsed(t0, 60, 0))
-        if self.boolDiagExpStore or self.boolOccEnStore or self.boolOffDiag:
+        if self.boolDiagExpStore or self.boolOccEnStore or self.boolOffDiagOcc or self.boolOffDiagDens:
             self.updateEigenenergies()
-            eivectinv = la.inv(np.matrix(self.eigVects.T))
+            eivectinv = la.inv(np.matrix(self.eigVects.T))  # this will later be stored in the class if needed
 
         # expectation values in diagonal representation (ETH)
 
-        if self.boolDiagExpStore or self.boolOffDiag:
+        if self.boolDiagExpStore or self.boolOffDiagOcc:
             t0 = tm.time()
             # if the tmp array has already been calculated this step can be omitted - see top of this method
             if self.boolDecompStore:
@@ -698,12 +759,12 @@ class mpSystem:
 
             if self.boolDiagExpStore:
                 # diagonals in expectation value    
-                ethfil = open('./data/diagexpect.txt', 'w')
+                ethfil = open('./data/diagoccexpect.txt', 'w')
                 for i in range(0, self.m):
-                    if self.boolOffDiag:
+                    if self.boolOffDiagOcc:
                         # first store everything, later delete diagonal elements
-                        self.offDiagMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
-                        tmpocc = np.dot(np.abs(self.enState) ** 2, np.diag(self.offDiagMat[i])).real
+                        self.offDiagOccMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
+                        tmpocc = np.dot(np.abs(self.enState) ** 2, np.diag(self.offDiagOccMat[i])).real
                     else:
                         tmpocc = multi_dot([self.enState.conj(), self.eigVects.T, self.operators[i, i].dot(eivectinv),
                                             self.enState]).real
@@ -712,16 +773,16 @@ class mpSystem:
                 ethfil.close()
 
             # now store the diagonals in one file for comparison to the off diagonals later
-            if self.boolOffDiag:
-                diagfil = open('./data/diagsingles.txt', 'w')
+            if self.boolOffDiagOcc:
+                diagfil = open('./data/diagoccsingles.txt', 'w')
                 for i in range(0, self.m):
                     # if the matrices have not yet been constructed - do this
                     if not self.boolDiagExpStore:
                         # first store everything, later delete diagonal elements
-                        self.offDiagMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
+                        self.offDiagOccMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
 
                     # now get the single off diagonals
-                    tmpdiag = np.einsum('l,ll,l -> l', self.enState.conj(), self.offDiagMat[i], self.enState,
+                    tmpdiag = np.einsum('l,ll,l -> l', self.enState.conj(), self.offDiagOccMat[i], self.enState,
                                         optimize=True).real
                     for j in range(0, self.dim):
                         diagfil.write('%i %.16e %.16e \n' % (i, self.eigVals[j], tmpdiag[j]))
@@ -730,9 +791,9 @@ class mpSystem:
         # store the actual matrix to a file (might become very large!)
         if self.boolOccEnStore:
             for i in range(0, self.m):
-                if self.boolOffDiag:
+                if self.boolOffDiagOcc:
                     # note that the off diag mat still contains the diagonals right now!
-                    storeMatrix(self.offDiagMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False,
+                    storeMatrix(self.offDiagOccMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False,
                                 stabs=False)
                 else:
                     storeMatrix(np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv)),
@@ -740,14 +801,14 @@ class mpSystem:
             print("Occupation number matrices stored after " + time_elapsed(t0, 60, 1))
 
         # now we remove the diagonal elements
-        if self.boolOffDiag:
+        if self.boolOffDiagOcc:
             for i in range(0, self.m):
-                np.fill_diagonal(self.offDiagMat[i], 0)
+                np.fill_diagonal(self.offDiagOccMat[i], 0)
 
-        if self.occEnSingle and self.boolOffDiag:
+        if self.occEnSingle and self.boolOffDiagOcc:
             t0 = tm.time()
-            infofile = open('./data/offdiagsingleinfo.txt', 'w')
-            if not (self.boolDiagExpStore or self.boolOffDiag):
+            infofile = open('./data/offdiagoccsinglesinfo.txt', 'w')
+            if not (self.boolDiagExpStore or self.boolOffDiagOcc):
                 if self.boolDecompStore:
                     self.enState = tmp
                 else:
@@ -760,8 +821,9 @@ class mpSystem:
             num_largest = self.occEnSingle
             for i in range(0, self.m):
                 # this is not optimized but one has to store it as a matrix for correct searching
-                tmpmat = np.einsum('l,lj,j -> lj', self.enState.conj(), self.offDiagMat[i], self.enState, optimize=True)
-                # tmpmat = np.outer(self.enState.conj(), np.dot(self.offDiagMat[i], self.enState))
+                tmpmat = np.einsum('l,lj,j -> lj', self.enState.conj(), self.offDiagOccMat[i], self.enState,
+                                   optimize=True)
+                # tmpmat = np.outer(self.enState.conj(), np.dot(self.offDiagOccMat[i], self.enState))
                 infofile.write('%i ' % (i))
                 # to use argpartition correctly we must treat the matrix as an array
                 indices = tmpmat.argpartition(tmpmat.size - num_largest, axis=None)[-num_largest:]
@@ -775,36 +837,51 @@ class mpSystem:
             print("Largest elements found and infos stored after " + time_elapsed(t0, 60, 1))
             del tmpmat  # not sure if this is neccessary but do it regardless...
 
+        # store the inverted eigenvector matrix for later use
+        if self.boolOffDiagDens:
+            self.eigInv = eivectinv
+
         if clear:
             # free the memory
             del self.eigVals
-            if not self.boolOffDiag:
+            if (not self.boolOffDiagOcc and not self.boolOffDiagDens):
                 del self.eigVects
                 self.eigVects = []
             self.eigVals = []
             self.eigInd = False
 
-    def updateOffDiag(self):
+    def updateOffDiagOcc(self):
         # calculate all overlaps at once
         self.enState = np.dot(self.eigVects.T, self.state)
 
         for i in range(0, self.m):
-            self.offDiag[i] = np.vdot(self.enState, self.offDiagMat[i].dot(self.enState))
+            self.offDiagOcc[i] = np.vdot(self.enState, self.offDiagOccMat[i].dot(self.enState))
 
             # check for imaginary part -> would give an indication for errors
-            if self.offDiag[i].imag > 1e-6:
-                print('The offdiagonal expectation value has an imaginary part of ', self.offDiag[i].imag)
+            if self.offDiagOcc[i].imag > 1e-6:
+                print('The offdiagonal expectation value has an imaginary part of ', self.offDiagOcc[i].imag)
 
         if self.occEnSingle:
             for i in range(0, self.m):
                 for j in range(0, self.occEnSingle):
                     x = int(self.occEnInds[i, 0, j])
                     y = int(self.occEnInds[i, 1, j])
-                    self.offDiagSingles[i, j] = self.enState[x].conj() * self.offDiagMat[i][x, y] * self.enState[y]
+                    self.offDiagOccSingles[i, j] = self.enState[x].conj() * self.offDiagOccMat[i][x, y] * self.enState[
+                        y]
 
     def updateOffDiagDens(self):
-        self.offDiagDens = (multi_dot([np.ones(self.dimRed), self.densityMatrixRed, np.ones(self.dimRed)]) - np.trace(
+        self.offDiagDens = (multi_dot(
+            [np.ones(self.dim), self.eigVects.T, self.densityMatrix, self.eigInv, np.ones(self.dim)]) - np.trace(
+            self.densityMatrix)).real
+
+    def updateOffDiagDensRed(self):
+        if not self.eigIndRed:
+            self.updateEigenenergiesRed()
+
+        self.offDiagDensRed = (multi_dot(
+            [np.ones(self.dimRed), self.eigVectsRed.T, self.densityMatrixRed, self.eigInvRed, np.ones(self.dimRed)]) - np.trace(
             self.densityMatrixRed)).real
+
 
     def updateEntropy(self):
         self.entropy = 0
@@ -834,10 +911,15 @@ class mpSystem:
 
     # end of updateOccNumbers
 
-    def updateEnergy(self):
+    def updateTotalEnergy(self):
         self.energy = (self.expectValue(self.hamiltonian)).real
 
-    # end of updateEnergy
+    # end of updateTotalEnergy
+
+    def updateReducedEnergy(self):
+        self.energyRed = (self.expectValueRed(self.hamiltonianRed)).real
+
+    # end of updateReducedEnergy
 
     def evaluateGreen(self):
         # use dots for multithread!
@@ -901,10 +983,12 @@ class mpSystem:
             self.updateDensityMatrix()
             self.reduceDensityMatrix()
             self.updateOccNumbers()
-        if self.boolOffDiag:
-            self.updateOffDiag()
+        if self.boolOffDiagOcc:
+            self.updateOffDiagOcc()
         if self.boolOffDiagDens:
             self.updateOffDiagDens()
+        if self.boolOffDiagDensRed:
+            self.updateOffDiagDensRed()
         self.updateEntropyRed()
 
     ###### the magic of time evolution
@@ -1005,18 +1089,18 @@ class mpSystem:
             else:
                 self.dmFileFactor += 1
 
-        if self.boolOffDiag:
-            self.filOffDiag.write('%.16e ' % (self.evolTime))
+        if self.boolOffDiagOcc:
+            self.filOffDiagOcc.write('%.16e ' % (self.evolTime))
             for i in range(0, self.m):
-                self.filOffDiag.write('%.16e ' % (self.offDiag[i].real))
-            self.filOffDiag.write('\n')
+                self.filOffDiagOcc.write('%.16e ' % (self.offDiagOcc[i].real))
+            self.filoffDiagOcc.write('\n')
             if self.occEnSingle:
-                self.filOffSingles.write('%.16e ' % (self.evolTime))
+                self.filOffDiagOccSingles.write('%.16e ' % (self.evolTime))
                 for i in range(0, self.m):
                     for j in range(0, self.occEnSingle):
-                        self.filOffSingles.write(
-                            '%.16e %.16e ' % (self.offDiagSingles[i, j].real, self.offDiagSingles[i, j].imag))
-                self.filOffSingles.write('\n')
+                        self.filOffDiagOccSingles.write(
+                            '%.16e %.16e ' % (self.offDiagOccSingles[i, j].real, self.offDiagOccSingles[i, j].imag))
+                self.filOffDiagOccSingles.write('\n')
 
         self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
         self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
@@ -1028,6 +1112,9 @@ class mpSystem:
         if self.boolOffDiagDens:
             self.filOffDiagDens.write('%.16e %.16e \n' % (self.evolTime, self.offDiagDens))
 
+        if self.boolOffDiagDensRed:
+            self.filOffDiagDensRed.write('%.16e %.16e \n' % (self.evolTime, self.offDiagDensRed))
+
     def openFiles(self):
         self.filEnt = open('./data/entropy.txt', 'w')
         self.filNorm = open('./data/norm.txt', 'w')
@@ -1037,12 +1124,14 @@ class mpSystem:
         if self.boolTotalEnergy:
             self.filEnergy = open('./data/total_energy.txt', 'w')
         self.filProg = open('./data/progress.log', 'w')
-        if self.boolOffDiag:
-            self.filOffDiag = open('./data/offdiagonal.txt', 'w')
+        if self.boolOffDiagOcc:
+            self.filOffDiagOcc = open('./data/offdiagocc.txt', 'w')
             if self.occEnSingle:
-                self.filOffSingles = open('./data/offdiagsingle.txt', 'w')
+                self.filOffDiagOccSingles = open('./data/offdiagoccsingle.txt', 'w')
         if self.boolOffDiagDens:
-            self.filOffDiagDens = open('./data/offdiagonaldens.txt', 'w')
+            self.filOffDiagDens = open('./data/offdiagdens.txt', 'w')
+        if self.boolOffDiagDensRed:
+            self.filOffDiagDensRed = open('./data/offdiagdensred.txt', 'w')
         self.filProg.close()
 
     # close all files
@@ -1054,12 +1143,14 @@ class mpSystem:
             self.filTotEnt.close()
         if self.boolTotalEnergy:
             self.filEnergy.close()
-        if self.boolOffDiag:
-            self.filOffDiag.close()
+        if self.boolOffDiagOcc:
+            self.filOffDiagOcc.close()
             if self.occEnSingle:
-                self.filOffSingles.close()
+                self.filOffDiagOccSingles.close()
         if self.boolOffDiagDens:
             self.filOffDiagDens.close()
+        if self.boolOffDiagDensRed:
+            self.filOffDiagDensRed.close()
 
     def plotDMAnimation(self, stepSize):
         ep.plotDensityMatrixAnimation(self.steps, self.deltaT, self.dmFiles, stepSize, framerate=self.dmFilesFPS)
@@ -1084,8 +1175,8 @@ class mpSystem:
     def plotOccEnbasis(self):
         ep.plotOccs(self)
 
-    def plotOffDiagSingles(self):
-        ep.plotOffDiagSingles(self)
+    def plotOffDiagOccSingles(self):
+        ep.plotOffDiagOccSingles(self)
 
     def plotTimescale(self):
         ep.plotTimescale(self)
@@ -1103,8 +1194,8 @@ class mpSystem:
             self.plotOccEnbasis()
         if self.boolPlotTimescale:
             self.plotTimescale()
-        if self.boolPlotOffDiagSingles:
-            self.plotOffDiagSingles()
+        if self.boolPlotOffDiagOccSingles:
+            self.plotOffDiagOccSingles()
         if self.boolClear:
             prepFolders(True)
 
@@ -1146,9 +1237,9 @@ def prepFolders(clearbool=0):
 
 # calculate the number of Coefficients
 def dimOfBasis(N, m):
-    return np.uint32(binom(N + m - 1, N))
+    return int(binom(N + m - 1, N))
 
-
+# fill the fock basis, offset says where to start
 def fillBasis(basis, N, m, offset=0):
     if m != 1:
         counter = [offset]
@@ -1184,6 +1275,7 @@ def rect(x, mu, sigm=1, norm=1):
     return tmp
 
 
+# gives offsets for reduced density matrix
 def basisOffsets(N, m):
     offsets = np.zeros((N + 2), dtype=np.int32)
     # set starting positions (counting from N,m-1 downwards) => results in rdm being block matrix of decreasing N_sub
