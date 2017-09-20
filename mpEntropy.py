@@ -25,9 +25,9 @@ class mpSystem:
     # N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
     def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False):
         self.confFile = cFile
-        if not plotOnly:
-            prepFolders(0)
         self.loadConfig()
+        if not plotOnly:
+            prepFolders(0,self.boolDMStore,self.boolDMRedStore,self.boolOccEnStore,self.boolCleanFiles)
         # mask selects only not traced out states
         self.mask = np.ones((self.m), dtype=bool)
         for k in self.kRed:
@@ -49,9 +49,9 @@ class mpSystem:
             self.densityMatrix = []  # do not initialize yet - it wait until hamiltonian decomposition has been done for memory efficiency 
             self.densityMatrixInd = False
             self.entropy = 0
-            self.energy = 0
+            self.totalEnergy = 0
             if self.boolReducedEnergy:
-                self.energyRed = 0
+                self.reducedEnergy = 0
             self.operators = quadraticArray(self)
             self.occNo = np.zeros(self.m, dtype=np.float64)
             # hamiltonian - initialized with zeros (note - datatype is not! complex)
@@ -117,6 +117,7 @@ class mpSystem:
             # NOTE here it is
             if self.boolOffDiagDensRed:
                 self.offDiagDensRed = 0
+            if self.boolOffDiagDensRed or self.boolReducedEnergy:
                 self.hamiltonianRed = coo_matrix(np.zeros((self.dimRed, self.dimRed)),
                                                  shape=(self.dimRed, self.dimRed),
                                                  dtype=np.float64).tocsr()
@@ -195,6 +196,7 @@ class mpSystem:
         self.dataPoints = int(configParser.getfloat('filemanagement', 'datapoints'))
         self.dmFilesSkipFactor = int(configParser.getfloat('filemanagement', 'dmfile_skipfactor'))
         self.boolClear = configParser.getboolean('filemanagement', 'clear')
+        self.boolCleanFiles = configParser.getboolean('filemanagement', 'cleanfiles')
         self.boolDataStore = configParser.getboolean('filemanagement', 'datastore')
         self.boolDMStore = configParser.getboolean('filemanagement', 'dmstore')
         self.boolDMRedStore = configParser.getboolean('filemanagement', 'dmredstore')
@@ -413,7 +415,7 @@ class mpSystem:
 
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
-    def initEvolutionMatrix(self, diagonalize=True):
+    def initEvolutionMatrix(self, diagonalize=False):
         if self.order == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if (not np.allclose(self.hamiltonian.toarray(), self.hamiltonian.toarray().T.conjugate())):
@@ -912,12 +914,12 @@ class mpSystem:
     # end of updateOccNumbers
 
     def updateTotalEnergy(self):
-        self.energy = (self.expectValue(self.hamiltonian)).real
+        self.totalEnergy = (self.expectValue(self.hamiltonian)).real
 
     # end of updateTotalEnergy
 
     def updateReducedEnergy(self):
-        self.energyRed = (self.expectValueRed(self.hamiltonianRed)).real
+        self.reducedEnergy = (self.expectValueRed(self.hamiltonianRed)).real
 
     # end of updateReducedEnergy
 
@@ -983,6 +985,8 @@ class mpSystem:
             self.updateDensityMatrix()
             self.reduceDensityMatrix()
             self.updateOccNumbers()
+        if self.boolReducedEnergy:
+            self.updateReducedEnergy()
         if self.boolOffDiagOcc:
             self.updateOffDiagOcc()
         if self.boolOffDiagDens:
@@ -1036,8 +1040,8 @@ class mpSystem:
                     self.filTotEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropy))
 
                 if self.boolTotalEnergy:
-                    self.updateEnergy()
-                    self.filEnergy.write('%.16e %.16e \n' % (self.evolTime, self.energy))
+                    self.updateTotalEnergy()
+                    self.filTotalEnergy.write('%.16e %.16e \n' % (self.evolTime, self.totalEnergy))
 
                 print('.', end='', flush=True)
                 if self.dim > 1e3 or self.steps > 1e7:
@@ -1089,11 +1093,14 @@ class mpSystem:
             else:
                 self.dmFileFactor += 1
 
+        if self.boolReducedEnergy:
+            self.filRedEnergy.write('%.16e %.16e \n' % (self.evolTime, self.reducedEnergy))
+
         if self.boolOffDiagOcc:
             self.filOffDiagOcc.write('%.16e ' % (self.evolTime))
             for i in range(0, self.m):
                 self.filOffDiagOcc.write('%.16e ' % (self.offDiagOcc[i].real))
-            self.filoffDiagOcc.write('\n')
+            self.filOffDiagOcc.write('\n')
             if self.occEnSingle:
                 self.filOffDiagOccSingles.write('%.16e ' % (self.evolTime))
                 for i in range(0, self.m):
@@ -1122,7 +1129,9 @@ class mpSystem:
         if self.boolTotalEnt:
             self.filTotEnt = open('./data/total_entropy.txt', 'w')
         if self.boolTotalEnergy:
-            self.filEnergy = open('./data/total_energy.txt', 'w')
+            self.filTotalEnergy = open('./data/total_energy.txt', 'w')
+        if self.boolReducedEnergy:
+            self.filRedEnergy = open('./data/reduced_energy.txt', 'w')
         self.filProg = open('./data/progress.log', 'w')
         if self.boolOffDiagOcc:
             self.filOffDiagOcc = open('./data/offdiagocc.txt', 'w')
@@ -1142,7 +1151,9 @@ class mpSystem:
         if self.boolTotalEnt:
             self.filTotEnt.close()
         if self.boolTotalEnergy:
-            self.filEnergy.close()
+            self.filTotalEnergy.close()
+        if self.boolReducedEnergy:
+            self.filRedEnergy.close()
         if self.boolOffDiagOcc:
             self.filOffDiagOcc.close()
             if self.occEnSingle:
@@ -1203,23 +1214,29 @@ class mpSystem:
         prepFolders(True)
 
 
-def prepFolders(clearbool=0):
+def prepFolders(clearbool=0, densbool=0, reddensbool=0 ,spectralbool=0, cleanbeforebool=0):
     # create the needed folders
+    if cleanbeforebool:
+        if os.path.exists("./data/"):
+            for root, dirs, files in os.walk("./data/", topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+            print("Old data folder has been completely cleared")
     if not os.path.exists("./data/"):
         os.mkdir("./data/")
-        print("Creating ./data Folder since it didn't exist")
-    if not os.path.exists("./data/density/"):
-        os.mkdir("./data/density/")
-        print("Creating ./data/density Folder since it didn't exist")
-    if not os.path.exists("./data/red_density/"):
-        os.mkdir("./data/red_density/")
-        print("Creating ./data/red_density Folder since it didn't exist")
-    if not os.path.exists("./data/spectral/"):
-        os.mkdir("./data/spectral/")
-        print("Creating ./data/spectral Folder since it didn't exist")
+    if densbool:
+        if not os.path.exists("./data/density/"):
+            os.mkdir("./data/density/")
+    if reddensbool:
+        if not os.path.exists("./data/red_density/"):
+            os.mkdir("./data/red_density/")
+    if spectralbool:
+        if not os.path.exists("./data/spectral/"):
+            os.mkdir("./data/spectral/")
     if not os.path.exists("./plots/"):
         os.mkdir("./plots/")
-        print("Creating ./plts Folder since it didn't exist")
     # remove the old stuff
     if clearbool:
         if os.path.isfile("./data/density/densmat0.txt") == True:

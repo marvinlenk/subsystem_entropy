@@ -60,16 +60,11 @@ print("Dimension of the basis:", sysVar.dim)
 # initially occupied states with relative weight (entanglement of starting state):
 initstates = [[(sysVar.N, 0, 0, 0, 0), 1]]
 
-sysVar.initHamiltonian()
-if sysVar.boolRetgreen:
-    sysVar.initSpecLoHamiltonian()
-    sysVar.initSpecHiHamiltonian()
+sysVar.initAllHamiltonians()
+
 print('The Hamiltonian has been written!')
 
-sysVar.initEvolutionMatrix()
-if sysVar.boolRetgreen:
-    sysVar.initSpecLoEvolutionMatrix()
-    sysVar.initSpecHiEvolutionMatrix()
+sysVar.initAllEvolutionMatrices()
 
 # start with all particles in 0th state
 for el in initstates:

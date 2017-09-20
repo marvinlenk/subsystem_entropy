@@ -84,6 +84,10 @@ def plotData(sysVar):
         # en_micind = find_nearest(engies[:,1], en0)
         # print(' - |(E0 - Emicro)/E0|: %.0e - ' % (np.abs((en0 - engies[en_micind,1])/en0)), end='' )
 
+    if sysVar.boolReducedEnergy:
+        redEnergyfile = './data/reduced_energy.txt'
+        redEnergy = np.loadtxt(redEnergyfile)
+
     if sysVar.boolPlotDiagExp:
         microexpfile = './data/diagoccexpect.txt'
         microexp = np.loadtxt(microexpfile)
@@ -132,6 +136,25 @@ def plotData(sysVar):
     plt.xlabel(r'$J\,t$')
     plt.ylabel('Subsystem entropy')
     plt.tight_layout()
+    pp.savefig()
+    plt.clf()
+    print('.', end='', flush=True)
+
+    # Subsystem entropy with inlay
+    max_time = step_array[-1]
+    max_ind = int(max_time / step_array[-1] * len(step_array))
+
+    avg = np.mean(ent_array[loavgind:, 1])
+    plt.plot(step_array[:], ent_array[:, 1], linewidth=0.3, color='r')
+    if sysVar.boolPlotAverages:
+        tavg = savgol_filter(ent_array[:, 1], fwidth, ford)
+        plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
+    plt.xlabel(r'$J\,t$')
+    plt.ylabel(r'Subsystem entropy $S\textsubscript{sys}$')
+    a = plt.axes([.5, .3, .4, .4])
+    plt.semilogy(step_array[:max_ind], np.abs(avg - ent_array[:max_ind, 1]), linewidth=0.3, color='r')
+    plt.ylabel(r'$|\,\overline{S}\textsubscript{sys} - S\textsubscript{sys}(t)|$')
+    plt.yticks([])
     pp.savefig()
     plt.clf()
     print('.', end='', flush=True)
@@ -450,6 +473,21 @@ def plotData(sysVar):
         plt.clf()
         print('.', end='', flush=True)
 
+    def reduced_energy():
+        return 0
+        ### Total system energy
+
+    if sysVar.boolReducedEnergy:
+        plt.plot(redEnergy[:, 0] * sysVar.plotTimeScale, redEnergy[:, 1], linewidth=0.6)
+        plt.ylabel(r'$E_{sys}$')
+        plt.xlabel(r'$J\,t$')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
+
     def norm_deviation():
         return 0
         ### Norm deviation
@@ -533,19 +571,23 @@ def plotData(sysVar):
         ### Greensfunction
 
     if sysVar.boolPlotGreen:
-        gd = greendat
+        greenCropInd = np.power(2, int(np.log2(len(greendat[:, 0]))))
+        print(len(greendat[:, 0]) - greenCropInd)
+        gd = greendat[:greenCropInd, :]
+        print(len(gd))
+        discpoints = len(gd[:, 0])
+
         '''
         gd = np.zeros((np.shape(greendat)[0]*2,np.shape(greendat)[1]))
         gd[int(np.shape(greendat)[0]/2):-int(np.shape(greendat)[0]/2 + np.shape(greendat)[0]%2)] = greendat[:,:].copy()
         '''
         spec = []
-        discpoints = len(gd[:, 0])
         print('')
         for i in range(0, sysVar.m):
             plt.title(r'two time Green function of level $%i$' % (i))
             ind = 2 * i + 1
-            plt.plot(greendat[:, 0] * sysVar.plotTimeScale, greendat[:, ind], lw=0.1, color='red', label='real')
-            plt.plot(greendat[:, 0] * sysVar.plotTimeScale, greendat[:, ind + 1], lw=0.1, color='blue',
+            plt.plot(greendat[:, 0] * sysVar.plotTimeScale, greendat[:, ind], lw=0.2, color='red', label='real')
+            plt.plot(greendat[:, 0] * sysVar.plotTimeScale, greendat[:, ind + 1], lw=0.2, color='blue',
                      label='imaginary')
             # plt.xlim(xmax=10)
             plt.ylabel(r'$G^R(\tau)$')
@@ -559,8 +601,9 @@ def plotData(sysVar):
             ###
             plt.title(r'Spectral function of level $%i$' % (i))
             green_ret = gd[:, ind] + 1j * gd[:, ind + 1]
-            green_ret_freq = fft(np.hanning(len(green_ret)) * green_ret, norm='ortho')
-            spec_tmp = np.abs(-2 * fftshift(green_ret_freq.imag))[::-1]
+            # green_ret_freq = fft(np.hanning(len(green_ret)) * green_ret, norm='ortho')
+            green_ret_freq = fft(green_ret, norm='ortho')
+            spec_tmp = (-2 * fftshift(green_ret_freq.imag))
             if i == 0:
                 samp_spacing = sysVar.deltaT * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
                 hlpfrq = fftshift(fftfreq(len(spec_tmp))) * (2 * np.pi) / samp_spacing
@@ -574,13 +617,13 @@ def plotData(sysVar):
             spec.append(spec_tmp)
             print(i, np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
             # exit()
-            plt.plot(hlpfrq, spec_tmp, color='red', lw=0.1)
+            plt.plot(hlpfrq, spec_tmp, color='red', lw=0.2)
             plt.minorticks_on()
             plt.ylabel(r'$A$')
             plt.xlabel(r'$\omega / J$')
 
             plt.grid()
-            plt.grid(which='minor', color='blue', linestyle='dotted', lw=0.2)
+            #plt.grid(which='minor', color='blue', linestyle='dotted', lw=0.2)
             plt.tight_layout()
             ###
             pp.savefig()
@@ -611,7 +654,7 @@ def plotData(sysVar):
         weights = np.zeros(len(spec))
         for s in range(0, len(spec)):
             print(np.average(hlpfrq, weights=spec[s]), np.average(hlpfrq, weights=np.abs(spec[s])))
-            weights[s] = np.abs(np.average(hlpfrq, weights=np.abs(spec[s])))
+            weights[s] = -np.average(hlpfrq, weights=np.abs(spec[s]))
         print('')
         '''
         # the integrated version
@@ -642,8 +685,8 @@ def plotData(sysVar):
                 ret.append(occno(weights[i], temp, mu))
             return np.array(ret)
 
-        strt = np.array([10, -0.1])
-        bnds = np.array([[0.0001, -500], [1000, weights[0]]])
+        strt = np.array([10, -100])
+        bnds = np.array([[0.0001, -500], [10000, weights[0]]])
         rgs = least_squares(bestatd, x0=strt, bounds=bnds, loss='soft_l1')
         print(rgs)
         print(rgs.x)
@@ -658,7 +701,7 @@ def plotData(sysVar):
         ws = np.sort(weights)
         lo = ws[0] - ws[0] / 100
         hi = ws[-1] + ws[-1] / 100
-        plt.xlim(lo, hi)
+        #plt.xlim(lo, hi)
         xvals = np.linspace(lo, hi, 1e3)
         yvals = occno(xvals, rgs.x[0], rgs.x[1]) / sysVar.N
         for l in range(0, sysVar.m):
