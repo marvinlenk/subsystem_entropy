@@ -462,7 +462,7 @@ def plotData(sysVar):
         ### Total system energy
 
     if sysVar.boolTotalEnergy:
-        plt.title('$E_{tot}, \; E_0$ = %.2e' % en0)
+        plt.title('$E_{tot}, \; E_0$ = %.2f' % en0)
         plt.plot(en_array[:, 0] * sysVar.plotTimeScale, en_array[:, 1] * 1e10, linewidth=0.6)
         plt.ylabel(r'$E_{tot} - E_0 / 10^{-10}$')
         plt.xlabel(r'$J\,t$')
@@ -535,7 +535,7 @@ def plotData(sysVar):
             plt.plot(engies[:, 0], engies[:, 1], linestyle='none', marker='o', ms=0.5, color='blue')
 
         plt.ylabel(r'Energy / J')
-        plt.xlabel(r'\Eigenvalue Index')
+        plt.xlabel(r'Eigenvalue Index')
         plt.grid(False)
         plt.xlim(xmin=-(len(engies[:, 0]) * (2.0 / 100)))
         plt.tight_layout()
@@ -571,7 +571,8 @@ def plotData(sysVar):
         ### Greensfunction
 
     if sysVar.boolPlotGreen:
-        greenCropInd = np.power(2, int(np.log2(len(greendat[:, 0]))))
+        #greenCropInd = np.power(2, int(np.log2(len(greendat[:, 0]))))
+        greenCropInd = len(greendat[:, 0])
         print(len(greendat[:, 0]) - greenCropInd)
         gd = greendat[:greenCropInd, :]
         print(len(gd))
@@ -605,7 +606,7 @@ def plotData(sysVar):
             green_ret_freq = fft(green_ret, norm='ortho')
             spec_tmp = (-2 * fftshift(green_ret_freq.imag))
             if i == 0:
-                samp_spacing = sysVar.deltaT * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
+                samp_spacing = sysVar.deltaT * 2 * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
                 hlpfrq = fftshift(fftfreq(len(spec_tmp))) * (2 * np.pi) / samp_spacing
             ### !!! normalize by hand! this might be strange but is necessary here
             spec_tmp /= (np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
@@ -685,8 +686,8 @@ def plotData(sysVar):
                 ret.append(occno(weights[i], temp, mu))
             return np.array(ret)
 
-        strt = np.array([10, -100])
-        bnds = np.array([[0.0001, -500], [10000, weights[0]]])
+        strt = np.array([-100, -100])
+        bnds = np.array([[-100, -500], [10000, weights[0]]])
         rgs = least_squares(bestatd, x0=strt, bounds=bnds, loss='soft_l1')
         print(rgs)
         print(rgs.x)
