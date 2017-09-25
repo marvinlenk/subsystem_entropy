@@ -1,4 +1,5 @@
 import numpy as np
+import dft
 import os as os
 import scipy.integrate as scint
 import matplotlib as mpl
@@ -158,6 +159,7 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.', end='', flush=True)
+    
     '''
     ###FFT
     print('')
@@ -573,10 +575,10 @@ def plotData(sysVar):
     if sysVar.boolPlotGreen:
         #greenCropInd = np.power(2, int(np.log2(len(greendat[:, 0]))))
         greenCropInd = len(greendat[:, 0])
-        print(len(greendat[:, 0]) - greenCropInd)
+        #print(len(greendat[:, 0]) - greenCropInd)
         gd = greendat[:greenCropInd, :]
-        print(len(gd))
-        discpoints = len(gd[:, 0])
+        #print(len(gd))
+        #discpoints = len(gd[:, 0])
 
         '''
         gd = np.zeros((np.shape(greendat)[0]*2,np.shape(greendat)[1]))
@@ -602,14 +604,18 @@ def plotData(sysVar):
             ###
             plt.title(r'Spectral function of level $%i$' % (i))
             green_ret = gd[:, ind] + 1j * gd[:, ind + 1]
+            print(np.shape(green_ret))
             # green_ret_freq = fft(np.hanning(len(green_ret)) * green_ret, norm='ortho')
-            green_ret_freq = fft(green_ret, norm='ortho')
-            spec_tmp = (-2 * fftshift(green_ret_freq.imag))
+            #green_ret_freq = fft(green_ret, norm='ortho')
+            #spec_tmp = (-2 * fftshift(green_ret_freq.imag))
             if i == 0:
-                samp_spacing = sysVar.deltaT * 2 * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
-                hlpfrq = fftshift(fftfreq(len(spec_tmp))) * (2 * np.pi) / samp_spacing
+                #samp_spacing = sysVar.deltaT * 2 * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
+                samp_spacing = (gd[-1,0] - gd[0,0]) / len(green_ret)
+            green_ret_freq = dft.dft(green_ret, 1.0 / samp_spacing)
+            spec_tmp = (-2 * green_ret_freq[1,:].imag)
+            hlpfrq = green_ret_freq[0,:].real
             ### !!! normalize by hand! this might be strange but is necessary here
-            spec_tmp /= (np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
+            #spec_tmp /= (np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
             if i == 0:
                 spec_total = spec_tmp[:]
                 # scale on x-axis is frequency
@@ -685,7 +691,7 @@ def plotData(sysVar):
             for i in range(0, sysVar.m):
                 ret.append(occno(weights[i], temp, mu))
             return np.array(ret)
-
+        '''
         strt = np.array([-100, -100])
         bnds = np.array([[-100, -500], [10000, weights[0]]])
         rgs = least_squares(bestatd, x0=strt, bounds=bnds, loss='soft_l1')
@@ -717,7 +723,7 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.', end='', flush=True)
-
+        '''
     if sysVar.boolPlotDecomp:
         def eigendecomposition():
             return 0
