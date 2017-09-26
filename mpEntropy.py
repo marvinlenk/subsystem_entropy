@@ -46,7 +46,7 @@ class mpSystem:
             self.stateNorm = 0
             self.stateNormAbs = 0
             self.stateNormCheck = 1e1  # check if norm has been supressed too much
-            self.densityMatrix = []  # do not initialize yet - it wait until hamiltonian decomposition has been done for memory efficiency 
+            self.densityMatrix = []  # do not initialize yet - wait until hamiltonian decomposition has been done for memory efficiency
             self.densityMatrixInd = False
             self.entropy = 0
             self.totalEnergy = 0
@@ -110,7 +110,11 @@ class mpSystem:
                 self.offsetsRedComp = basisOffsets(self.N, self.mRedComp)
                 self.basisRedComp = np.zeros((self.dimRedComp, self.mRedComp), dtype=np.int)
                 fillReducedBasis(self.basisRedComp, self.N, self.mRedComp, self.offsetsRedComp)
-                self.densityMatrixRed = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
+                # if only one level left, reduced matrix is diagonal
+                if self.mRedComp == 1:
+                    self.densityMatrixRed = np.zeros((self.dimRed,), dtype=self.datType)
+                else:
+                    self.densityMatrixRed = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
                 self.iteratorRed = np.zeros((0, 4), dtype=np.int32)
                 self.initIteratorRed()
 
@@ -260,10 +264,10 @@ class mpSystem:
 
     ###### Methods:
     def updateDensityMatrix(self):
-        if self.densityMatrixInd == False:
+        if not self.densityMatrixInd:
             # there might be a memory reallocation error with np.outer... however, initialization is always nice
             self.densityMatrix = np.zeros((self.dim, self.dim), dtype=self.datType)
-            self.densMatrixInd = True
+            self.densityMatrixInd = True
 
         self.densityMatrix = np.outer(self.state, self.state.conj())
 
@@ -289,11 +293,16 @@ class mpSystem:
     def reduceDensityMatrix(self):
         if self.densityMatrixRed is None:
             return
+
         self.densityMatrixRed.fill(0)
-        for el in self.iteratorRed:
-            self.densityMatrixRed[el[0], el[1]] += self.densityMatrix[el[2], el[3]]
-            if el[0] != el[1]:
-                self.densityMatrixRed[el[1], el[0]] += self.densityMatrix[el[3], el[2]]
+        if self.mRed == 1:
+            for el in self.iteratorRed:
+                self.densityMatrixRed[el[0]] += self.densityMatrix[el[2], el[3]]
+        else:
+            for el in self.iteratorRed:
+                self.densityMatrixRed[el[0], el[1]] += self.densityMatrix[el[2], el[3]]
+                if el[0] != el[1]:
+                    self.densityMatrixRed[el[1], el[0]] += self.densityMatrix[el[3], el[2]]
 
     def reduceDensityMatrixFromState(self):
         if self.densityMatrixRed is None:
@@ -658,7 +667,11 @@ class mpSystem:
             exit('Dimension of operator is' + str(np.shape(operator)) + 'but' + str(
                 (self.dimRed, self.dimRed)) + 'is needed!')
         # this order is needed for sparse matrices - still works because of cyclic invariance
-        return np.trace(operator.dot(self.densityMatrixRed))
+        if not self.mRed == 1:
+            return np.trace(operator.dot(self.densityMatrixRed))
+        else:
+            # when the density matrix is diagonal, this is essentially the formula
+            return np.diag(operator).dot(self.densityMatrixRed)
 
     def updateEigenenergies(self):
         if not self.eigInd:
@@ -879,10 +892,12 @@ class mpSystem:
     def updateOffDiagDensRed(self):
         if not self.eigIndRed:
             self.updateEigenenergiesRed()
-
-        self.offDiagDensRed = (multi_dot(
-            [np.ones(self.dimRed), self.eigVectsRed.T, self.densityMatrixRed, self.eigInvRed, np.ones(self.dimRed)]) - np.trace(
-            self.densityMatrixRed)).real
+        if self.mRed == 1:
+            self.offDiagDensRed = 0 + 0j
+        else:
+            self.offDiagDensRed = (multi_dot(
+                [np.ones(self.dimRed), self.eigVectsRed.T, self.densityMatrixRed, self.eigInvRed,
+                 np.ones(self.dimRed)]) - np.trace(self.densityMatrixRed)).real
 
 
     def updateEntropy(self):
@@ -899,11 +914,16 @@ class mpSystem:
         if self.densityMatrixRed is None:
             return
         self.entropyRed = 0
-        for el in la.eigvalsh(self.densityMatrixRed, check_finite=False):
-            if el.real > 0:
+        if self.mRed != 1:
+            for el in la.eigvalsh(self.densityMatrixRed, check_finite=False):
+                if el.real > 0:
+                    self.entropyRed -= el.real * nplog(el.real)
+                if el.real < -1e-7:
+                    print('Oh god, there is a negative eigenvalue smaller than 1e-7 ! Namely:', el)
+        else:
+            # if only one level left, density matrix is already diagonal
+            for el in self.densityMatrixRed:
                 self.entropyRed -= el.real * nplog(el.real)
-            if el.real < -1e-7:
-                print('Oh god, there is a negative eigenvalue smaller than 1e-7 ! Namely:', el)
 
     # end of updateEntropyRed
 

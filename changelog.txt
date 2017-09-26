@@ -1,5 +1,9 @@
 change log
 
+### 26.09.2017
+- added optimizations for only one level left
+- !!! fixed a bug where the density matrix indicator was not set correctly, resulting in a reallocation every time!
+
 ### 25.09.2017
 - added a self-programmed DFT to the code (as an external python file dft.py)
 
