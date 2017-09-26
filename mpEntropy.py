@@ -116,7 +116,8 @@ class mpSystem:
                 else:
                     self.densityMatrixRed = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
                 self.iteratorRed = np.zeros((0, 4), dtype=np.int32)
-                self.initIteratorRed()
+                if not (self.m == 2 and self.mRed == 1):
+                    self.initIteratorRed()
 
             # NOTE here it is
             if self.boolOffDiagDensRed:
@@ -294,11 +295,15 @@ class mpSystem:
         if self.densityMatrixRed is None:
             return
 
-        self.densityMatrixRed.fill(0)
         if self.mRed == 1:
-            for el in self.iteratorRed:
-                self.densityMatrixRed[el[0]] += self.densityMatrix[el[2], el[3]]
+            if self.m == 2:
+                self.densityMatrixRed = self.densityMatrix.diagonal()
+            else:
+                self.densityMatrixRed.fill(0)
+                for el in self.iteratorRed:
+                    self.densityMatrixRed[el[0]] += self.densityMatrix[el[2], el[3]]
         else:
+            self.densityMatrixRed.fill(0)
             for el in self.iteratorRed:
                 self.densityMatrixRed[el[0], el[1]] += self.densityMatrix[el[2], el[3]]
                 if el[0] != el[1]:
@@ -317,10 +322,14 @@ class mpSystem:
 
     def reduceMatrix(self, matrx):
         tmpret = np.zeros((self.dimRed, self.dimRed))
-        for el in self.iteratorRed:
-            tmpret[el[0], el[1]] += matrx[el[2], el[3]]
-            if el[0] != el[1]:
-                tmpret[el[1], el[0]] += matrx[el[3], el[2]]
+        if self.m == 2 and self.mRed == 1:
+            for i in range(0, self.dimRed):
+                tmpret[i, i] = matrx[i]
+        else:
+            for el in self.iteratorRed:
+                tmpret[el[0], el[1]] += matrx[el[2], el[3]]
+                if el[0] != el[1]:
+                    tmpret[el[1], el[0]] += matrx[el[3], el[2]]
         return tmpret
 
     def initAllHamiltonians(self):
@@ -918,12 +927,15 @@ class mpSystem:
             for el in la.eigvalsh(self.densityMatrixRed, check_finite=False):
                 if el.real > 0:
                     self.entropyRed -= el.real * nplog(el.real)
-                if el.real < -1e-7:
-                    print('Oh god, there is a negative eigenvalue smaller than 1e-7 ! Namely:', el)
+                elif el.real < -1e-7:
+                    print('Oh god, there is a negative eigenvalue below 1e-7 ! Namely:', el)
         else:
             # if only one level left, density matrix is already diagonal
             for el in self.densityMatrixRed:
-                self.entropyRed -= el.real * nplog(el.real)
+                if el.real > 0:
+                    self.entropyRed -= el.real * nplog(el.real)
+                elif el.real < -1e-7:
+                    print('Oh god, there is a negative eigenvalue below 1e-7 ! Namely:', el)
 
     # end of updateEntropyRed
 
@@ -1073,14 +1085,18 @@ class mpSystem:
             self.tavg += tm.time() - t1  # add passed time
             self.tavg /= self.evolStep  # average over total number of steps
             t1 = tm.time()
-            print(' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) + ' elapsed: ' + time_elapsed(t0, 60,
-                                                                                                      0) + " ###### eta: " + str(
-                int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(
-                int(self.tavg * (self.steps - self.evolStep) % 60)) + "s", "\n" + str(i * 10) + "% ", end='')
+            print(str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) + ' elapsed: ' +
+                  time_elapsed(t0, 60, 0), end='')
+            if i != 10:
+                print(" ###### eta: " + str(
+                    int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(
+                    int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ", end='')
+            # write to progress log!
             self.filProg = open('./data/progress.log', 'a')
-            self.filProg.write(
-                ' 1-norm: ' + str(1 - np.round(self.stateNormAbs, 2)) + ' elapsed ' + time_elapsed(t0, 60,
-                                                                                                   0) + " ###### eta: " + str(
+            self.filProg.write(str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) +
+                               ' elapsed: ' + time_elapsed(t0, 60, 0))
+            if i != 10:
+                self.filProg.write(" ###### eta: " + str(
                     int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(
                     int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ")
             self.filProg.close()
