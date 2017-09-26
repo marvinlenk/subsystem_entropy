@@ -159,7 +159,7 @@ def plotData(sysVar):
     pp.savefig()
     plt.clf()
     print('.', end='', flush=True)
-    
+
     '''
     ###FFT
     print('')

@@ -312,11 +312,20 @@ class mpSystem:
     def reduceDensityMatrixFromState(self):
         if self.densityMatrixRed is None:
             return
-        self.densityMatrixRed.fill(0)
-        for el in self.iteratorRed:
-            self.densityMatrixRed[el[0], el[1]] += self.state[el[2]] * self.state[el[3]].conj()
-            if el[0] != el[1]:
-                self.densityMatrixRed[el[1], el[0]] += self.state[el[3]] * self.state[el[2]].conj()
+
+        if self.mRed == 1:
+            if self.m == 2:
+                self.densityMatrixRed = np.abs(self.state)**2
+            else:
+                self.densityMatrixRed.fill(0)
+                for el in self.iteratorRed:
+                    self.densityMatrixRed[el[0]] += self.state[el[2]] * self.state[el[3]].conj()
+        else:
+            self.densityMatrixRed.fill(0)
+            for el in self.iteratorRed:
+                self.densityMatrixRed[el[0], el[1]] += self.state[el[2]] * self.state[el[3]].conj()
+                if el[0] != el[1]:
+                    self.densityMatrixRed[el[1], el[0]] += self.state[el[3]] * self.state[el[2]].conj()
 
     # end of reduceDensityMatrixFromState
 

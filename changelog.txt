@@ -3,6 +3,7 @@ change log
 ### 26.09.2017
 - added optimizations for only one level left
 - added optimizations for only two levels overall
+- also added those for reduce from state - try this for those cases
 - !!! fixed a bug where the density matrix indicator was not set correctly, resulting in a reallocation every time!
 - changed cosmetics of progress bar
 
