@@ -1085,7 +1085,7 @@ class mpSystem:
             self.tavg += tm.time() - t1  # add passed time
             self.tavg /= self.evolStep  # average over total number of steps
             t1 = tm.time()
-            print(str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) + ' elapsed: ' +
+            print(' ' + str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) + ' elapsed: ' +
                   time_elapsed(t0, 60, 0), end='')
             if i != 10:
                 print(" ###### eta: " + str(
@@ -1093,7 +1093,7 @@ class mpSystem:
                     int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ", end='')
             # write to progress log!
             self.filProg = open('./data/progress.log', 'a')
-            self.filProg.write(str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) +
+            self.filProg.write(' ' + str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) +
                                ' elapsed: ' + time_elapsed(t0, 60, 0))
             if i != 10:
                 self.filProg.write(" ###### eta: " + str(
