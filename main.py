@@ -61,9 +61,6 @@ print("Dimension of the basis:", sysVar.dim)
 initstates = [[(sysVar.N, 0, 0, 0, 0), 1]]
 
 sysVar.initAllHamiltonians()
-
-print('The Hamiltonian has been written!')
-
 sysVar.initAllEvolutionMatrices()
 
 # start with all particles in 0th state

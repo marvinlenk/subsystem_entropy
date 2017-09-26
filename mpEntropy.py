@@ -28,6 +28,8 @@ class mpSystem:
         self.loadConfig()
         if not plotOnly:
             prepFolders(0,self.boolDMStore,self.boolDMRedStore,self.boolOccEnStore,self.boolCleanFiles)
+            # touch the progress file
+            open('./data/progress.log', 'w').close()
         # mask selects only not traced out states
         self.mask = np.ones((self.m), dtype=bool)
         for k in self.kRed:
@@ -342,12 +344,33 @@ class mpSystem:
         return tmpret
 
     def initAllHamiltonians(self):
+        t0 = tm.time()
+
         self.initHamiltonian()
+
+        self.filProg = open('./data/progress.log', 'a')
+        self.filProg.write('Wrote hamiltonian in ' + time_elapsed(t0, 60, 0) + '\n')
+        self.filProg.close()
+
         if self.boolOffDiagDensRed or self.boolReducedEnergy:
+            t1 = tm.time()
+
             self.initHamiltonianRed()
+
+            self.filProg = open('./data/progress.log', 'a')
+            self.filProg.write('Wrote reduced hamiltonian in ' + time_elapsed(t1, 60, 0) + '\n')
+            self.filProg.close()
+
         if self.boolRetgreen:
+            t1 = tm.time()
+
             self.initSpecLoHamiltonian()
             self.initSpecHiHamiltonian()
+
+            self.filProg = open('./data/progress.log', 'a')
+            self.filProg.write('Wrote high and low hamiltonian in ' + time_elapsed(t1, 60, 0) + '\n')
+            self.filProg.close()
+        print('Wrote all hamiltonians in ' + time_elapsed(t0, 60, 0))
 
     # hamiltonian with equal index interaction different to non equal index interaction
     def initHamiltonian(self):
@@ -435,10 +458,23 @@ class mpSystem:
             del tmpspecops
 
     def initAllEvolutionMatrices(self):
+        t0 = tm.time()
+
         self.initEvolutionMatrix()
+
+        self.filProg = open('./data/progress.log', 'a')
+        self.filProg.write('Initialized evolution matrix in ' + time_elapsed(t0,60,0) + '\n')
+        self.filProg.close()
         if self.boolRetgreen:
+            t1 = tm.time()
+
             self.initSpecLoEvolutionMatrix()
             self.initSpecHiEvolutionMatrix()
+
+            self.filProg = open('./data/progress.log', 'a')
+            self.filProg.write('Initialized high and low evolution matrices in ' + time_elapsed(t1, 60, 0) + '\n')
+            self.filProg.close()
+        print('Initialized evolution matrices in ' + time_elapsed(t0,60,0))
 
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
@@ -723,7 +759,10 @@ class mpSystem:
         if self.boolEngyStore:
             t0 = tm.time()
             self.updateEigenenergies()
-            print("Hamiltonian diagonalized after " + time_elapsed(t0, 60, 0))
+            self.filProg = open('./data/progress.log', 'a')
+            self.filProg.write('Hamiltonian diagonalized in ' + time_elapsed(t0, 60, 0) + '\n')
+            self.filProg.close()
+            print("Hamiltonian diagonalized in " + time_elapsed(t0, 60, 0))
             t0 = tm.time()
 
             # decomposition in energy space       
@@ -773,7 +812,10 @@ class mpSystem:
                     sfil.write('%i ' % self.basis[i, j])
                 sfil.write('\n')
             sfil.close()
-            print("Eigendecomposition completed after " + time_elapsed(t0, 60, 0))
+            self.filProg = open('./data/progress.log', 'a')
+            self.filProg.write('Eigendecomposition completed in ' + time_elapsed(t0, 60, 0) + '\n')
+            self.filProg.close()
+            print("Eigendecomposition completed in " + time_elapsed(t0, 60, 0))
         if self.boolDiagExpStore or self.boolOccEnStore or self.boolOffDiagOcc or self.boolOffDiagDens:
             self.updateEigenenergies()
             eivectinv = la.inv(np.matrix(self.eigVects.T))  # this will later be stored in the class if needed
@@ -803,6 +845,9 @@ class mpSystem:
                                             self.enState]).real
                     ethfil.write('%i %.16e \n' % (i, tmpocc))
                 print("Occupation matrices transformed " + time_elapsed(t0, 60, 1))
+                self.filProg = open('./data/progress.log', 'a')
+                self.filProg.write('Occupation matrices transformed in ' + time_elapsed(t0, 60, 1) + '\n')
+                self.filProg.close()
                 ethfil.close()
 
             # now store the diagonals in one file for comparison to the off diagonals later
@@ -831,7 +876,7 @@ class mpSystem:
                 else:
                     storeMatrix(np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv)),
                                 './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
-            print("Occupation number matrices stored after " + time_elapsed(t0, 60, 1))
+            print("Occupation number matrices stored in " + time_elapsed(t0, 60, 1))
 
         # now we remove the diagonal elements
         if self.boolOffDiagOcc:
@@ -867,7 +912,11 @@ class mpSystem:
                         self.eigVals[self.occEnInds[i, 1, j]].real))
                 infofile.write('\n')
             infofile.close()
-            print("Largest elements found and infos stored after " + time_elapsed(t0, 60, 1))
+            print("Largest elements found and infos stored in " + time_elapsed(t0, 60, 1))
+            self.filProg = open('./data/progress.log', 'a')
+            self.filProg.write('Largest elements found and infos stored in ' + time_elapsed(t0, 60, 1) + '\n')
+            self.filProg.close()
+
             del tmpmat  # not sure if this is neccessary but do it regardless...
 
         # store the inverted eigenvector matrix for later use
@@ -1025,7 +1074,7 @@ class mpSystem:
         else:
             self.updateDensityMatrix()
             self.reduceDensityMatrix()
-            self.updateOccNumbers()
+        self.updateOccNumbers()
         if self.boolReducedEnergy:
             self.updateReducedEnergy()
         if self.boolOffDiagOcc:
@@ -1117,7 +1166,7 @@ class mpSystem:
         if self.boolRetgreen:
             self.greenStoreState()
 
-        print('\n' + 'Time evolution finished after', time_elapsed(t0, 60), 'with average time/step of',
+        print('\n' + 'Time evolution finished in', time_elapsed(t0, 60), 'with average time/step of',
               "%.4e" % self.tavg)
         if self.boolDataStore:
             self.closeFiles()
@@ -1177,7 +1226,6 @@ class mpSystem:
             self.filTotalEnergy = open('./data/total_energy.txt', 'w')
         if self.boolReducedEnergy:
             self.filRedEnergy = open('./data/reduced_energy.txt', 'w')
-        self.filProg = open('./data/progress.log', 'w')
         if self.boolOffDiagOcc:
             self.filOffDiagOcc = open('./data/offdiagocc.txt', 'w')
             if self.occEnSingle:
@@ -1186,7 +1234,6 @@ class mpSystem:
             self.filOffDiagDens = open('./data/offdiagdens.txt', 'w')
         if self.boolOffDiagDensRed:
             self.filOffDiagDensRed = open('./data/offdiagdensred.txt', 'w')
-        self.filProg.close()
 
     # close all files
     def closeFiles(self):
@@ -1560,23 +1607,23 @@ def quarticArrayRed(sysVar):
 
 def getQuartic(sysVar, k, l, m, n):
     if l != m:
-        return (sysVar.operators[k, m] * sysVar.operators[l, n]).copy()
+        return (sysVar.operators[k, m].dot(sysVar.operators[l, n])).copy()
     else:
-        return ((sysVar.operators[k, m] * sysVar.operators[l, n]) - sysVar.operators[k, n]).copy()
+        return ((sysVar.operators[k, m].dot(sysVar.operators[l, n])) - sysVar.operators[k, n]).copy()
 
 
 def getQuarticRed(sysVar, k, l, m, n):
     if l != m:
-        return (getQuadraticRed(sysVar, k, m) * getQuadraticRed(sysVar, l, n)).copy()
+        return (getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))).copy()
     else:
-        return ((getQuadraticRed(sysVar, k, m) * getQuadraticRed(sysVar, l, n)) - getQuadraticRed(sysVar, k, n)).copy()
+        return ((getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))) - getQuadraticRed(sysVar, k, n)).copy()
 
 
 def getQuarticSpec(quadops, k, l, m, n):
     if l != m:
-        return (quadops[k, m] * quadops[l, n]).copy()
+        return (quadops[k, m].dot(quadops[l, n])).copy()
     else:
-        return ((quadops[k, m] * quadops[l, n]) - quadops[k, n]).copy()
+        return ((quadops[k, m].dot(quadops[l, n])) - quadops[k, n]).copy()
 
 
 # destruction operator (N -> N-1)
