@@ -70,11 +70,10 @@ for el in initstates:
 sysVar.normalize(True)
 
 # sysVar.stateEnergy(muperc=[50,20,25],sigma=[100,0.5,0.5],phase=['rnd','none','none'],skip=[0,0,0],dist=['rnd','std','std'],peakamps=[0.1,1,0.8],skew=[0,0,0])
-print("Preparations finished after " + time_elapsed(t0, 60, 0) + " \n")
 
 sysVar.evolve()
-t0 = tm.time()
+
 if sysVar.boolRetgreen:
     sysVar.evaluateGreen()
-    print('green: ' + time_elapsed(t0, 60, 0))
+
 sysVar.plot()

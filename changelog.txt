@@ -5,6 +5,9 @@ change log
 - changed occupation numbers to be also calculated when reducing from state (this was a feature previously)
 - added more information to progress.log and included print commands in respective methods
 - huge cleanup with PyCharm - basically initialized every variable and made everything explicit
+- added green-function progress output to stdout and progress.log
+- added methods for progress file opening and closing
+- a metric shit ton of cosmetics
 
 ### 26.09.2017
 - added optimizations for only one level left

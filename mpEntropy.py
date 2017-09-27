@@ -442,18 +442,18 @@ class mpSystem:
 
         self.initHamiltonian()
 
-        self.filProg = open('./data/progress.log', 'a')
+        self.openProgressFile()
         self.filProg.write('Wrote hamiltonian in ' + time_elapsed(t0, 60, 0) + '\n')
-        self.filProg.close()
+        self.closeProgressFile()
 
         if self.boolOffDiagDensRed or self.boolReducedEnergy:
             t1 = tm.time()
 
             self.initHamiltonianRed()
 
-            self.filProg = open('./data/progress.log', 'a')
+            self.openProgressFile()
             self.filProg.write('Wrote reduced hamiltonian in ' + time_elapsed(t1, 60, 0) + '\n')
-            self.filProg.close()
+            self.closeProgressFile()
 
         if self.boolRetgreen:
             t1 = tm.time()
@@ -461,9 +461,9 @@ class mpSystem:
             self.initSpecLoHamiltonian()
             self.initSpecHiHamiltonian()
 
-            self.filProg = open('./data/progress.log', 'a')
+            self.openProgressFile()
             self.filProg.write('Wrote high and low hamiltonian in ' + time_elapsed(t1, 60, 0) + '\n')
-            self.filProg.close()
+            self.closeProgressFile()
         print('Wrote all hamiltonians in ' + time_elapsed(t0, 60, 0))
 
     # hamiltonian with equal index interaction different to non equal index interaction
@@ -556,18 +556,18 @@ class mpSystem:
 
         self.initEvolutionMatrix()
 
-        self.filProg = open('./data/progress.log', 'a')
+        self.openProgressFile()
         self.filProg.write('Initialized evolution matrix in ' + time_elapsed(t0, 60, 0) + '\n')
-        self.filProg.close()
+        self.closeProgressFile()
         if self.boolRetgreen:
             t1 = tm.time()
 
             self.initSpecLoEvolutionMatrix()
             self.initSpecHiEvolutionMatrix()
 
-            self.filProg = open('./data/progress.log', 'a')
+            self.openProgressFile()
             self.filProg.write('Initialized high and low evolution matrices in ' + time_elapsed(t1, 60, 0) + '\n')
-            self.filProg.close()
+            self.closeProgressFile()
         print('Initialized evolution matrices in ' + time_elapsed(t0, 60, 0))
 
     # The matrix already inherits the identity so step is just mutliplication
@@ -879,9 +879,9 @@ class mpSystem:
         if self.boolEngyStore:
             t0 = tm.time()
             self.updateEigenenergies()
-            self.filProg = open('./data/progress.log', 'a')
+            self.openProgressFile()
             self.filProg.write('Hamiltonian diagonalized in ' + time_elapsed(t0, 60, 0) + '\n')
-            self.filProg.close()
+            self.closeProgressFile()
             print("Hamiltonian diagonalized in " + time_elapsed(t0, 60, 0))
             t0 = tm.time()
 
@@ -931,9 +931,9 @@ class mpSystem:
                     sfil.write('%i ' % self.basis[i, j])
                 sfil.write('\n')
             sfil.close()
-            self.filProg = open('./data/progress.log', 'a')
+            self.openProgressFile()
             self.filProg.write('Eigendecomposition completed in ' + time_elapsed(t0, 60, 0) + '\n')
-            self.filProg.close()
+            self.closeProgressFile()
             print("Eigendecomposition completed in " + time_elapsed(t0, 60, 0))
         if self.boolDiagExpStore or self.boolOccEnStore or self.boolOffDiagOcc or self.boolOffDiagDens:
             self.updateEigenenergies()
@@ -964,9 +964,9 @@ class mpSystem:
                                             self.enState]).real
                     ethfil.write('%i %.16e \n' % (i, tmpocc))
                 print("Occupation matrices transformed " + time_elapsed(t0, 60, 1))
-                self.filProg = open('./data/progress.log', 'a')
+                self.openProgressFile()
                 self.filProg.write('Occupation matrices transformed in ' + time_elapsed(t0, 60, 1) + '\n')
-                self.filProg.close()
+                self.closeProgressFile()
                 ethfil.close()
 
             # now store the diagonals in one file for comparison to the off diagonals later
@@ -1033,9 +1033,9 @@ class mpSystem:
                 infofile.write('\n')
             infofile.close()
             print("Largest elements found and infos stored in " + time_elapsed(t0, 60, 1))
-            self.filProg = open('./data/progress.log', 'a')
+            self.openProgressFile()
             self.filProg.write('Largest elements found and infos stored in ' + time_elapsed(t0, 60, 1) + '\n')
-            self.filProg.close()
+            self.closeProgressFile()
 
             del tmpmat  # not sure if this is neccessary but do it regardless...
 
@@ -1133,9 +1133,11 @@ class mpSystem:
     # end of updateReducedEnergy
 
     def evaluateGreen(self):
-        # use dots for multithread!
         self.filGreen = open('./data/green.txt', 'w')  # t, re, im
-
+        self.openProgressFile()
+        self.filProg.write('Starting evalutation of Green\'s function:\n' + ' 0% ')
+        print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
+        self.closeProgressFile()
         tmpHiEvol = np.identity(self.specHiDim, dtype=self.datType)
         tmpLoEvol = np.identity(self.specLoDim, dtype=self.datType)
 
@@ -1147,21 +1149,16 @@ class mpSystem:
         self.filGreen.write('%.16e ' % 0)
         for ind in range(0, self.m):
             self.filGreen.write('%.16e %.16e ' % (0, -1))
-            '''
-            #raising is the higher dimension creation operator, raising.T.c the annihilation
-            tmpGreen = (self.stateSaves[bound].T.conjugate() * (self.specRaising[ind].T * tmpHiEvol * self.specRaising[ind]) * self.stateSaves[bound])[0,0]
-            #lowering is the lower dimension annihilation operator, raising.T.c the creation
-            tmpGreen -= (self.stateSaves[bound].T.conjugate() * (self.specLowering[ind].T * tmpLoEvol * self.specLowering[ind]) * self.stateSaves[bound])[0,0]    
-            tmpGreen = np.dot(self.stateSaves[bound].T.conjugate() , self.stateSaves[bound])[0,0] - (self.stateSaves[bound].T.conjugate() @ self.stateSaves[bound])[0,0]
-            #tmpGreen = np.real(np.sqrt(npeinsum('ij,ij->j', self.stateSaves[bound], np.conjugate(self.stateSaves[bound])),dtype=np.complex128))[0]
-            print(tmpGreen)
-            print(type(self.stateSaves[bound]))
-            '''
         self.filGreen.write(' \n')
 
+        # now start from the first non-zero difference time
+        t0 = tm.time()
+        t1 = tm.time()
+        tavg = 0
+        bound_permil = 1000 / bound  # use per 1000 to get easier condition for 1% and 10%
         for i in range(1, bound + 1):
-            tmpHiEvol = np.dot(tmpHiEvol, self.specHiEvolutionMatrix)  ## they need to be the squared ones!
-            tmpLoEvol = np.dot(tmpLoEvol, self.specLoEvolutionMatrix)  ## they need to be the squared ones!
+            tmpHiEvol = np.dot(tmpHiEvol, self.specHiEvolutionMatrix)  # they need to be the squared ones!
+            tmpLoEvol = np.dot(tmpLoEvol, self.specLoEvolutionMatrix)  # they need to be the squared ones!
             self.filGreen.write('%.16e ' % (2 * dt * i))
             for m in range(0, self.m):
                 # raising is the higher dimension creation operator, raising.T.c the annihilation
@@ -1176,11 +1173,27 @@ class mpSystem:
                 # first number is real part, second imaginary
                 self.filGreen.write('%.16e %.16e ' % (tmpGreen.imag, -1 * tmpGreen.real))
             self.filGreen.write(' \n')
+            # time estimation start
+            if int(i * bound_permil) % 10 == 0:
+                self.openProgressFile()
+                self.filProg.write('.')
+                print('.', end='', flush=True)
+                if int(i * bound_permil) % 100 == 0:
+                    tavg *= int(i - bound/10)  # calculate from time/step back to unit: time
+                    tavg += tm.time() - t1  # add passed time
+                    tavg /= i  # average over total number of steps
+                    t1 = tm.time()
+                    print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
+                          + time_elapsed(t0, 60, 0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
+                          + str(int(tavg * (bound - i) % 60)) + "s" + "\n" + str(int(i * bound_permil / 10)) + "% "
+                          , end='', flush=True)
+                    self.filProg.write(
+                        ' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
+                        + time_elapsed(t0, 60, 0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
+                        + str(int(tavg * (bound - i) % 60)) + "s" + "\n" + str(int(i * bound_permil / 10)) + "%")
+                self.closeProgressFile()
+                # time estimation end
         self.filGreen.close()
-        '''
-        for i in range(0,self.m):
-            self.green[i] = -1j * (np.einsum('ij,ij -> j', self.state.T.conjugate(), (self.specRaising[i] * self.initStateHiKet[i]))[0] - np.einsum('ij,ij -> j',self.initStateLoBra[i], (self.specLowering[i] * self.state))[0])
-        '''
 
     # update everything EXCEPT for total entropy and energy - they are only updated 100 times
     def updateEverything(self):
@@ -1217,9 +1230,9 @@ class mpSystem:
         t0 = t1 = tm.time()  # time before iteration
         self.tavg = 0  # needed for estimation of remaining time
         print('Time evolution\n' + ' 0% ', end='')
-        self.filProg = open('./data/progress.log', 'a')
+        self.openProgressFile()
         self.filProg.write('Time evolution\n' + ' 0% ')
-        self.filProg.close()
+        self.closeProgressFile()
         # percent loop
         for i in range(1, 11):
             # decimal loop
@@ -1252,9 +1265,9 @@ class mpSystem:
 
                 print('.', end='', flush=True)
                 if self.dim > int(1e3) or self.steps > int(1e7):
-                    self.filProg = open('./data/progress.log', 'a')
+                    self.openProgressFile()
                     self.filProg.write('.')
-                    self.filProg.close()
+                    self.closeProgressFile()
 
             self.tavg *= int(self.evolStep - self.steps / 10)  # calculate from time/step back to unit: time
             self.tavg += tm.time() - t1  # add passed time
@@ -1267,14 +1280,14 @@ class mpSystem:
                     int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(
                     int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ", end='')
             # write to progress log!
-            self.filProg = open('./data/progress.log', 'a')
+            self.openProgressFile()
             self.filProg.write(' ' + str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) +
                                ' elapsed: ' + time_elapsed(t0, 60, 0))
             if i != 10:
                 self.filProg.write(" ###### eta: " + str(
                     int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(
                     int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ")
-            self.filProg.close()
+            self.closeProgressFile()
 
         # so we have datapoints+1 points!
         if self.boolDataStore:
@@ -1283,8 +1296,7 @@ class mpSystem:
         if self.boolRetgreen:
             self.greenStoreState()
 
-        print('\n' + 'Time evolution finished in', time_elapsed(t0, 60), 'with average time/step of',
-              "%.4e" % self.tavg)
+        print('\n' + 'Time evolution finished with average time/step of ' + time_form(self.tavg) + '\n', flush=True)
         if self.boolDataStore:
             self.closeFiles()
 
@@ -1332,6 +1344,12 @@ class mpSystem:
 
         if self.boolOffDiagDensRed:
             self.filOffDiagDensRed.write('%.16e %.16e \n' % (self.evolTime, self.offDiagDensRed))
+
+    def openProgressFile(self):
+        self.filProg = open('./data/progress.log', 'a')
+
+    def closeProgressFile(self):
+        self.filProg.close()
 
     def openFiles(self):
         self.filEnt = open('./data/entropy.txt', 'w')
@@ -1729,7 +1747,7 @@ def getQuarticRed(sysVar, k, l, m, n):
         return (getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))).copy()
     else:
         return (
-        (getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))) - getQuadraticRed(sysVar, k, n)).copy()
+            (getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))) - getQuadraticRed(sysVar, k, n)).copy()
 
 
 def getQuarticSpec(quadops, k, l, m, n):
@@ -1820,10 +1838,40 @@ def time_elapsed(t0, divider, decimals=0):
     if divider == 60:
         t_min = t_el // 60
         t_sec = t_el % 60
-        return str(int(t_min)) + "m " + str(int(t_sec)) + "s"
+        return "%2im %2is" % (int(t_min), int(t_sec))
     else:
         t_sec = t_el / divider
         return str(round(t_sec, decimals)) + "s"
+
+
+def time_form(seconds):
+    magnitude = int(np.log10(seconds))
+    unit = ''
+    divider = 1
+    if magnitude < 0:
+        if magnitude >= -3:
+            unit = 'ms'
+            divider = 1e-3
+        elif magnitude >= -6:
+            unit = chr(230) + 's'
+            divider = 1e-6
+        elif magnitude >= -9:
+            unit = 'ns'
+            divider = 1e-9
+        elif magnitude >= -12:
+            unit = 'ps'
+            divider = 1e-12
+    else:
+        if seconds < 1e2:
+            unit = 's'
+            divider = 1
+        elif seconds < 6e3:
+            unit = 'm'
+            divider = 60
+        elif seconds < 3.6e5:
+            unit = 'h'
+            divider = 3.6e3
+    return str(int(seconds / divider)) + unit
 
 
 # stores the matrix of dimension sysvar[2] in a file
