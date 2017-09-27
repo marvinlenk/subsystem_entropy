@@ -1,54 +1,138 @@
 # This program is explicitly written for PYTHON3.X and will not work under Python2.X
 
-import numpy as np
-import shutil
-from scipy.special import binom
-from scipy.sparse import coo_matrix, csr_matrix, issparse
-from scipy.sparse import identity as spidentity
-from scipy.special import erf
-import scipy.linalg as la
-from numpy.linalg import multi_dot
-from numpy import einsum as npeinsum
+import configparser
+import os
 import time as tm
-import os, configparser
-import entPlot as ep
-from numpy import sqrt
+import numpy as np
+import scipy.linalg as la
 from numpy import log as nplog
+from numpy import sqrt
 from numpy.linalg import matrix_power as npmatrix_power
-from configparser import ConfigParser
+from numpy.linalg import multi_dot
+from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import identity as spidentity
+from scipy.special import binom
+from scipy.special import erf
 from scipy.special.basic import factorial
-from scipy import vdot
+
+import entPlot as ep
 
 
 # manyparticle system class
+# noinspection PyTypeChecker
 class mpSystem:
     # N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
     def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False):
         self.confFile = cFile
+
+        # here comes a ridiculously long list of variables which are initialized for loading the config
+        self.N = 0
+        self.m = 0
+        self.kRed = None
+        # ## hamiltonian parameters
+        self.onsite = 0.0
+        self.hybrid = 0.0
+        self.interequal = 0.0
+        self.interdiff = 0.0
+        # ## iteration parameters
+        self.steps = 0
+        self.deltaT = 0.0
+        self.order = 0
+        self.loOrder = 0
+        self.hiOrder = 0
+        # ## file management
+        self.dataPoints = 0
+        self.dmFilesSkipFactor = 0
+        self.boolClear = False
+        self.boolCleanFiles = False
+        self.boolDataStore = False
+        self.boolDMStore = False
+        self.boolDMRedStore = False
+        self.boolHamilStore = False
+        self.boolOccEnStore = False
+        self.occEnSingle = 0
+        self.boolOffDiagOcc = False
+        self.boolOffDiagDens = False
+        self.boolOffDiagDensRed = False
+        self.boolEngyStore = False
+        self.boolDecompStore = False
+        self.boolDiagExpStore = False
+        self.boolRetgreen = False
+        # ## calculation-parameters
+        self.boolOnlyRed = False
+        self.boolTotalEnt = False
+        self.boolTotalEnergy = False
+        self.boolReducedEnergy = False
+        # ## plotting booleans and parameters
+        self.boolPlotData = False
+        self.boolPlotAverages = False
+        self.boolPlotHamiltonian = False
+        self.boolPlotDMAnimation = False
+        self.boolPlotDMRedAnimation = False
+        self.boolPlotOccEn = False
+        self.boolPlotOffDiagOcc = False
+        self.boolPlotOffDiagOccSingles = False
+        self.boolPlotOffDiagDens = False
+        self.boolPlotOffDiagDensRed = False
+        self.boolPlotEngy = False
+        self.boolPlotDecomp = False
+        self.boolPlotDiagExp = False
+        self.boolPlotTimescale = False
+        self.boolPlotDOS = False
+        self.boolPlotSpectralDensity = False
+        self.boolPlotGreen = False
+        # ## plotting variables
+        self.dmFilesStepSize = 0
+        self.dmFilesFPS = 0
+        self.plotFontSize = 0
+        self.plotLegendSize = 0
+        self.plotSavgolFrame = 0
+        self.plotSavgolOrder = 0
+        self.plotLoAvgPerc = 0.0
+        self.plotTimeScale = 0.0
+        self.evolStepDist = 0
+        self.dmFiles = 0
+        # end of the list
+        # a new list of file variables which also have to be initialized
+        self.filEnt = None
+        self.filNorm = None
+        self.filOcc = None
+        self.filTotEnt = None
+        self.filTotalEnergy = None
+        self.filRedEnergy = None
+        self.filOffDiagOcc = None
+        self.filOffDiagOccSingles = None
+        self.filOffDiagDens = None
+        self.filOffDiagDensRed = None
+        self.filProg = None
+        self.filGreen = None
+        # end of the list
+
         self.loadConfig()
         if not plotOnly:
-            prepFolders(0,self.boolDMStore,self.boolDMRedStore,self.boolOccEnStore,self.boolCleanFiles)
+            prepFolders(0, self.boolDMStore, self.boolDMRedStore, self.boolOccEnStore, self.boolCleanFiles)
             # touch the progress file
             open('./data/progress.log', 'w').close()
         # mask selects only not traced out states
-        self.mask = np.ones((self.m), dtype=bool)
+        self.mask = np.ones(self.m, dtype=bool)
         for k in self.kRed:
             self.mask[k] = False
 
         self.dim = dimOfBasis(self.N, self.m)  # dimension of basis
-        ###### system variables
+        # system variables
         if not plotOnly:
             self.datType = dtType
             self.basis = np.zeros((self.dim, self.m), dtype=np.int)
             fillBasis(self.basis, self.N, self.m)
             self.basisDict = basis2dict(self.basis, self.dim)
             # note that there is an additional dimension there! needed for fast multiplication algorithm
-            self.state = np.zeros((self.dim), dtype=self.datType)
+            self.state = np.zeros(self.dim, dtype=self.datType)
             # parameter for storing in file
             self.stateNorm = 0
             self.stateNormAbs = 0
             self.stateNormCheck = 1e1  # check if norm has been supressed too much
-            self.densityMatrix = []  # do not initialize yet - wait until hamiltonian decomposition has been done for memory efficiency
+            # do not initialize yet - wait until hamiltonian decomposition has been done for memory efficiency
+            self.densityMatrix = np.array([])
             self.densityMatrixInd = False
             self.entropy = 0
             self.totalEnergy = 0
@@ -62,8 +146,8 @@ class mpSystem:
             # matrix for time evolution - initially empty
             self.evolutionMatrix = None
             # eigenvalue and vectors
-            self.eigVals = []
-            self.eigVects = []
+            self.eigVals = np.array([])
+            self.eigVects = np.array([])
             self.eigInd = False
 
             # iteration step
@@ -73,23 +157,24 @@ class mpSystem:
             self.tavg = 0  # needed for estimation of remaining time
             self.dmcount = 0  # needed for numbering of density matrix files
             self.dmFileFactor = 0  # counting value for density matrix storage
-            ###### variables for the partial trace algorithm
+            # ##### variables for the partial trace algorithm
             self.mRed = self.m - len(self.kRed)
             self.mRedComp = len(self.kRed)
             self.entropyRed = 0
 
-            ###### energy eigenbasis stuff
+            # ##### energy eigenbasis stuff
             if self.boolOffDiagOcc or self.boolDiagExpStore:
-                self.enState = np.zeros((self.dim), dtype=self.datType)
+                self.enState = np.zeros(self.dim, dtype=self.datType)
             if self.boolOffDiagOcc:
-                self.offDiagOccMat = np.empty((self.m), dtype=object)
-                self.offDiagOcc = np.zeros((self.m), dtype=self.datType)
+                self.offDiagOccMat = np.empty(self.m, dtype=object)
+                self.offDiagOcc = np.zeros(self.m, dtype=self.datType)
                 if self.occEnSingle > 0:
                     self.occEnInds = np.zeros((self.m, 2, self.occEnSingle), dtype=np.int16)
-                    self.offDiagSingles = np.zeros((self.m, self.occEnSingle), dtype=self.datType)
+                    self.offDiagOccSingles = np.zeros((self.m, self.occEnSingle), dtype=self.datType)
 
             if self.boolOffDiagDens:
                 self.offDiagDens = 0
+                self.eigInv = np.array([])
             # NOTE reduced density matrix offdiagonal stuff is initiated AFTER the reduced basis is created!
 
             if self.mRedComp == 0:
@@ -129,41 +214,47 @@ class mpSystem:
                                                  shape=(self.dimRed, self.dimRed),
                                                  dtype=np.float64).tocsr()
                 self.operatorsRed = quadraticArrayRed(self)
-                self.eigValsRed = []
-                self.eigVectsRed = []
-                self.eigInvRed = []
+                self.eigValsRed = np.array([])
+                self.eigVectsRed = np.array([])
+                self.eigInvRed = np.array([])
                 self.eigIndRed = False
 
-            ### Spectral
+            # ## Spectral
             if self.boolRetgreen:
-                ## lo
+                # lo
                 self.specLoDim = dimOfBasis(self.N - 1, self.m)
                 self.specLoBasis = np.zeros((self.specLoDim, self.m), dtype=np.int)
                 fillBasis(self.specLoBasis, self.N - 1, self.m)
                 self.specLoBasisDict = basis2dict(self.specLoBasis, self.specLoDim)
                 self.specLoHamiltonian = coo_matrix(np.zeros((self.specLoDim, self.specLoDim)),
                                                     shape=(self.specLoDim, self.specLoDim), dtype=np.float64).tocsr()
-                ## hi
+                self.specLoEigVals = np.array([])
+                self.specLoEigVects = np.array([])
+                self.specLoEigInd = False
+                # hi
                 self.specHiDim = dimOfBasis(self.N + 1, self.m)
                 self.specHiBasis = np.zeros((self.specHiDim, self.m), dtype=np.int)
                 fillBasis(self.specHiBasis, self.N + 1, self.m)
                 self.specHiBasisDict = basis2dict(self.specHiBasis, self.specHiDim)
                 self.specHiHamiltonian = coo_matrix(np.zeros((self.specHiDim, self.specHiDim)),
                                                     shape=(self.specHiDim, self.specHiDim), dtype=np.float64).tocsr()
-                if self.boolRetgreen:
-                    self.green = np.zeros(self.m, dtype=self.datType)
-                    self.stateSaves = []  # append with time dep. state vector
-                    self.timeSaves = []  # append with time of saved state vector
-                    self.specLoEvolutionMatrix = None
-                    self.specHiEvolutionMatrix = None
-                    self.specLowering = []
-                    self.specRaising = []
-                    # fill'em
-                    for i in range(0, self.m):
-                        # note that the lowering operator transposed is the raising op. of the lower dimension space
-                        self.specLowering.append(getLoweringSpec(self, i))
-                        # the raising operator transposed is the lowering op. of the higher dimension space
-                        self.specRaising.append(getRaisingSpec(self, i))
+                self.specHiEigVals = np.array([])
+                self.specHiEigVects = np.array([])
+                self.specHiEigInd = False
+                # general
+                self.green = np.zeros(self.m, dtype=self.datType)
+                self.stateSaves = []  # append with time dep. state vector
+                self.timeSaves = []  # append with time of saved state vector
+                self.specLoEvolutionMatrix = None
+                self.specHiEvolutionMatrix = None
+                self.specLowering = []
+                self.specRaising = []
+                # fill'em
+                for i in range(0, self.m):
+                    # note that the lowering operator transposed is the raising op. of the lower dimension space
+                    self.specLowering.append(getLoweringSpec(self, i))
+                    # the raising operator transposed is the lowering op. of the higher dimension space
+                    self.specRaising.append(getRaisingSpec(self, i))
 
     # end of init
 
@@ -183,8 +274,9 @@ class mpSystem:
         self.N = int(configParser.getfloat('system', 'N'))
         self.m = int(configParser.getfloat('system', 'm'))
         self.kRed = configParser.get('system', 'kred').split(',')
-        if len(self.kRed[0]) == 0:
-            self.kRed = []
+        if self.kRed[0] == '':
+            self.kRed = np.array([])
+            print('a')
         else:
             self.kRed = [int(el) for el in self.kRed]
         # ## hamiltonian parameters
@@ -277,8 +369,8 @@ class mpSystem:
     # end of updateDensityMatrix
 
     def initIteratorRed(self):
-        el1 = np.zeros((self.m), dtype=np.int)
-        el2 = np.zeros((self.m), dtype=np.int)
+        el1 = np.zeros(self.m, dtype=np.int)
+        el2 = np.zeros(self.m, dtype=np.int)
         for i in reversed(range(0, self.N + 1)):
             for j in range(self.offsetsRed[i], self.offsetsRed[i - 1]):
                 for jj in range(j, self.offsetsRed[i - 1]):
@@ -293,6 +385,7 @@ class mpSystem:
 
     # end of initTest
 
+    # noinspection PyTypeChecker
     def reduceDensityMatrix(self):
         if self.densityMatrixRed is None:
             return
@@ -303,6 +396,7 @@ class mpSystem:
             else:
                 self.densityMatrixRed.fill(0)
                 for el in self.iteratorRed:
+                    # noinspection PyTypeChecker
                     self.densityMatrixRed[el[0]] += self.densityMatrix[el[2], el[3]]
         else:
             self.densityMatrixRed.fill(0)
@@ -317,7 +411,7 @@ class mpSystem:
 
         if self.mRed == 1:
             if self.m == 2:
-                self.densityMatrixRed = np.abs(self.state)**2
+                self.densityMatrixRed = np.abs(self.state) ** 2
             else:
                 self.densityMatrixRed.fill(0)
                 for el in self.iteratorRed:
@@ -379,7 +473,7 @@ class mpSystem:
                 if i != j:
                     self.hamiltonian += self.hybrid * self.operators[i, j]
                 else:
-                    self.hamiltonian += (i) * (self.onsite) * self.operators[i, j]
+                    self.hamiltonian += i * self.onsite * self.operators[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
             for i in range(0, self.m):
@@ -388,9 +482,9 @@ class mpSystem:
                         for l in range(0, self.m):
                             tmp = getQuartic(self, i, j, k, l)
                             if i == j and k == l and k == j:
-                                self.hamiltonian += (self.interequal) * tmp
+                                self.hamiltonian += self.interequal * tmp
                             else:
-                                self.hamiltonian += (self.interdiff) * tmp
+                                self.hamiltonian += self.interdiff * tmp
                             del tmp
 
     def initHamiltonianRed(self):
@@ -399,7 +493,7 @@ class mpSystem:
                 if i != j:
                     self.hamiltonianRed += self.hybrid * self.operatorsRed[i, j]
                 else:
-                    self.hamiltonianRed += (i) * (self.onsite) * self.operatorsRed[i, j]
+                    self.hamiltonianRed += i * self.onsite * self.operatorsRed[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
             for i in range(0, self.mRed):
@@ -408,9 +502,9 @@ class mpSystem:
                         for l in range(0, self.mRed):
                             tmp = getQuarticRed(self, i, j, k, l)
                             if i == j and k == l and k == j:
-                                self.hamiltonianRed += (self.interequal) * tmp
+                                self.hamiltonianRed += self.interequal * tmp
                             else:
-                                self.hamiltonianRed += (self.interdiff) * tmp
+                                self.hamiltonianRed += self.interdiff * tmp
                             del tmp
 
     def initSpecLoHamiltonian(self):
@@ -420,7 +514,7 @@ class mpSystem:
                 if i != j:
                     self.specLoHamiltonian += self.hybrid * tmpspecops[i, j]
                 else:
-                    self.specLoHamiltonian += (i) * (self.onsite) * tmpspecops[i, j]
+                    self.specLoHamiltonian += i * self.onsite * tmpspecops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
             for i in range(0, self.m):
@@ -429,9 +523,9 @@ class mpSystem:
                         for l in range(0, self.m):
                             tmp = getQuarticSpec(tmpspecops, i, j, k, l)
                             if i == j and k == l and k == j:
-                                self.specLoHamiltonian += (self.interequal) * tmp
+                                self.specLoHamiltonian += self.interequal * tmp
                             else:
-                                self.specLoHamiltonian += (self.interdiff) * tmp
+                                self.specLoHamiltonian += self.interdiff * tmp
                             del tmp
             del tmpspecops
 
@@ -442,7 +536,7 @@ class mpSystem:
                 if i != j:
                     self.specHiHamiltonian += self.hybrid * tmpspecops[i, j]
                 else:
-                    self.specHiHamiltonian += (i) * (self.onsite) * tmpspecops[i, j]
+                    self.specHiHamiltonian += i * self.onsite * tmpspecops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
             for i in range(0, self.m):
@@ -451,9 +545,9 @@ class mpSystem:
                         for l in range(0, self.m):
                             tmp = getQuarticSpec(tmpspecops, i, j, k, l)
                             if i == j and k == l and k == j:
-                                self.specHiHamiltonian += (self.interequal) * tmp
+                                self.specHiHamiltonian += self.interequal * tmp
                             else:
-                                self.specHiHamiltonian += (self.interdiff) * tmp
+                                self.specHiHamiltonian += self.interdiff * tmp
                             del tmp
             del tmpspecops
 
@@ -463,7 +557,7 @@ class mpSystem:
         self.initEvolutionMatrix()
 
         self.filProg = open('./data/progress.log', 'a')
-        self.filProg.write('Initialized evolution matrix in ' + time_elapsed(t0,60,0) + '\n')
+        self.filProg.write('Initialized evolution matrix in ' + time_elapsed(t0, 60, 0) + '\n')
         self.filProg.close()
         if self.boolRetgreen:
             t1 = tm.time()
@@ -474,14 +568,14 @@ class mpSystem:
             self.filProg = open('./data/progress.log', 'a')
             self.filProg.write('Initialized high and low evolution matrices in ' + time_elapsed(t1, 60, 0) + '\n')
             self.filProg.close()
-        print('Initialized evolution matrices in ' + time_elapsed(t0,60,0))
+        print('Initialized evolution matrices in ' + time_elapsed(t0, 60, 0))
 
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     def initEvolutionMatrix(self, diagonalize=False):
         if self.order == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if (not np.allclose(self.hamiltonian.toarray(), self.hamiltonian.toarray().T.conjugate())):
+        if not np.allclose(self.hamiltonian.toarray(), self.hamiltonian.toarray().T.conjugate()):
             print('Warning - hamiltonian is not hermitian!')
         self.evolutionMatrix = spidentity(self.dim, dtype=self.datType, format='csr')
 
@@ -508,12 +602,12 @@ class mpSystem:
     def initSpecLoEvolutionMatrix(self, diagonalize=False, conj=True, sq=True):
         if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if (not np.allclose(self.specLoHamiltonian.toarray(), self.specLoHamiltonian.toarray().T.conj())):
+        if not np.allclose(self.specLoHamiltonian.toarray(), self.specLoHamiltonian.toarray().T.conj()):
             print('Warning - hamiltonian is not hermitian!')
         self.specLoEvolutionMatrix = spidentity(self.specLoDim, dtype=self.datType, format='csr')
 
         if conj:
-            pre = (1j)
+            pre = 1j
         else:
             pre = (-1j)
 
@@ -535,12 +629,12 @@ class mpSystem:
     def initSpecHiEvolutionMatrix(self, diagonalize=False, conj=False, sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if (not np.allclose(self.specHiHamiltonian.toarray(), self.specHiHamiltonian.toarray().T.conj())):
+        if not np.allclose(self.specHiHamiltonian.toarray(), self.specHiHamiltonian.toarray().T.conj()):
             print('Warning - hamiltonian is not hermitian!')
         self.specHiEvolutionMatrix = spidentity(self.specHiDim, dtype=self.datType, format='csr')
 
         if conj:
-            pre = (1j)
+            pre = 1j
         else:
             pre = (-1j)
 
@@ -566,8 +660,29 @@ class mpSystem:
 
     # approximate distributions in energy space - all parameters have to be set!
     # if skip is set to negative, the absolute value gives probability for finding a True in binomial
-    def stateEnergy(self, muperc=[50], sigma=[1], phase=['none'], skip=[0], dist=['std'], peakamps=[1], skew=[0]):
-        if self.eigInd == False:
+    def stateEnergy(self, muperc=None, sigma=None, phase=None, skip=None, dist=None, peakamps=None, skew=None):
+        if muperc is None:
+            muperc = [50]
+        if sigma is None:
+            sigma = [1]
+        if phase is None:
+            phase = ['none']
+        if skip is None:
+            skip = [0]
+        if dist is None:
+            dist = ['std']
+        if peakamps is None:
+            peakamps = [1]
+        if skew is None:
+            skew = [0]
+
+        # initialize everything
+        tmpdist = None
+        phaseArray = np.array([])
+        skipArray = np.array([])
+        # end of initializing
+
+        if not self.eigInd:
             self.updateEigenenergies()
 
         self.state.fill(0)
@@ -626,8 +741,12 @@ class mpSystem:
     # approximate distributions in energy space - all parameters have to be set!
     # if skip is set to negative, the absolute value gives probability for finding a True in binomial
     def stateEnergyMicrocan(self, avgen=0, sigma=1, phase='none', skip=0, dist='rect', peakamps=1, skew=0):
-        if self.eigInd == False:
+        if not self.eigInd:
             self.updateEigenenergies()
+
+        # initialize everything
+        tmpdist = None
+        # end of initializing
 
         self.state.fill(0)
 
@@ -684,7 +803,7 @@ class mpSystem:
         self.state /= self.stateNorm
         # do not store the new state norm - it is defined to be 1 so just store last norm value!
         # self.stateNorm = np.real(sqrt(npeinsum('ij,ij->j',self.state,np.conjugate(self.state))))[0]
-        if bool(initial) == True:
+        if bool(initial):
             self.stateNormAbs = 1
             self.updateEigendecomposition()
             # store starting states used for green function
@@ -705,21 +824,20 @@ class mpSystem:
     # this one explicitly uses the state vector - note that this also works with sparse matrices!
     def expectValue(self, operator):
         if operator.shape != (self.dim, self.dim):
-            exit('Dimension of operator is', np.shape(operator), 'but', (self.dim, self.dim), 'is needed!')
+            exit('Operator shape is' + str(np.shape(operator)) + 'but' + str((self.dim, self.dim)) + 'is needed!')
         # return multi_dot([np.conjugate(np.array(self.state)[:,0]), operator, np.array(self.state)[:,0]])
         return np.vdot(self.state, operator.dot(self.state))
 
     # note that - in principle - the expectation value can be complex! (though it shouldn't be)
     def expectValueDM(self, operator):
         if operator.shape != (self.dim, self.dim):
-            exit('Dimension of operator is', np.shape(operator), 'but', (self.dim, self.dim), 'is needed!')
+            exit('Operator shape is' + str(np.shape(operator)) + 'but' + str((self.dim, self.dim)) + 'is needed!')
         # this order is needed for sparse matrices - still works because of cyclic invariance
         return np.trace(operator.dot(self.densityMatrix))
 
     def expectValueRed(self, operator):
         if operator.shape != (self.dimRed, self.dimRed):
-            exit('Dimension of operator is' + str(np.shape(operator)) + 'but' + str(
-                (self.dimRed, self.dimRed)) + 'is needed!')
+            exit('Operator shape is' + str(np.shape(operator)) + 'but' + str((self.dimRed, self.dimRed)) + 'is needed!')
         # this order is needed for sparse matrices - still works because of cyclic invariance
         if not self.mRed == 1:
             return np.trace(operator.dot(self.densityMatrixRed))
@@ -738,8 +856,8 @@ class mpSystem:
             self.eigInvRed = la.inv(np.matrix(self.eigVectsRed.T))
             self.eigIndRed = True
             # TMP TMP TMP
-            tmpfil=open('./data/eigenvaluesRed.txt','w')
-            for i in range(0,self.dimRed):
+            tmpfil = open('./data/eigenvaluesRed.txt', 'w')
+            for i in range(0, self.dimRed):
                 tmpfil.write("%i %.16e\n" % (i, self.eigValsRed[i]))
             tmpfil.close()
 
@@ -756,6 +874,8 @@ class mpSystem:
             ## will free the memory!!!
 
     def updateEigendecomposition(self, clear=True):
+        tmp = None
+        tmpmat = None
         if self.boolEngyStore:
             t0 = tm.time()
             self.updateEigenenergies()
@@ -769,7 +889,6 @@ class mpSystem:
             tfil = open('./data/hamiltonian_eigvals.txt', 'w')
             if self.boolDecompStore:
                 tmpAbsSq = np.zeros(self.dim)
-                tmp = np.zeros(self.dim)
                 # generate all overlaps at once
                 # note that conj() is optional since the vectors can be chosen to be real
                 tmp = np.dot(self.eigVects.T.conj(), self.state)
@@ -868,6 +987,7 @@ class mpSystem:
 
         # store the actual matrix to a file (might become very large!)
         if self.boolOccEnStore:
+            t0 = tm.time()
             for i in range(0, self.m):
                 if self.boolOffDiagOcc:
                     # note that the off diag mat still contains the diagonals right now!
@@ -902,7 +1022,7 @@ class mpSystem:
                 tmpmat = np.einsum('l,lj,j -> lj', self.enState.conj(), self.offDiagOccMat[i], self.enState,
                                    optimize=True)
                 # tmpmat = np.outer(self.enState.conj(), np.dot(self.offDiagOccMat[i], self.enState))
-                infofile.write('%i ' % (i))
+                infofile.write('%i ' % i)
                 # to use argpartition correctly we must treat the matrix as an array
                 indices = tmpmat.argpartition(tmpmat.size - num_largest, axis=None)[-num_largest:]
                 self.occEnInds[i, 0], self.occEnInds[i, 1] = np.unravel_index(indices, tmpmat.shape)
@@ -926,10 +1046,10 @@ class mpSystem:
         if clear:
             # free the memory
             del self.eigVals
-            if (not self.boolOffDiagOcc and not self.boolOffDiagDens):
+            if not self.boolOffDiagOcc and not self.boolOffDiagDens:
                 del self.eigVects
-                self.eigVects = []
-            self.eigVals = []
+                self.eigVects = np.array([])
+            self.eigVals = np.array([])
             self.eigInd = False
 
     def updateOffDiagOcc(self):
@@ -965,7 +1085,6 @@ class mpSystem:
             self.offDiagDensRed = (multi_dot(
                 [np.ones(self.dimRed), self.eigVectsRed.T, self.densityMatrixRed, self.eigInvRed,
                  np.ones(self.dimRed)]) - np.trace(self.densityMatrixRed)).real
-
 
     def updateEntropy(self):
         self.entropy = 0
@@ -1019,14 +1138,13 @@ class mpSystem:
 
         tmpHiEvol = np.identity(self.specHiDim, dtype=self.datType)
         tmpLoEvol = np.identity(self.specLoDim, dtype=self.datType)
-        tmpGreen = np.complex128(0)
 
         saves = len(self.timeSaves)
         bound = int((saves - 1) / 2)
         dt = self.timeSaves[1]
 
         # handle the i=0 case => equal time greens function is always -i:
-        self.filGreen.write('%.16e ' % (0))
+        self.filGreen.write('%.16e ' % 0)
         for ind in range(0, self.m):
             self.filGreen.write('%.16e %.16e ' % (0, -1))
             '''
@@ -1096,7 +1214,6 @@ class mpSystem:
 
         self.evolStepTmp = self.evolStep
         stepNo = int(self.dataPoints / 100)
-        dmFileFactor = self.dmFilesSkipFactor
         t0 = t1 = tm.time()  # time before iteration
         self.tavg = 0  # needed for estimation of remaining time
         print('Time evolution\n' + ' 0% ', end='')
@@ -1134,7 +1251,7 @@ class mpSystem:
                     self.filTotalEnergy.write('%.16e %.16e \n' % (self.evolTime, self.totalEnergy))
 
                 print('.', end='', flush=True)
-                if self.dim > 1e3 or self.steps > 1e7:
+                if self.dim > int(1e3) or self.steps > int(1e7):
                     self.filProg = open('./data/progress.log', 'a')
                     self.filProg.write('.')
                     self.filProg.close()
@@ -1191,12 +1308,12 @@ class mpSystem:
             self.filRedEnergy.write('%.16e %.16e \n' % (self.evolTime, self.reducedEnergy))
 
         if self.boolOffDiagOcc:
-            self.filOffDiagOcc.write('%.16e ' % (self.evolTime))
+            self.filOffDiagOcc.write('%.16e ' % self.evolTime)
             for i in range(0, self.m):
-                self.filOffDiagOcc.write('%.16e ' % (self.offDiagOcc[i].real))
+                self.filOffDiagOcc.write('%.16e ' % self.offDiagOcc[i].real)
             self.filOffDiagOcc.write('\n')
             if self.occEnSingle:
-                self.filOffDiagOccSingles.write('%.16e ' % (self.evolTime))
+                self.filOffDiagOccSingles.write('%.16e ' % self.evolTime)
                 for i in range(0, self.m):
                     for j in range(0, self.occEnSingle):
                         self.filOffDiagOccSingles.write(
@@ -1255,25 +1372,18 @@ class mpSystem:
         if self.boolOffDiagDensRed:
             self.filOffDiagDensRed.close()
 
-    def plotDMAnimation(self, stepSize):
+    def plotDMAnimation(self, stepSize=1):
         ep.plotDensityMatrixAnimation(self.steps, self.deltaT, self.dmFiles, stepSize, framerate=self.dmFilesFPS)
 
-    # end of plotDMAnimation
-
-    def plotDMRedAnimation(self, stepSize):
+    def plotDMRedAnimation(self, stepSize=1):
         ep.plotDensityMatrixAnimation(self.steps, self.deltaT, self.dmFiles, stepSize, 1, framerate=self.dmFilesFPS)
-
-    # end of plotDMAnimation
 
     def plotData(self):
         ep.plotData(self)
 
-    # end of plotData
-
-    def plotHamiltonian(self):
+    @staticmethod
+    def plotHamiltonian():
         ep.plotHamiltonian()
-
-    # end of plotHamiltonian
 
     def plotOccEnbasis(self):
         ep.plotOccs(self)
@@ -1302,11 +1412,12 @@ class mpSystem:
         if self.boolClear:
             prepFolders(True)
 
-    def clearDensityData(self):
+    @staticmethod
+    def clearDensityData():
         prepFolders(True)
 
 
-def prepFolders(clearbool=0, densbool=0, reddensbool=0 ,spectralbool=0, cleanbeforebool=0):
+def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, cleanbeforebool=0):
     # create the needed folders
     if cleanbeforebool:
         if os.path.exists("./data/"):
@@ -1331,13 +1442,13 @@ def prepFolders(clearbool=0, densbool=0, reddensbool=0 ,spectralbool=0, cleanbef
         os.mkdir("./plots/")
     # remove the old stuff
     if clearbool:
-        if os.path.isfile("./data/density/densmat0.txt") == True:
+        if os.path.isfile("./data/density/densmat0.txt"):
             for root, dirs, files in os.walk('./data/density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
             print("Cleared density folder")
 
-        if os.path.isfile("./data/red_density/densmat0.txt") == True:
+        if os.path.isfile("./data/red_density/densmat0.txt"):
             for root, dirs, files in os.walk('./data/red_density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
@@ -1347,6 +1458,7 @@ def prepFolders(clearbool=0, densbool=0, reddensbool=0 ,spectralbool=0, cleanbef
 # calculate the number of Coefficients
 def dimOfBasis(N, m):
     return int(binom(N + m - 1, N))
+
 
 # fill the fock basis, offset says where to start
 def fillBasis(basis, N, m, offset=0):
@@ -1368,7 +1480,7 @@ def gaussian(x, mu, sigm=1, norm=1, skw=0):
     if norm:
         tmp /= np.sqrt(2 * np.pi * sigm ** 2)
     if skw != 0:
-        tmp *= (1 + erf(skw * (x - mu) / (sigm * sqrt(2))))
+        tmp *= (1 + erf(np.array([skw * (x - mu) / (sigm * sqrt(2))]))[0])
     return tmp
 
 
@@ -1505,7 +1617,7 @@ def getQuadratic(sysVar, l, m):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.m), dtype=np.int)
+    tmp = np.zeros(sysVar.m, dtype=np.int)
     for el in sysVar.basis:
         if el[m] != 0:
             tmp = el.copy()
@@ -1526,7 +1638,7 @@ def getQuadraticRed(sysVar, l, m):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.mRed), dtype=np.int)
+    tmp = np.zeros(sysVar.mRed, dtype=np.int)
     for el in sysVar.basisRed:
         if el[m] != 0:
             tmp = el.copy()
@@ -1545,7 +1657,7 @@ def getQuadraticSpecLo(sysVar, l, m):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.m), dtype=np.int)
+    tmp = np.zeros(sysVar.m, dtype=np.int)
     for el in sysVar.specLoBasis:
         if el[m] != 0:
             tmp = el.copy()
@@ -1564,7 +1676,7 @@ def getQuadraticSpecHi(sysVar, l, m):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.m), dtype=np.int)
+    tmp = np.zeros(sysVar.m, dtype=np.int)
     for el in sysVar.specHiBasis:
         if el[m] != 0:
             tmp = el.copy()
@@ -1616,7 +1728,8 @@ def getQuarticRed(sysVar, k, l, m, n):
     if l != m:
         return (getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))).copy()
     else:
-        return ((getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))) - getQuadraticRed(sysVar, k, n)).copy()
+        return (
+        (getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))) - getQuadraticRed(sysVar, k, n)).copy()
 
 
 def getQuarticSpec(quadops, k, l, m, n):
@@ -1632,7 +1745,7 @@ def getLoweringSpec(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.m), dtype=np.int)
+    tmp = np.zeros(sysVar.m, dtype=np.int)
     for el in sysVar.basis:
         if el[l] != 0:
             tmp = el.copy()
@@ -1652,7 +1765,7 @@ def getRaisingSpec(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.m), dtype=np.int)
+    tmp = np.zeros(sysVar.m, dtype=np.int)
     for el in sysVar.basis:
         tmp = el.copy()
         tmp[l] += 1
@@ -1670,7 +1783,7 @@ def getRaisingSpecAdj(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.m), dtype=np.int)
+    tmp = np.zeros(sysVar.m, dtype=np.int)
     for el in sysVar.specHiBasis:
         if el[l] != 0:
             tmp = el.copy()
@@ -1689,7 +1802,7 @@ def getRaisingSpecInv(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros((sysVar.m), dtype=np.int)
+    tmp = np.zeros(sysVar.m, dtype=np.int)
     for el in sysVar.basis:
         tmp = el.copy()
         tmp[l] += 1
@@ -1707,7 +1820,7 @@ def time_elapsed(t0, divider, decimals=0):
     if divider == 60:
         t_min = t_el // 60
         t_sec = t_el % 60
-        return (str(int(t_min)) + "m " + str(int(t_sec)) + "s")
+        return str(int(t_min)) + "m " + str(int(t_sec)) + "s"
     else:
         t_sec = t_el / divider
         return str(round(t_sec, decimals)) + "s"
@@ -1715,7 +1828,7 @@ def time_elapsed(t0, divider, decimals=0):
 
 # stores the matrix of dimension sysvar[2] in a file
 def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
-    matDim = np.shape(mat)[0]
+    matDim = mat.shape[0]
     if absOnly == 0:
         # assume dot + 3 letter ending e.g. .txt
         fname = fil[:-4]

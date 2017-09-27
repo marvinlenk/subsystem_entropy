@@ -51,8 +51,8 @@ if args.plot_occen:
     exit()
 
 if args.plot_odsingles:
-    if sysVar.boolPlotOffDiagSingles:
-        sysVar.plotOffDiagSingles()
+    if sysVar.boolPlotOffDiagOccSingles:
+        sysVar.plotOffDiagOccSingles()
     exit()
 
 print("Dimension of the basis:", sysVar.dim)

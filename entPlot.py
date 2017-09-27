@@ -3,7 +3,6 @@ import dft
 import os as os
 import scipy.integrate as scint
 import matplotlib as mpl
-from scipy.optimize import least_squares
 
 mpl.use('Agg')
 from matplotlib.pyplot import cm, step
@@ -11,7 +10,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from numpy.fft import fft, fftfreq, fftshift, rfft, rfftfreq
 from scipy.integrate import cumtrapz
 
 
@@ -27,6 +25,7 @@ import warnings
 warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
 
 
+# noinspection PyStringFormat
 def plotData(sysVar):
     print("Plotting datapoints to pdf", end='')
 
@@ -111,7 +110,7 @@ def plotData(sysVar):
 
     def complete_system_enttropy():
         return 0
-        #### Complete system Entropy
+        # ### Complete system Entropy
 
     if (sysVar.boolTotalEnt):
         plt.plot(totent_array[:, 0] * sysVar.plotTimeScale, totent_array[:, 1] * 1e13, linewidth=0.6, color='r')
@@ -127,7 +126,7 @@ def plotData(sysVar):
 
     def subsystem_entropy():
         return 0
-        ### Subsystem Entropy
+        # ## Subsystem Entropy
 
     plt.plot(step_array, ent_array[:, 1], linewidth=0.8, color='r')
     plt.grid()
@@ -180,7 +179,7 @@ def plotData(sysVar):
 
     def single_level_occ():
         return 0
-        ### Single-level occupation numbers
+        # ## Single-level occupation numbers
 
     for i in range(0, sysVar.m):
         plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.5)
@@ -223,7 +222,7 @@ def plotData(sysVar):
     def bath_occ():
         return 0
 
-    ### Traced out (bath) occupation numbers
+    # ## Traced out (bath) occupation numbers
     for i in sysVar.kRed:
         plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
         if sysVar.boolPlotDiagExp:
@@ -244,7 +243,7 @@ def plotData(sysVar):
 
     def system_occ():
         return 0
-        ### Leftover (system) occupation numbers
+        # ## Leftover (system) occupation numbers
 
     for i in np.arange(sysVar.m)[sysVar.mask]:
         plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
@@ -266,7 +265,7 @@ def plotData(sysVar):
 
     def subsystem_occupation():
         return 0
-        ### Subsystems occupation numbers
+        # ## Subsystems occupation numbers
 
     # store fluctuations in a data
     fldat = open('./data/fluctuation.txt', 'w')
@@ -290,7 +289,8 @@ def plotData(sysVar):
     stddev = np.std(tmp[loavgind:], dtype=np.float64)
     fldat.write('bath_average: %.16e\n' % avg)
     fldat.write('bath_stddev: %.16e\n' % stddev)
-    fldat.write('bath_rel._fluctuation: %.16e\n' % (stddev / avg))
+    # noinspection PyStringFormat
+    fldat.write("bath_rel._fluctuation: %.16e\n" % (stddev / avg))
 
     tmp.fill(0)
     for i in np.arange(sysVar.m)[sysVar.mask]:
@@ -376,7 +376,7 @@ def plotData(sysVar):
         nrm = offdiagocc[:, 0] / dt
         nrm[1:] = 1 / nrm[1:]
         for i in range(0, sysVar.m):
-            ###### only sum (subsystem-thermalization)
+            # ##### only sum (subsystem-thermalization)
             plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
             # start at 10% of the whole x-axis
             lox = (offdiagocc[-1, 0] - offdiagocc[0, 0]) / 10 + offdiagocc[0, 0]
@@ -386,7 +386,7 @@ def plotData(sysVar):
             plt.ylim(ymax=hiy)
             plt.grid()
             plt.tight_layout()
-            ###inlay with the whole deal
+            # ##inlay with the whole deal
             a = plt.axes([0.62, 0.6, 0.28, 0.28])
             a.plot(offdiagocc[:, 0], offdiagocc[:, i + 1], linewidth=0.8)
             a.set_xticks([])
@@ -401,7 +401,7 @@ def plotData(sysVar):
             plt.ylim(ymin=1e-2)
             plt.grid()
             plt.tight_layout()
-            ###inlay with the whole deal
+            # ##inlay with the whole deal
             a = plt.axes([0.62, 0.6, 0.28, 0.28])
             a.semilogy(offdiagocc[:, 0], offdiagocc[:, i + 1], linewidth=0.8)
             a.set_ylim(ymin=1e-2)
@@ -411,7 +411,7 @@ def plotData(sysVar):
             pp.savefig()
             plt.clf()
 
-            ###### average (eigenstate-thermalization)
+            # ##### average (eigenstate-thermalization)
             f, (ax1, ax2) = plt.subplots(2, sharex=False, sharey=False)
             tmp = cumtrapz(offdiagocc[:, i + 1], offdiagocc[:, 0], initial=offdiagocc[0, i + 1])
             tmp = np.multiply(tmp, nrm)
@@ -461,7 +461,7 @@ def plotData(sysVar):
 
     def total_energy():
         return 0
-        ### Total system energy
+        # ## Total system energy
 
     if sysVar.boolTotalEnergy:
         plt.title('$E_{tot}, \; E_0$ = %.2f' % en0)
@@ -477,7 +477,7 @@ def plotData(sysVar):
 
     def reduced_energy():
         return 0
-        ### Total system energy
+        # ## Total system energy
 
     if sysVar.boolReducedEnergy:
         plt.plot(redEnergy[:, 0] * sysVar.plotTimeScale, redEnergy[:, 1], linewidth=0.6)
@@ -492,7 +492,7 @@ def plotData(sysVar):
 
     def norm_deviation():
         return 0
-        ### Norm deviation
+        # ## Norm deviation
 
     plt.plot(step_array, norm_array[:, 1], "ro", ms=0.5)
     plt.ylabel('norm deviation from 1')
@@ -518,7 +518,7 @@ def plotData(sysVar):
 
     def eigenvalues():
         return 0
-        ### Hamiltonian eigenvalues (Eigenenergies)
+        # ## Hamiltonian eigenvalues (Eigenenergies)
 
     if sysVar.boolPlotEngy:
         linearize = False
@@ -548,7 +548,7 @@ def plotData(sysVar):
 
     def density_of_states():
         return 0
-        ### DOS
+        # ## DOS
 
     if sysVar.boolPlotDOS:
         dos = np.zeros(sysVar.dim)
@@ -570,15 +570,15 @@ def plotData(sysVar):
 
     def greensfunction():
         return 0
-        ### Greensfunction
+        # ## Greensfunction
 
     if sysVar.boolPlotGreen:
-        #greenCropInd = np.power(2, int(np.log2(len(greendat[:, 0]))))
+        # greenCropInd = np.power(2, int(np.log2(len(greendat[:, 0]))))
         greenCropInd = len(greendat[:, 0])
-        #print(len(greendat[:, 0]) - greenCropInd)
+        # print(len(greendat[:, 0]) - greenCropInd)
         gd = greendat[:greenCropInd, :]
-        #print(len(gd))
-        #discpoints = len(gd[:, 0])
+        # print(len(gd))
+        # discpoints = len(gd[:, 0])
 
         '''
         gd = np.zeros((np.shape(greendat)[0]*2,np.shape(greendat)[1]))
@@ -606,16 +606,16 @@ def plotData(sysVar):
             green_ret = gd[:, ind] + 1j * gd[:, ind + 1]
             print(np.shape(green_ret))
             # green_ret_freq = fft(np.hanning(len(green_ret)) * green_ret, norm='ortho')
-            #green_ret_freq = fft(green_ret, norm='ortho')
-            #spec_tmp = (-2 * fftshift(green_ret_freq.imag))
+            # green_ret_freq = fft(green_ret, norm='ortho')
+            # spec_tmp = (-2 * fftshift(green_ret_freq.imag))
             if i == 0:
-                #samp_spacing = sysVar.deltaT * 2 * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
-                samp_spacing = (gd[-1,0] - gd[0,0]) / len(green_ret)
+                # samp_spacing = sysVar.deltaT * 2 * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
+                samp_spacing = (gd[-1, 0] - gd[0, 0]) / len(green_ret)
             green_ret_freq = dft.dft(green_ret, 1.0 / samp_spacing)
-            spec_tmp = (-2 * green_ret_freq[1,:].imag)
-            hlpfrq = green_ret_freq[0,:].real
-            ### !!! normalize by hand! this might be strange but is necessary here
-            #spec_tmp /= (np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
+            spec_tmp = (-2 * green_ret_freq[1, :].imag)
+            hlpfrq = green_ret_freq[0, :].real
+            # ## !!! normalize by hand! this might be strange but is necessary here
+            # spec_tmp /= (np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
             if i == 0:
                 spec_total = spec_tmp[:]
                 # scale on x-axis is frequency
@@ -630,7 +630,7 @@ def plotData(sysVar):
             plt.xlabel(r'$\omega / J$')
 
             plt.grid()
-            #plt.grid(which='minor', color='blue', linestyle='dotted', lw=0.2)
+            # plt.grid(which='minor', color='blue', linestyle='dotted', lw=0.2)
             plt.tight_layout()
             ###
             pp.savefig()
@@ -691,6 +691,7 @@ def plotData(sysVar):
             for i in range(0, sysVar.m):
                 ret.append(occno(weights[i], temp, mu))
             return np.array(ret)
+
         '''
         strt = np.array([-100, -100])
         bnds = np.array([[-100, -500], [10000, weights[0]]])
@@ -1062,13 +1063,14 @@ def plotOffDiagOccSingles(sysVar):
                     r'$n_{%i} \quad E_n=%.2f \; E_m=%.2f$' % (i, singlesinfo[i, infoind], singlesinfo[i, infoind + 1]))
             elif ordr1 == 0:
                 f.suptitle(r'$n_{%i} \quad E_n=%.2f \; E_m=%.2f \cdot 10^{%i}$' % (
-                i, singlesinfo[i, infoind], singlesinfo[i, infoind + 1] / (10 ** ordr2), ordr2))
+                    i, singlesinfo[i, infoind], singlesinfo[i, infoind + 1] / (10 ** ordr2), ordr2))
             elif ordr2 == 0:
                 f.suptitle(r'$n_{%i} \quad E_n=%.2f \cdot 10^{%i} \; E_m=%.2f$' % (
-                i, singlesinfo[i, infoind] / (10 ** ordr1), ordr1, singlesinfo[i, infoind + 1]))
+                    i, singlesinfo[i, infoind] / (10 ** ordr1), ordr1, singlesinfo[i, infoind + 1]))
             else:
                 f.suptitle(r'$n_{%i} \quad E_n=%.2f \cdot 10^{%i} \; E_m=%.2f \cdot 10^{%i}$' % (
-                i, singlesinfo[i, infoind] / (10 ** ordr1), ordr1, singlesinfo[i, infoind + 1] / (10 ** ordr2), ordr2))
+                    i, singlesinfo[i, infoind] / (10 ** ordr1), ordr1, singlesinfo[i, infoind + 1] / (10 ** ordr2),
+                    ordr2))
             #
             ind = 1 + 2 * j + (i * sysVar.occEnSingle * 2)
             comp = singlesdat[:, ind] + 1j * singlesdat[:, ind + 1]
