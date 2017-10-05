@@ -1,5 +1,16 @@
 change log
 
+### 05.10.2017
+- fixed bug where reduced density matrix was not initialized correctly for only one traced out level
+- fixed bug where progress output for greens functions with more than 999 datapoints was broken
+
+### 04.10.2017
+- changed time output in progress display to dynamically choose the best format
+
+### 28.09.2017
+- changed character code for mu in time_format to actually print out a mu
+- fixed bug in progress print for evaluate_green
+
 ### 27.09.2017
 - changed getQuartic like functions to multiplication with dot instead of asterisk
 - changed occupation numbers to be also calculated when reducing from state (this was a feature previously)
@@ -8,6 +19,7 @@ change log
 - added green-function progress output to stdout and progress.log
 - added methods for progress file opening and closing
 - a metric shit ton of cosmetics
+- added function time_format for int(seconds) to str(sensible)
 
 ### 26.09.2017
 - added optimizations for only one level left

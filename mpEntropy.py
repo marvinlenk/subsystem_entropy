@@ -198,7 +198,7 @@ class mpSystem:
                 self.basisRedComp = np.zeros((self.dimRedComp, self.mRedComp), dtype=np.int)
                 fillReducedBasis(self.basisRedComp, self.N, self.mRedComp, self.offsetsRedComp)
                 # if only one level left, reduced matrix is diagonal
-                if self.mRedComp == 1:
+                if self.mRed == 1:
                     self.densityMatrixRed = np.zeros((self.dimRed,), dtype=self.datType)
                 else:
                     self.densityMatrixRed = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
@@ -1155,7 +1155,7 @@ class mpSystem:
         t0 = tm.time()
         t1 = tm.time()
         tavg = 0
-        bound_permil = 1000 / bound  # use per 1000 to get easier condition for 1% and 10%
+        bound_permil = 1000.0 / bound # use per 1000 to get easier condition for 1% and 10%
         for i in range(1, bound + 1):
             tmpHiEvol = np.dot(tmpHiEvol, self.specHiEvolutionMatrix)  # they need to be the squared ones!
             tmpLoEvol = np.dot(tmpLoEvol, self.specLoEvolutionMatrix)  # they need to be the squared ones!
@@ -1174,22 +1174,22 @@ class mpSystem:
                 self.filGreen.write('%.16e %.16e ' % (tmpGreen.imag, -1 * tmpGreen.real))
             self.filGreen.write(' \n')
             # time estimation start
-            if int(i * bound_permil) % 10 == 0:
+            if round(i * bound_permil, 1) % 10.0 == 0:
                 self.openProgressFile()
                 self.filProg.write('.')
                 print('.', end='', flush=True)
-                if int(i * bound_permil) % 100 == 0:
-                    tavg *= int(i - bound/10)  # calculate from time/step back to unit: time
+                if round(i * bound_permil, 1) % 100 == 0:
+                    tavg *= int(i - bound / 10)  # calculate from time/step back to unit: time
                     tavg += tm.time() - t1  # add passed time
                     tavg /= i  # average over total number of steps
                     t1 = tm.time()
                     print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
-                          + time_elapsed(t0, 60, 0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
+                          + time_form(tm.time() - t0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
                           + str(int(tavg * (bound - i) % 60)) + "s" + "\n" + str(int(i * bound_permil / 10)) + "% "
                           , end='', flush=True)
                     self.filProg.write(
                         ' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
-                        + time_elapsed(t0, 60, 0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
+                        + time_form(tm.time() - t0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
                         + str(int(tavg * (bound - i) % 60)) + "s" + "\n" + str(int(i * bound_permil / 10)) + "%")
                 self.closeProgressFile()
                 # time estimation end
@@ -1274,19 +1274,18 @@ class mpSystem:
             self.tavg /= self.evolStep  # average over total number of steps
             t1 = tm.time()
             print(' ' + str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) + ' elapsed: ' +
-                  time_elapsed(t0, 60, 0), end='')
+                  time_form(tm.time() - t0), end='')
             if i != 10:
-                print(" ###### eta: " + str(
-                    int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(
-                    int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ", end='')
+                print(" ###### eta: " + time_form(self.tavg * (self.steps - self.evolStep)) + "\n" + str(
+                    i * 10) + "% ", end='')
             # write to progress log!
             self.openProgressFile()
             self.filProg.write(' ' + str(i * 10) + "%" + ' 1-norm: ' + str(np.round(1 - self.stateNormAbs, 2)) +
-                               ' elapsed: ' + time_elapsed(t0, 60, 0))
+                               ' elapsed: ' + time_form(tm.time() - t0))
             if i != 10:
-                self.filProg.write(" ###### eta: " + str(
-                    int(self.tavg * (self.steps - self.evolStep) / 60)) + "m " + str(
-                    int(self.tavg * (self.steps - self.evolStep) % 60)) + "s" + "\n" + str(i * 10) + "% ")
+                self.filProg.write(
+                    " ###### eta: " + time_form(self.tavg * (self.steps - self.evolStep)) + "\n" + str(
+                        i * 10) + "% ")
             self.closeProgressFile()
 
         # so we have datapoints+1 points!
@@ -1296,7 +1295,8 @@ class mpSystem:
         if self.boolRetgreen:
             self.greenStoreState()
 
-        print('\n' + 'Time evolution finished with average time/step of ' + time_form(self.tavg) + '\n', flush=True)
+        print('\n' + 'Time evolution finished with average time/datapoint of ' + time_form(
+            self.tavg * self.evolStepDist) + '\n', flush=True)
         if self.boolDataStore:
             self.closeFiles()
 
@@ -1853,7 +1853,7 @@ def time_form(seconds):
             unit = 'ms'
             divider = 1e-3
         elif magnitude >= -6:
-            unit = chr(230) + 's'
+            unit = chr(956) + 's'
             divider = 1e-6
         elif magnitude >= -9:
             unit = 'ns'
