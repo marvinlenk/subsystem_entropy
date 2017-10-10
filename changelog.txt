@@ -1,7 +1,9 @@
 change log
 
 ### 10.10.2017
-- fixed eta for green's function 
+- fixed eta for green's function
+- changed updateAll to be outside the if clause for storeData
+- added config parameter for reduced entropy and occupation number
 
 ### 05.10.2017
 - fixed bug where reduced density matrix was not initialized correctly for only one traced out level

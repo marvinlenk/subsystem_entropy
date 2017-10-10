@@ -60,9 +60,11 @@ class mpSystem:
         self.boolRetgreen = False
         # ## calculation-parameters
         self.boolOnlyRed = False
-        self.boolTotalEnt = False
+        self.boolTotalEntropy = False
+        self.boolReducedEntropy = False
         self.boolTotalEnergy = False
         self.boolReducedEnergy = False
+        self.boolOccupations = False
         # ## plotting booleans and parameters
         self.boolPlotData = False
         self.boolPlotAverages = False
@@ -311,9 +313,11 @@ class mpSystem:
         self.boolRetgreen = configParser.getboolean('filemanagement', 'retgreen')
         # ## calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
-        self.boolTotalEnt = configParser.getboolean('calcparams', 'totalentropy')
+        self.boolTotalEntropy = configParser.getboolean('calcparams', 'totalentropy')
+        self.boolReducedEntropy = configParser.getboolean('calcparams', 'reducedentropy')
         self.boolTotalEnergy = configParser.getboolean('calcparams', 'totalenergy')
         self.boolReducedEnergy = configParser.getboolean('calcparams', 'reducedenergy')
+        self.boolOccupations = configParser.getboolean('calcparams', 'occupations')
         # ## plotting booleans and parameters
         self.boolPlotData = configParser.getboolean('plotbools', 'data')
         self.boolPlotAverages = configParser.getboolean('plotbools', 'averages')
@@ -1200,12 +1204,16 @@ class mpSystem:
         self.evolTime += (self.evolStep - self.evolStepTmp) * self.deltaT
         self.evolStepTmp = self.evolStep
         self.normalize()
-        if self.boolOnlyRed:
-            self.reduceDensityMatrixFromState()
-        else:
-            self.updateDensityMatrix()
-            self.reduceDensityMatrix()
-        self.updateOccNumbers()
+        if self.boolReducedEntropy or self.boolReducedEnergy: # only calculate reduced if needed
+            if self.boolOnlyRed:
+                self.reduceDensityMatrixFromState()
+            else:
+                self.updateDensityMatrix()
+                self.reduceDensityMatrix()
+        if self.boolOccupations:
+            self.updateOccNumbers()
+        if self.boolReducedEntropy:
+            self.updateEntropyRed()
         if self.boolReducedEnergy:
             self.updateReducedEnergy()
         if self.boolOffDiagOcc:
@@ -1214,7 +1222,6 @@ class mpSystem:
             self.updateOffDiagDens()
         if self.boolOffDiagDensRed:
             self.updateOffDiagDensRed()
-        self.updateEntropyRed()
 
     ###### the magic of time evolution
     def evolve(self):
@@ -1239,8 +1246,8 @@ class mpSystem:
             for ii in range(1, 11):
                 # need only dataPoints steps of size evolStepDist
                 for j in range(0, stepNo):
+                    self.updateEverything() # update always - config file should control what to update
                     if self.boolDataStore:
-                        self.updateEverything()
                         self.writeData()
                     if self.boolRetgreen:
                         self.greenStoreState()
@@ -1255,7 +1262,7 @@ class mpSystem:
                 #    self.greenStoreState()
 
                 # calculate total entropy and energy only 100 times, it is time consuming and only a check
-                if self.boolTotalEnt:
+                if self.boolTotalEntropy:
                     self.updateEntropy()
                     self.filTotEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropy))
 
@@ -1355,7 +1362,7 @@ class mpSystem:
         self.filEnt = open('./data/entropy.txt', 'w')
         self.filNorm = open('./data/norm.txt', 'w')
         self.filOcc = open('./data/occupation.txt', 'w')
-        if self.boolTotalEnt:
+        if self.boolTotalEntropy:
             self.filTotEnt = open('./data/total_entropy.txt', 'w')
         if self.boolTotalEnergy:
             self.filTotalEnergy = open('./data/total_energy.txt', 'w')
@@ -1375,7 +1382,7 @@ class mpSystem:
         self.filEnt.close()
         self.filNorm.close()
         self.filOcc.close()
-        if self.boolTotalEnt:
+        if self.boolTotalEntropy:
             self.filTotEnt.close()
         if self.boolTotalEnergy:
             self.filTotalEnergy.close()
