@@ -1,5 +1,8 @@
 change log
 
+### 10.10.2017
+- fixed eta for green's function 
+
 ### 05.10.2017
 - fixed bug where reduced density matrix was not initialized correctly for only one traced out level
 - fixed bug where progress output for greens functions with more than 999 datapoints was broken

@@ -1155,7 +1155,7 @@ class mpSystem:
         t0 = tm.time()
         t1 = tm.time()
         tavg = 0
-        bound_permil = 1000.0 / bound # use per 1000 to get easier condition for 1% and 10%
+        bound_permil = 1000.0 / bound  # use per 1000 to get easier condition for 1% and 10%
         for i in range(1, bound + 1):
             tmpHiEvol = np.dot(tmpHiEvol, self.specHiEvolutionMatrix)  # they need to be the squared ones!
             tmpLoEvol = np.dot(tmpLoEvol, self.specLoEvolutionMatrix)  # they need to be the squared ones!
@@ -1184,13 +1184,13 @@ class mpSystem:
                     tavg /= i  # average over total number of steps
                     t1 = tm.time()
                     print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
-                          + time_form(tm.time() - t0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
-                          + str(int(tavg * (bound - i) % 60)) + "s" + "\n" + str(int(i * bound_permil / 10)) + "% "
+                          + time_form(tm.time() - t0) + " ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                        int(i * bound_permil / 10)) + "% "
                           , end='', flush=True)
                     self.filProg.write(
                         ' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
-                        + time_form(tm.time() - t0) + " ###### eta: " + str(int(tavg * (bound - i) / 60)) + "m "
-                        + str(int(tavg * (bound - i) % 60)) + "s" + "\n" + str(int(i * bound_permil / 10)) + "%")
+                        + time_form(tm.time() - t0) + " ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                            int(i * bound_permil / 10)) + "%")
                 self.closeProgressFile()
                 # time estimation end
         self.filGreen.close()
