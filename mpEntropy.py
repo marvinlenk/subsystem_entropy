@@ -1187,14 +1187,19 @@ class mpSystem:
                     tavg += tm.time() - t1  # add passed time
                     tavg /= i  # average over total number of steps
                     t1 = tm.time()
-                    print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
-                          + time_form(tm.time() - t0) + " ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
-                        int(i * bound_permil / 10)) + "% "
-                          , end='', flush=True)
+                    print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0), end='',
+                          flush=True)
+
                     self.filProg.write(
-                        ' ' + str(int(i * bound_permil / 10)) + "% elapsed: "
-                        + time_form(tm.time() - t0) + " ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                        ' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0))
+                    if i != bound:
+                        print(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                            int(i * bound_permil / 10)) + "% ", end='', flush=True)
+                        self.filProg.write(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
                             int(i * bound_permil / 10)) + "%")
+                    else:
+                        print('\n')
+                        self.filProg.write('\n')
                 self.closeProgressFile()
                 # time estimation end
         self.filGreen.close()
@@ -1204,7 +1209,7 @@ class mpSystem:
         self.evolTime += (self.evolStep - self.evolStepTmp) * self.deltaT
         self.evolStepTmp = self.evolStep
         self.normalize()
-        if self.boolReducedEntropy or self.boolReducedEnergy: # only calculate reduced if needed
+        if self.boolReducedEntropy or self.boolReducedEnergy:  # only calculate reduced if needed
             if self.boolOnlyRed:
                 self.reduceDensityMatrixFromState()
             else:
@@ -1246,7 +1251,7 @@ class mpSystem:
             for ii in range(1, 11):
                 # need only dataPoints steps of size evolStepDist
                 for j in range(0, stepNo):
-                    self.updateEverything() # update always - config file should control what to update
+                    self.updateEverything()  # update always - config file should control what to update
                     if self.boolDataStore:
                         self.writeData()
                     if self.boolRetgreen:
@@ -1293,6 +1298,8 @@ class mpSystem:
                 self.filProg.write(
                     " ###### eta: " + time_form(self.tavg * (self.steps - self.evolStep)) + "\n" + str(
                         i * 10) + "% ")
+            else:
+                self.filProg.write('\n')
             self.closeProgressFile()
 
         # so we have datapoints+1 points!

@@ -1,5 +1,12 @@
 change log
 
+### 12.10.2017
+- added linebreak in progress.log after time evolution
+- changed plotting to recognize what data is created (basically added if clause for reduced ent and occ)
+- fixed dft frequencies to be correctly calculated
+- fixed dft of greens function to get the correct sample spacing
+- NOTE: DFT can only handle uneven numbers of datapoints, fix this!
+
 ### 10.10.2017
 - fixed eta for green's function
 - changed updateAll to be outside the if clause for storeData

@@ -53,18 +53,18 @@ def plotData(sysVar):
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
     pp = PdfPages('./plots/plots.pdf')
 
-    occfile = './data/occupation.txt'
-    occ_array = np.loadtxt(occfile)
-    # multiply step array with time scale
-    step_array = occ_array[:, 0] * sysVar.plotTimeScale
+    if sysVar.boolOccupations:
+        occfile = './data/occupation.txt'
+        occ_array = np.loadtxt(occfile)
 
     normfile = './data/norm.txt'
     norm_array = np.loadtxt(normfile)
     # want deviation from 1
     norm_array[:, 1] = 1 - norm_array[:, 1]
 
-    entfile = './data/entropy.txt'
-    ent_array = np.loadtxt(entfile)
+    if sysVar.boolReducedEntropy:
+        entfile = './data/entropy.txt'
+        ent_array = np.loadtxt(entfile)
 
     if sysVar.boolPlotEngy:
         engies = np.loadtxt('./data/hamiltonian_eigvals.txt')
@@ -72,7 +72,7 @@ def plotData(sysVar):
     if sysVar.boolPlotDecomp:
         stfacts = np.loadtxt('./data/state.txt')
 
-    if sysVar.boolTotalEnt:
+    if sysVar.boolTotalEntropy:
         totentfile = './data/total_entropy.txt'
         totent_array = np.loadtxt(totentfile)
 
@@ -112,7 +112,7 @@ def plotData(sysVar):
         return 0
         # ### Complete system Entropy
 
-    if (sysVar.boolTotalEnt):
+    if sysVar.boolTotalEntropy:
         plt.plot(totent_array[:, 0] * sysVar.plotTimeScale, totent_array[:, 1] * 1e13, linewidth=0.6, color='r')
 
         plt.grid()
@@ -127,234 +127,238 @@ def plotData(sysVar):
     def subsystem_entropy():
         return 0
         # ## Subsystem Entropy
-
-    plt.plot(step_array, ent_array[:, 1], linewidth=0.8, color='r')
-    plt.grid()
-    if sysVar.boolPlotAverages:
-        tavg = savgol_filter(ent_array[:, 1], fwidth, ford)
-        plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
-    plt.xlabel(r'$J\,t$')
-    plt.ylabel('Subsystem entropy')
-    plt.tight_layout()
-    pp.savefig()
-    plt.clf()
-    print('.', end='', flush=True)
-
-    # Subsystem entropy with inlay
-    max_time = step_array[-1]
-    max_ind = int(max_time / step_array[-1] * len(step_array))
-
-    avg = np.mean(ent_array[loavgind:, 1])
-    plt.plot(step_array[:], ent_array[:, 1], linewidth=0.3, color='r')
-    if sysVar.boolPlotAverages:
-        tavg = savgol_filter(ent_array[:, 1], fwidth, ford)
-        plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
-    plt.xlabel(r'$J\,t$')
-    plt.ylabel(r'Subsystem entropy $S\textsubscript{sys}$')
-    a = plt.axes([.5, .3, .4, .4])
-    plt.semilogy(step_array[:max_ind], np.abs(avg - ent_array[:max_ind, 1]), linewidth=0.3, color='r')
-    plt.ylabel(r'$|\,\overline{S}\textsubscript{sys} - S\textsubscript{sys}(t)|$')
-    plt.yticks([])
-    pp.savefig()
-    plt.clf()
-    print('.', end='', flush=True)
-
-    '''
-    ###FFT
-    print('')
-    fourier = np.fft.rfft(ent_array[loavgind:,1])
-    print(fourier[0].real)
-    freq = np.fft.rfftfreq(np.shape(ent_array[loavgind:,1])[-1], d=step_array[1])
-    plt.plot(freq[1:],np.abs(fourier[1:]))
-    print('')
-    plt.ylabel(r'$A_{\omega}$')
-    plt.xlabel(r'$\omega$')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.',end='',flush=True)
-    '''
-
-    def single_level_occ():
-        return 0
-        # ## Single-level occupation numbers
-
-    for i in range(0, sysVar.m):
-        plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.5)
+    if sysVar.boolReducedEntropy:
+        step_array = ent_array[:, 0] * sysVar.plotTimeScale
+        plt.plot(step_array, ent_array[:, 1], linewidth=0.8, color='r')
+        plt.grid()
         if sysVar.boolPlotAverages:
-            tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
+            tavg = savgol_filter(ent_array[:, 1], fwidth, ford)
             plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
-        if sysVar.boolPlotDiagExp:
-            plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
+        plt.xlabel(r'$J\,t$')
+        plt.ylabel('Subsystem entropy')
+        plt.tight_layout()
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
 
-    plt.ylabel(r'Occupation number')
-    plt.xlabel(r'$J\,t$')
-    plt.legend(loc='upper right')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.', end='', flush=True)
-    '''
-    ###FFT
-    print('')
-    for i in range(0,sysVar.m):
-        plt.xlim(xmax=30)
-        #GK = -i(2n-1)
-        fourier = (rfft(occ_array[loavgind:,i+1],norm='ortho'))*2 -1
+        # Subsystem entropy with inlay
+        max_time = step_array[-1]
+        max_ind = int(max_time / step_array[-1] * len(step_array))
+
+        avg = np.mean(ent_array[loavgind:, 1])
+        plt.plot(step_array[:], ent_array[:, 1], linewidth=0.3, color='r')
+        if sysVar.boolPlotAverages:
+            tavg = savgol_filter(ent_array[:, 1], fwidth, ford)
+            plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
+        plt.xlabel(r'$J\,t$')
+        plt.ylabel(r'Subsystem entropy $S\textsubscript{sys}$')
+        a = plt.axes([.5, .3, .4, .4])
+        plt.semilogy(step_array[:max_ind], np.abs(avg - ent_array[:max_ind, 1]), linewidth=0.3, color='r')
+        plt.ylabel(r'$|\,\overline{S}\textsubscript{sys} - S\textsubscript{sys}(t)|$')
+        plt.yticks([])
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
+
+        '''
+        ###FFT
+        print('')
+        fourier = np.fft.rfft(ent_array[loavgind:,1])
         print(fourier[0].real)
-        freq = rfftfreq(np.shape(occ_array[loavgind:,i+1])[-1], d=step_array[1])
-        plt.plot(freq,fourier.real,linewidth = 0.05)
-        plt.plot(freq,fourier.imag,linewidth = 0.05)
-        plt.ylabel(r'$G^K_{\omega}$')
+        freq = np.fft.rfftfreq(np.shape(ent_array[loavgind:,1])[-1], d=step_array[1])
+        plt.plot(freq[1:],np.abs(fourier[1:]))
+        print('')
+        plt.ylabel(r'$A_{\omega}$')
         plt.xlabel(r'$\omega$')
         plt.grid()
         plt.tight_layout()
         ###
         pp.savefig()
         plt.clf()
-    print('.',end='',flush=True)
-    '''
+        print('.',end='',flush=True)
+        '''
 
-    def bath_occ():
+    def single_level_occ():
         return 0
+        # ## Single-level occupation numbers
 
-    # ## Traced out (bath) occupation numbers
-    for i in sysVar.kRed:
-        plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
-        if sysVar.boolPlotDiagExp:
-            plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
-        if sysVar.boolPlotAverages:
-            tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
-            plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
+    if sysVar.boolOccupations:
+        step_array = occ_array[:, 0] * sysVar.plotTimeScale
+        for i in range(0, sysVar.m):
+            plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.5)
+            if sysVar.boolPlotAverages:
+                tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
+                plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
+            if sysVar.boolPlotDiagExp:
+                plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
 
-    plt.ylabel(r'Occupation number')
-    plt.xlabel(r'$J\,t$')
-    plt.legend(loc='lower right')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.', end='', flush=True)
+        plt.ylabel(r'Occupation number')
+        plt.xlabel(r'$J\,t$')
+        plt.legend(loc='upper right')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
+        '''
+        ###FFT
+        print('')
+        for i in range(0,sysVar.m):
+            plt.xlim(xmax=30)
+            #GK = -i(2n-1)
+            fourier = (rfft(occ_array[loavgind:,i+1],norm='ortho'))*2 -1
+            print(fourier[0].real)
+            freq = rfftfreq(np.shape(occ_array[loavgind:,i+1])[-1], d=step_array[1])
+            plt.plot(freq,fourier.real,linewidth = 0.05)
+            plt.plot(freq,fourier.imag,linewidth = 0.05)
+            plt.ylabel(r'$G^K_{\omega}$')
+            plt.xlabel(r'$\omega$')
+            plt.grid()
+            plt.tight_layout()
+            ###
+            pp.savefig()
+            plt.clf()
+        print('.',end='',flush=True)
+        '''
 
-    def system_occ():
-        return 0
-        # ## Leftover (system) occupation numbers
+        def bath_occ():
+            return 0
 
-    for i in np.arange(sysVar.m)[sysVar.mask]:
-        plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
-        if sysVar.boolPlotDiagExp:
-            plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
-        if sysVar.boolPlotAverages:
-            tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
-            plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
-
-    plt.ylabel(r'Occupation number')
-    plt.xlabel(r'$J\,t$')
-    plt.legend(loc='lower right')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.', end='', flush=True)
-
-    def subsystem_occupation():
-        return 0
-        # ## Subsystems occupation numbers
-
-    # store fluctuations in a data
-    fldat = open('./data/fluctuation.txt', 'w')
-    fldat.write('N_tot: %i\n' % (sysVar.N))
-    tmp = np.zeros(len(step_array))
-    for i in sysVar.kRed:
-        tmp += occ_array[:, i + 1]
-    plt.plot(step_array, tmp, label="bath", linewidth=0.8, color='magenta')
-
-    if sysVar.boolPlotAverages:
-        tavg = savgol_filter(tmp, fwidth, ford)
-        plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
-
-    if sysVar.boolPlotDiagExp:
-        mictmp = 0
+        # ## Traced out (bath) occupation numbers
         for i in sysVar.kRed:
-            mictmp += microexp[i, 1]
-        plt.axhline(y=mictmp, color='purple', linewidth=expectsize, linestyle=expectstyle)
+            plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
+            if sysVar.boolPlotDiagExp:
+                plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
+            if sysVar.boolPlotAverages:
+                tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
+                plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
 
-    avg = np.mean(tmp[loavgind:], dtype=np.float64)
-    stddev = np.std(tmp[loavgind:], dtype=np.float64)
-    fldat.write('bath_average: %.16e\n' % avg)
-    fldat.write('bath_stddev: %.16e\n' % stddev)
-    # noinspection PyStringFormat
-    fldat.write("bath_rel._fluctuation: %.16e\n" % (stddev / avg))
+        plt.ylabel(r'Occupation number')
+        plt.xlabel(r'$J\,t$')
+        plt.legend(loc='lower right')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
 
-    tmp.fill(0)
-    for i in np.arange(sysVar.m)[sysVar.mask]:
-        tmp += occ_array[:, i + 1]
-    plt.plot(step_array, tmp, label="system", linewidth=0.8, color='darkgreen')
+        def system_occ():
+            return 0
+            # ## Leftover (system) occupation numbers
 
-    if sysVar.boolPlotAverages:
-        tavg = savgol_filter(tmp, fwidth, ford)
-        plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
-
-    if sysVar.boolPlotDiagExp:
-        mictmp = 0
         for i in np.arange(sysVar.m)[sysVar.mask]:
-            mictmp += microexp[i, 1]
-        plt.axhline(y=mictmp, color='purple', linewidth=expectsize, linestyle=expectstyle)
+            plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
+            if sysVar.boolPlotDiagExp:
+                plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
+            if sysVar.boolPlotAverages:
+                tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
+                plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
 
-    avg = np.mean(tmp[loavgind:], dtype=np.float64)
-    stddev = np.std(tmp[loavgind:], dtype=np.float64)
-    fldat.write('system_average: %.16e\n' % avg)
-    fldat.write('system_stddev: %.16e\n' % stddev)
-    fldat.write('system_rel._fluctuation: %.16e\n' % (stddev / avg))
+        plt.ylabel(r'Occupation number')
+        plt.xlabel(r'$J\,t$')
+        plt.legend(loc='lower right')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
 
-    for i in range(sysVar.m):
-        avg = np.mean(occ_array[loavgind:, i + 1], dtype=np.float64)
-        stddev = np.std(occ_array[loavgind:, i + 1], dtype=np.float64)
-        fldat.write('n%i_average: %.16e\n' % (i, avg))
-        fldat.write('n%i_stddev: %.16e\n' % (i, stddev))
-        fldat.write('n%i_rel._fluctuation: %.16e\n' % (i, (stddev / avg)))
+        def subsystem_occupation():
+            return 0
+            # ## Subsystems occupation numbers
 
-    avg = np.mean(ent_array[loavgind:, 1], dtype=np.float64)
-    stddev = np.std(ent_array[loavgind:, 1], dtype=np.float64)
-    fldat.write('ssentropy_average: %.16e\n' % avg)
-    fldat.write('ssentropy_stddev: %.16e\n' % stddev)
-    fldat.write('ssentropy_rel._fluctuation: %.16e\n' % (stddev / avg))
+        # store fluctuations in a data
+        fldat = open('./data/fluctuation.txt', 'w')
+        fldat.write('N_tot: %i\n' % (sysVar.N))
+        tmp = np.zeros(len(step_array))
+        for i in sysVar.kRed:
+            tmp += occ_array[:, i + 1]
+        plt.plot(step_array, tmp, label="bath", linewidth=0.8, color='magenta')
 
-    fldat.close()
+        if sysVar.boolPlotAverages:
+            tavg = savgol_filter(tmp, fwidth, ford)
+            plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
 
-    plt.ylabel(r'Occupation number')
-    plt.xlabel(r'$J\,t$')
-    plt.legend(loc='center right')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.', end='', flush=True)
+        if sysVar.boolPlotDiagExp:
+            mictmp = 0
+            for i in sysVar.kRed:
+                mictmp += microexp[i, 1]
+            plt.axhline(y=mictmp, color='purple', linewidth=expectsize, linestyle=expectstyle)
 
-    def occ_distribution():
-        return 0
-        # occupation number in levels against level index
+        avg = np.mean(tmp[loavgind:], dtype=np.float64)
+        stddev = np.std(tmp[loavgind:], dtype=np.float64)
+        fldat.write('bath_average: %.16e\n' % avg)
+        fldat.write('bath_stddev: %.16e\n' % stddev)
+        # noinspection PyStringFormat
+        fldat.write("bath_rel._fluctuation: %.16e\n" % (stddev / avg))
 
-    occavg = np.loadtxt('./data/fluctuation.txt', usecols=(1,))
-    plt.xlim(-0.1, sysVar.m - 0.9)
-    for l in range(0, sysVar.m):
-        plt.errorbar(l, occavg[int(7 + 3 * l)] / sysVar.N, xerr=None, yerr=occavg[int(8 + 3 * l)] / sysVar.N,
-                     marker='o', color=cm.Set1(0))
-    plt.ylabel(r'Relative level occupation')
-    plt.xlabel(r'Level index')
-    plt.grid()
-    plt.tight_layout()
-    ###
-    pp.savefig()
-    plt.clf()
-    print('.', end='', flush=True)
+        tmp.fill(0)
+        for i in np.arange(sysVar.m)[sysVar.mask]:
+            tmp += occ_array[:, i + 1]
+        plt.plot(step_array, tmp, label="system", linewidth=0.8, color='darkgreen')
+
+        if sysVar.boolPlotAverages:
+            tavg = savgol_filter(tmp, fwidth, ford)
+            plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
+
+        if sysVar.boolPlotDiagExp:
+            mictmp = 0
+            for i in np.arange(sysVar.m)[sysVar.mask]:
+                mictmp += microexp[i, 1]
+            plt.axhline(y=mictmp, color='purple', linewidth=expectsize, linestyle=expectstyle)
+
+        avg = np.mean(tmp[loavgind:], dtype=np.float64)
+        stddev = np.std(tmp[loavgind:], dtype=np.float64)
+        fldat.write('system_average: %.16e\n' % avg)
+        fldat.write('system_stddev: %.16e\n' % stddev)
+        fldat.write('system_rel._fluctuation: %.16e\n' % (stddev / avg))
+
+        for i in range(sysVar.m):
+            avg = np.mean(occ_array[loavgind:, i + 1], dtype=np.float64)
+            stddev = np.std(occ_array[loavgind:, i + 1], dtype=np.float64)
+            fldat.write('n%i_average: %.16e\n' % (i, avg))
+            fldat.write('n%i_stddev: %.16e\n' % (i, stddev))
+            fldat.write('n%i_rel._fluctuation: %.16e\n' % (i, (stddev / avg)))
+
+        if sysVar.boolReducedEntropy:
+            avg = np.mean(ent_array[loavgind:, 1], dtype=np.float64)
+            stddev = np.std(ent_array[loavgind:, 1], dtype=np.float64)
+            fldat.write('ssentropy_average: %.16e\n' % avg)
+            fldat.write('ssentropy_stddev: %.16e\n' % stddev)
+            fldat.write('ssentropy_rel._fluctuation: %.16e\n' % (stddev / avg))
+
+        fldat.close()
+
+        plt.ylabel(r'Occupation number')
+        plt.xlabel(r'$J\,t$')
+        plt.legend(loc='center right')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
+
+        def occ_distribution():
+            return 0
+            # occupation number in levels against level index
+
+        occavg = np.loadtxt('./data/fluctuation.txt', usecols=(1,))
+        plt.xlim(-0.1, sysVar.m - 0.9)
+        for l in range(0, sysVar.m):
+            plt.errorbar(l, occavg[int(7 + 3 * l)] / sysVar.N, xerr=None, yerr=occavg[int(8 + 3 * l)] / sysVar.N,
+                         marker='o', color=cm.Set1(0))
+        plt.ylabel(r'Relative level occupation')
+        plt.xlabel(r'Level index')
+        plt.grid()
+        plt.tight_layout()
+        ###
+        pp.savefig()
+        plt.clf()
+        print('.', end='', flush=True)
 
     def sum_offdiagonals():
         return 0
@@ -494,6 +498,7 @@ def plotData(sysVar):
         return 0
         # ## Norm deviation
 
+    step_array = norm_array[:, 0] * sysVar.plotTimeScale
     plt.plot(step_array, norm_array[:, 1], "ro", ms=0.5)
     plt.ylabel('norm deviation from 1')
     plt.xlabel(r'$J\,t$')
@@ -604,16 +609,15 @@ def plotData(sysVar):
             ###
             plt.title(r'Spectral function of level $%i$' % (i))
             green_ret = gd[:, ind] + 1j * gd[:, ind + 1]
-            print(np.shape(green_ret))
             # green_ret_freq = fft(np.hanning(len(green_ret)) * green_ret, norm='ortho')
             # green_ret_freq = fft(green_ret, norm='ortho')
             # spec_tmp = (-2 * fftshift(green_ret_freq.imag))
             if i == 0:
                 # samp_spacing = sysVar.deltaT * 2 * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
-                samp_spacing = (gd[-1, 0] - gd[0, 0]) / len(green_ret)
-            green_ret_freq = dft.dft(green_ret, 1.0 / samp_spacing)
-            spec_tmp = (-2 * green_ret_freq[1, :].imag)
-            hlpfrq = green_ret_freq[0, :].real
+                samp_spacing = (gd[-1, 0] - gd[0, 0]) / (len(green_ret) - 1)
+            green_ret_freq = dft.rearrange(dft.dft(green_ret, 1.0 / samp_spacing))
+            spec_tmp = (-2 * green_ret_freq[:, 1].imag)
+            hlpfrq = green_ret_freq[:, 0].real
             # ## !!! normalize by hand! this might be strange but is necessary here
             # spec_tmp /= (np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
             if i == 0:
