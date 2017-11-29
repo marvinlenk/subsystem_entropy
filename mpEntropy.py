@@ -65,6 +65,7 @@ class mpSystem:
         self.boolTotalEnergy = False
         self.boolReducedEnergy = False
         self.boolOccupations = False
+        self.boolEntanglementSpectrum = False
         # ## plotting booleans and parameters
         self.boolPlotData = False
         self.boolPlotAverages = False
@@ -97,6 +98,7 @@ class mpSystem:
         # end of the list
         # a new list of file variables which also have to be initialized
         self.filEnt = None
+        self.filEntSpec = None
         self.filNorm = None
         self.filOcc = None
         self.filTotEnt = None
@@ -112,7 +114,8 @@ class mpSystem:
 
         self.loadConfig()
         if not plotOnly:
-            prepFolders(0, self.boolDMStore, self.boolDMRedStore, self.boolOccEnStore, self.boolCleanFiles)
+            prepFolders(0, self.boolDMStore, self.boolDMRedStore, self.boolOccEnStore,
+                        self.boolEntanglementSpectrum, self.boolCleanFiles)
             # touch the progress file
             open('./data/progress.log', 'w').close()
         # mask selects only not traced out states
@@ -220,7 +223,15 @@ class mpSystem:
                 self.eigVectsRed = np.array([])
                 self.eigInvRed = np.array([])
                 self.eigIndRed = False
-
+            elif self.boolEntanglementSpectrum:
+                # if it was not calculated here do it anyway to get the reduced operators
+                self.operatorsRed = quadraticArrayRed(self)
+            self.entanglementSpectrum = np.zeros(self.dimRed)
+            if self.boolEntanglementSpectrum:
+                self.entanglementSpectrumOccupation = np.zeros(self.dimRed)
+                self.operatorSubsystemOccupuation = self.operatorsRed[0, 0]
+                for i in range(1, self.mRed):
+                    self.operatorSubsystemOccupuation += self.operatorsRed[i, i]
             # ## Spectral
             if self.boolRetgreen:
                 # lo
@@ -318,6 +329,7 @@ class mpSystem:
         self.boolTotalEnergy = configParser.getboolean('calcparams', 'totalenergy')
         self.boolReducedEnergy = configParser.getboolean('calcparams', 'reducedenergy')
         self.boolOccupations = configParser.getboolean('calcparams', 'occupations')
+        self.boolEntanglementSpectrum = configParser.getboolean('calcparams', 'entanglementspectrum')
         # ## plotting booleans and parameters
         self.boolPlotData = configParser.getboolean('plotbools', 'data')
         self.boolPlotAverages = configParser.getboolean('plotbools', 'averages')
@@ -1100,24 +1112,30 @@ class mpSystem:
 
     # end of updateEntropy
 
+    def updateEntanglementSpectrum(self):
+        if self.mRed != 1:
+            if self.boolEntanglementSpectrum:
+                self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
+                for i in range(0, self.dimRed):
+                    self.entanglementSpectrumOccupation[i] = \
+                        np.vdot(entanglementStates[i],
+                                self.operatorSubsystemOccupuation.dot(entanglementStates[i])).real
+            else:
+                self.entanglementSpectrum = la.eigvalsh(self.densityMatrixRed, check_finite=False)
+        else:
+            # if only one level left, density matrix is already diagonal
+            self.entanglementSpectrum = self.densityMatrixRed
+
     def updateEntropyRed(self):
         if self.densityMatrixRed is None:
             return
         self.entropyRed = 0
-        if self.mRed != 1:
-            for el in la.eigvalsh(self.densityMatrixRed, check_finite=False):
-                if el.real > 0:
-                    self.entropyRed -= el.real * nplog(el.real)
-                elif el.real < -1e-7:
-                    print('Oh god, there is a negative eigenvalue below 1e-7 ! Namely:', el)
-        else:
-            # if only one level left, density matrix is already diagonal
-            for el in self.densityMatrixRed:
-                if el.real > 0:
-                    self.entropyRed -= el.real * nplog(el.real)
-                elif el.real < -1e-7:
-                    print('Oh god, there is a negative eigenvalue below 1e-7 ! Namely:', el)
-
+        self.updateEntanglementSpectrum()
+        for el in self.entanglementSpectrum:
+            if el.real > 0:
+                self.entropyRed -= el.real * nplog(el.real)
+            elif el.real < -1e-7:
+                print('Oh god, there is a negative eigenvalue below 1e-7 ! Namely:', el)
     # end of updateEntropyRed
 
     def updateOccNumbers(self):
@@ -1150,10 +1168,12 @@ class mpSystem:
         bound = int((saves - 1) / 2)
         dt = self.timeSaves[1]
 
-        # handle the i=0 case => equal time greens function is always -i:
+        # handle the i=0 case => equal time greater is -i*n_i+1, lesser is i*n_i
         self.filGreen.write('%.16e ' % 0)
         for ind in range(0, self.m):
-            self.filGreen.write('%.16e %.16e ' % (0, -1))
+            tmpexpectation = np.vdot(self.stateSaves[bound], self.operators[ind, ind].dot(self.stateSaves[bound]))
+            self.filGreen.write('%.16e %.16e ' % (0, -1*(tmpexpectation.real + 1)))
+            self.filGreen.write('%.16e %.16e ' % (0, tmpexpectation.real))
         self.filGreen.write(' \n')
 
         # now start from the first non-zero difference time
@@ -1174,7 +1194,7 @@ class mpSystem:
                 tmpGreenLow = multi_dot(
                     [self.stateSaves[bound - i].T.conjugate(), self.specLowering[m].T.dot(tmpLoEvol),
                      self.specLowering[m].dot(self.stateSaves[bound + i])])
-                # note that the larger greensfunction is multiplied by -i, which is included in the writing below!
+                # note that the greater greensfunction is multiplied by -i, which is included in the writing below!
                 # note that the lesser greensfunction is multiplied by i, which is included in the writing below!
                 # first number is real part, second imaginary
                 self.filGreen.write('%.16e %.16e ' % (-1 * tmpGreenHigh.imag, tmpGreenHigh.real))
@@ -1221,7 +1241,11 @@ class mpSystem:
         if self.boolOccupations:
             self.updateOccNumbers()
         if self.boolReducedEntropy:
+            # will automatically calculate entanglement spectrum
             self.updateEntropyRed()
+        elif self.boolEntanglementSpectrum:
+            # only do this if not already calculated for reduced entropy
+            self.updateEntanglementSpectrum()
         if self.boolReducedEnergy:
             self.updateReducedEnergy()
         if self.boolOffDiagOcc:
@@ -1349,9 +1373,19 @@ class mpSystem:
                             '%.16e %.16e ' % (self.offDiagOccSingles[i, j].real, self.offDiagOccSingles[i, j].imag))
                 self.filOffDiagOccSingles.write('\n')
 
-        self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
+        if self.boolReducedEntropy:
+            self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
+
+        if self.boolEntanglementSpectrum:
+            # note that this is the only! time where the time scale is already included
+            head = 'n_sys p(n_sys) /// Jt = $f' % (self.evolTime * self.plotTimeScale)
+            np.savetxt('./data/entanglement_spectrum/ent_spec_%i.dat' % self.evolStep,
+                       np.column_stack((self.entanglementSpectrumOccupation, self.entanglementSpectrum)), header=head)
+
         self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
-        self.filOcc.write('%.16e ' % self.evolTime)
+
+        if self.boolOccupations:
+            self.filOcc.write('%.16e ' % self.evolTime)
         for m in range(0, self.m):
             self.filOcc.write('%.16e ' % self.occNo[m])
         self.filOcc.write('\n')
@@ -1369,9 +1403,11 @@ class mpSystem:
         self.filProg.close()
 
     def openFiles(self):
-        self.filEnt = open('./data/entropy.txt', 'w')
         self.filNorm = open('./data/norm.txt', 'w')
-        self.filOcc = open('./data/occupation.txt', 'w')
+        if self.boolReducedEntropy:
+            self.filEnt = open('./data/entropy.txt', 'w')
+        if self.boolOccupations:
+            self.filOcc = open('./data/occupation.txt', 'w')
         if self.boolTotalEntropy:
             self.filTotEnt = open('./data/total_entropy.txt', 'w')
         if self.boolTotalEnergy:
@@ -1389,9 +1425,11 @@ class mpSystem:
 
     # close all files
     def closeFiles(self):
-        self.filEnt.close()
         self.filNorm.close()
-        self.filOcc.close()
+        if self.boolReducedEntropy:
+            self.filEnt.close()
+        if self.boolOccupations:
+            self.filOcc.close()
         if self.boolTotalEntropy:
             self.filTotEnt.close()
         if self.boolTotalEnergy:
@@ -1452,7 +1490,7 @@ class mpSystem:
         prepFolders(True)
 
 
-def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, cleanbeforebool=0):
+def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecbool=0, cleanbeforebool=0):
     # create the needed folders
     if cleanbeforebool:
         if os.path.exists("./data/"):
@@ -1473,6 +1511,9 @@ def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, cleanbef
     if spectralbool:
         if not os.path.exists("./data/spectral/"):
             os.mkdir("./data/spectral/")
+    if entspecbool:
+        if not os.path.exists("./data/entanglement_spectrum/"):
+            os.mkdir("./data/entanglement_spectrum/")
     if not os.path.exists("./plots/"):
         os.mkdir("./plots/")
     # remove the old stuff

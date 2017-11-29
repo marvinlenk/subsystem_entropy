@@ -1268,3 +1268,19 @@ def plotTimescale(sysVar):
     print('.', end='', flush=True)
     pp.close()
     print(" done!")
+
+
+def plotMatrix(fPath):
+    fName = fPath.split('/')[-1:][0]
+    pp = PdfPages('./plots/' + fName[:-4] + '.pdf')
+    plt.figure(num=None, figsize=(10, 10), dpi=300)
+    plt.title('absolute value of matrix')
+    dabs = np.loadtxt(fPath)
+    plt.xlabel('column')
+    plt.ylabel('row')
+    cmapVar = plt.cm.Reds
+    cmapVar.set_under(color='black')
+    plt.imshow(dabs, cmap=cmapVar, interpolation='none', vmin=1e-12)
+    pp.savefig()
+    pp.close()
+    plt.close()

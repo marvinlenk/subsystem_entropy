@@ -2,6 +2,12 @@ change log
 
 ### 29.10.2017
 - added splitting into greater and lesser greensfunctions
+- added entanglement spectrum to calculation parameters
+- added a savetxt algorithm for the entanglement spectrum
+- added the already scaled time to show up in the entanglement spectrum data header
+- added plotmatrix again since it might be useful
+- NOTE: for the future, rely more on savetxt and appending! see:
+    https://stackoverflow.com/questions/27786868/python3-numpy-appending-to-a-file-using-numpy-savetxt
 
 ### 16.10.2017
 - dft omits last point if number of datapoints is even
