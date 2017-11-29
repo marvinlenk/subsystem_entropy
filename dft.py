@@ -22,10 +22,11 @@ def idft_matrix(n_tot):
 
 
 # gives angular frequency -> 2 pi nu = omega
+# note that the order is 0 -> omega_nuquist and then -omega_nuqist to -omega_min
 def dft_frequencies(n_tot, sampling_rate):
     tmp = np.linspace(0, np.pi * (n_tot - 1) * sampling_rate / n_tot, int(n_tot / 2) + 1, dtype=np.float64)
     tmp2 = np.linspace(-np.pi * (n_tot - 1) * sampling_rate / n_tot, 0, int(n_tot / 2) + 1, dtype=np.float64)
-    return np.append(tmp, tmp2[:-1])
+    return np.concatenate((tmp, tmp2[:-1]))
 
 
 def idft_times(n_tot, sampling_rate):
@@ -33,13 +34,17 @@ def idft_times(n_tot, sampling_rate):
 
 
 def dft(f_array, sampling_rate):
-    return np.column_stack((dft_frequencies(len(f_array), sampling_rate),
-                            np.dot(dft_matrix(len(f_array)), f_array) / np.sqrt(len(f_array))))
-
+    if len(f_array) % 2 == 0:
+        return np.column_stack((dft_frequencies(len(f_array[:-1]), sampling_rate),
+                            np.dot(dft_matrix(len(f_array[:-1])), f_array[:-1]) / np.sqrt(len(f_array[:-1]))))
+    else:
+        return np.column_stack((dft_frequencies(len(f_array), sampling_rate),
+                                np.dot(dft_matrix(len(f_array)), f_array) / np.sqrt(len(f_array))))
 
 def idft(f_array, sampling_rate):
     return np.column_stack((idft_times(len(f_array), sampling_rate),
                             idft_matrix(len(f_array)).dot(f_array) / np.sqrt(len(f_array))))
+
 
 def rearrange(f_array):
     return np.concatenate((f_array[int(len(f_array)/2) + 1:], f_array[:int(len(f_array)/2) + 1]))

@@ -1,5 +1,14 @@
 change log
 
+### 29.10.2017
+- added splitting into greater and lesser greensfunctions
+
+### 16.10.2017
+- dft omits last point if number of datapoints is even
+
+### 13.10.2017
+- extended time_format by showing hours >= 100 and above 999h to show days automatically
+
 ### 12.10.2017
 - added linebreak in progress.log after time evolution
 - changed plotting to recognize what data is created (basically added if clause for reduced ent and occ)

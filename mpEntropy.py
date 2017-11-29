@@ -1138,6 +1138,7 @@ class mpSystem:
 
     def evaluateGreen(self):
         self.filGreen = open('./data/green.txt', 'w')  # t, re, im
+        self.filGreen.write('#tau re>_1 im>_1 re<_1 im<_1...\n')
         self.openProgressFile()
         self.filProg.write('Starting evalutation of Green\'s function:\n' + ' 0% ')
         print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
@@ -1166,16 +1167,18 @@ class mpSystem:
             self.filGreen.write('%.16e ' % (2 * dt * i))
             for m in range(0, self.m):
                 # raising is the higher dimension creation operator, raising.T.c the annihilation
-                tmpGreen = multi_dot(
+                tmpGreenHigh = multi_dot(
                     [self.stateSaves[bound + i].T.conjugate(), self.specRaising[m].T.dot(tmpHiEvol),
                      self.specRaising[m].dot(self.stateSaves[bound - i])])
                 # lowering is the lower dimension annihilation operator, raising.T.c the creation
-                tmpGreen -= multi_dot(
+                tmpGreenLow = multi_dot(
                     [self.stateSaves[bound - i].T.conjugate(), self.specLowering[m].T.dot(tmpLoEvol),
                      self.specLowering[m].dot(self.stateSaves[bound + i])])
-                # note that the greensfunction is multiplied by -i, which is included in the writing below!
+                # note that the larger greensfunction is multiplied by -i, which is included in the writing below!
+                # note that the lesser greensfunction is multiplied by i, which is included in the writing below!
                 # first number is real part, second imaginary
-                self.filGreen.write('%.16e %.16e ' % (tmpGreen.imag, -1 * tmpGreen.real))
+                self.filGreen.write('%.16e %.16e ' % (-1 * tmpGreenHigh.imag, tmpGreenHigh.real))
+                self.filGreen.write('%.16e %.16e ' % (tmpGreenLow.imag, -1 * tmpGreenLow.real))
             self.filGreen.write(' \n')
             # time estimation start
             if round(i * bound_permil, 1) % 10.0 == 0:
@@ -1442,7 +1445,7 @@ class mpSystem:
         if self.boolPlotOffDiagOccSingles:
             self.plotOffDiagOccSingles()
         if self.boolClear:
-            prepFolders(True)
+            prepFolders(True)  # clear out all the density matrix folders
 
     @staticmethod
     def clearDensityData():
@@ -1876,15 +1879,18 @@ def time_form(seconds):
             unit = 'ps'
             divider = 1e-12
     else:
-        if seconds < 1e2:
+        if seconds < 1e2: # 100 seconds
             unit = 's'
             divider = 1
-        elif seconds < 6e3:
+        elif seconds < 6e3: # 100 mins
             unit = 'm'
             divider = 60
-        elif seconds < 3.6e5:
+        elif seconds < 3.569e6: # 999 hours
             unit = 'h'
             divider = 3.6e3
+        else:
+            unit = 'd'
+            divider = 8.64e4
     return str(int(seconds / divider)) + unit
 
 

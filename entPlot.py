@@ -696,7 +696,8 @@ def plotData(sysVar):
                 ret.append(occno(weights[i], temp, mu))
             return np.array(ret)
 
-        '''
+        from scipy.optimize import least_squares
+        weights = np.array([13, 20, 30])
         strt = np.array([-100, -100])
         bnds = np.array([[-100, -500], [10000, weights[0]]])
         rgs = least_squares(bestatd, x0=strt, bounds=bnds, loss='soft_l1')
@@ -728,7 +729,7 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.', end='', flush=True)
-        '''
+
     if sysVar.boolPlotDecomp:
         def eigendecomposition():
             return 0
