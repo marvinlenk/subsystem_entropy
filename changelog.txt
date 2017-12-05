@@ -1,5 +1,9 @@
 change log
 
+### 05.12.2017
+- added warning when correlations indices input is wrong
+- extended correlations to all possible even numbers of operators
+
 ### 04.12.2017
 - removed print('a') if kred is empty!
 - added density density correlation function to the parameters

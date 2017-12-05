@@ -335,6 +335,19 @@ class mpSystem:
             self.correlationsIndices = np.array([])
         else:
             self.correlationsIndices = [[int(single) for single in el.split(',')] for el in self.correlationsIndices]
+            # check if input is valid
+            i = 0
+            while i < len(self.correlationsIndices):
+                if any(x < 0 for x in self.correlationsIndices[i]) or\
+                        any(x > (self.m - 1) for x in self.correlationsIndices[i]):
+                    print("ERROR: Following correlation indices are out of bounds and thus omitted:",
+                          self.correlationsIndices.pop(i))
+                    i -= 1
+                elif len(self.correlationsIndices[i]) % 2 != 0:
+                    print("ERROR: Following correlation indices are not quadratic and thus omitted:",
+                          self.correlationsIndices.pop(i))
+                    i -= 1
+                i += 1
         # ## plotting booleans and parameters
         self.boolPlotData = configParser.getboolean('plotbools', 'data')
         self.boolPlotAverages = configParser.getboolean('plotbools', 'averages')
@@ -1150,13 +1163,16 @@ class mpSystem:
     # end of updateOccNumbers
 
     def updateCorrelations(self):
-        for i in range(0, len(self.correlationsIndices)):
-            ind1 = self.correlationsIndices[i][0]
-            ind2 = self.correlationsIndices[i][1]
-            ind3 = self.correlationsIndices[i][2]
-            ind4 = self.correlationsIndices[i][3]
-            tmp = self.expectValue(self.operators[ind1, ind2].dot(self.operators[ind3, ind4]))
-            tmpfil = open("./data/correl%i%i%i%i.dat" % (ind1, ind2, ind3, ind4), "a")
+        for ind in self.correlationsIndices:
+            tmpop = self.operators[ind[0], ind[1]]
+            tmpnam = "./data/correl%i%i" % (ind[0], ind[1])
+            for i in range(1, int(len(ind)/2)):
+                tmpop = tmpop.dot(self.operators[ind[i*2], ind[i*2 + 1]])
+                tmpnam += "%i%i" % (ind[i*2], ind[i*2 + 1])
+            tmpnam += ".dat"
+            tmp = self.expectValue(tmpop)
+
+            tmpfil = open(tmpnam, "a")
             tmpfil.write("%.16e %.16e %.16e\n" % (self.evolTime * self.plotTimeScale, tmp.real, tmp.imag))
             tmpfil.close()
 
@@ -1271,7 +1287,7 @@ class mpSystem:
         if self.boolOffDiagDensRed:
             self.updateOffDiagDensRed()
         if len(self.correlationsIndices) != 0:
-            self.updateCorrelations() # note that the file writing is included!
+            self.updateCorrelations()  # note that the file writing is included!
 
     ###### the magic of time evolution
     def evolve(self):
