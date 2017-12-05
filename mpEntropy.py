@@ -66,6 +66,7 @@ class mpSystem:
         self.boolReducedEnergy = False
         self.boolOccupations = False
         self.boolEntanglementSpectrum = False
+        self.correlationsIndices = None
         # ## plotting booleans and parameters
         self.boolPlotData = False
         self.boolPlotAverages = False
@@ -289,7 +290,6 @@ class mpSystem:
         self.kRed = configParser.get('system', 'kred').split(',')
         if self.kRed[0] == '':
             self.kRed = np.array([])
-            print('a')
         else:
             self.kRed = [int(el) for el in self.kRed]
         # ## hamiltonian parameters
@@ -330,6 +330,11 @@ class mpSystem:
         self.boolReducedEnergy = configParser.getboolean('calcparams', 'reducedenergy')
         self.boolOccupations = configParser.getboolean('calcparams', 'occupations')
         self.boolEntanglementSpectrum = configParser.getboolean('calcparams', 'entanglementspectrum')
+        self.correlationsIndices = configParser.get('calcparams', 'correlations').split(';')
+        if self.correlationsIndices[0] == '':
+            self.correlationsIndices = np.array([])
+        else:
+            self.correlationsIndices = [[int(single) for single in el.split(',')] for el in self.correlationsIndices]
         # ## plotting booleans and parameters
         self.boolPlotData = configParser.getboolean('plotbools', 'data')
         self.boolPlotAverages = configParser.getboolean('plotbools', 'averages')
@@ -1144,6 +1149,17 @@ class mpSystem:
 
     # end of updateOccNumbers
 
+    def updateCorrelations(self):
+        for i in range(0, len(self.correlationsIndices)):
+            ind1 = self.correlationsIndices[i][0]
+            ind2 = self.correlationsIndices[i][1]
+            ind3 = self.correlationsIndices[i][2]
+            ind4 = self.correlationsIndices[i][3]
+            tmp = self.expectValue(self.operators[ind1, ind2].dot(self.operators[ind3, ind4]))
+            tmpfil = open("./data/correl%i%i%i%i.dat" % (ind1, ind2, ind3, ind4), "a")
+            tmpfil.write("%.16e %.16e %.16e\n" % (self.evolTime * self.plotTimeScale, tmp.real, tmp.imag))
+            tmpfil.close()
+
     def updateTotalEnergy(self):
         self.totalEnergy = (self.expectValue(self.hamiltonian)).real
 
@@ -1254,6 +1270,8 @@ class mpSystem:
             self.updateOffDiagDens()
         if self.boolOffDiagDensRed:
             self.updateOffDiagDensRed()
+        if len(self.correlationsIndices) != 0:
+            self.updateCorrelations() # note that the file writing is included!
 
     ###### the magic of time evolution
     def evolve(self):

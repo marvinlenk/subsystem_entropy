@@ -1,5 +1,9 @@
 change log
 
+### 04.12.2017
+- removed print('a') if kred is empty!
+- added density density correlation function to the parameters
+
 ### 29.10.2017
 - added splitting into greater and lesser greensfunctions
 - added entanglement spectrum to calculation parameters
