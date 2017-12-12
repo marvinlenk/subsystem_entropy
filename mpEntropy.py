@@ -1291,8 +1291,8 @@ class mpSystem:
             self.updateOffDiagDensRed()
         if len(self.correlationsIndices) != 0:
             self.updateCorrelations()  # note that the file writing is included!
-        self.reduceDensityMatrixFromState()
-        print(self.expectValueRed(self.reduceMatrix(self.hamiltonian)))
+        #self.reduceDensityMatrixFromState()
+        #print(self.expectValueRed(self.reduceMatrix(self.hamiltonian)))
     ###### the magic of time evolution
     def evolve(self):
         # check if state has been normalized yet (or initialized)
