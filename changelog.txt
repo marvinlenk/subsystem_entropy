@@ -1,8 +1,12 @@
 change log
 
+### 12.12.2017
+- changed green function definition such that both have -i in front! also there was a mistake
+
 ### 05.12.2017
 - added warning when correlations indices input is wrong
 - extended correlations to all possible even numbers of operators
+- added possibility to get creation and annihilation alone in reduced basis
 
 ### 04.12.2017
 - removed print('a') if kred is empty!

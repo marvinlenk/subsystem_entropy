@@ -1219,17 +1219,20 @@ class mpSystem:
             self.filGreen.write('%.16e ' % (2 * dt * i))
             for m in range(0, self.m):
                 # raising is the higher dimension creation operator, raising.T.c the annihilation
+                # this is the greater Green function (without factor of +-i)
                 tmpGreenHigh = multi_dot(
                     [self.stateSaves[bound + i].T.conjugate(), self.specRaising[m].T.dot(tmpHiEvol),
                      self.specRaising[m].dot(self.stateSaves[bound - i])])
                 # lowering is the lower dimension annihilation operator, raising.T.c the creation
+                # this is the lesser Green function (without factor of +-i)
                 tmpGreenLow = multi_dot(
                     [self.stateSaves[bound - i].T.conjugate(), self.specLowering[m].T.dot(tmpLoEvol),
                      self.specLowering[m].dot(self.stateSaves[bound + i])])
-                # note that the greater greensfunction is multiplied by -i, which is included in the writing below!
-                # note that the lesser greensfunction is multiplied by i, which is included in the writing below!
+                # note that the greater Green function is multiplied by -i, which is included in the writing below!
+                # note that the lesser Green function is multiplied by -i, which is included in the writing below!
                 # first number is real part, second imaginary
-                self.filGreen.write('%.16e %.16e ' % (-1 * tmpGreenHigh.imag, tmpGreenHigh.real))
+                # there is an overall minus sign!
+                self.filGreen.write('%.16e %.16e ' % (tmpGreenHigh.imag, -1 * tmpGreenHigh.real))
                 self.filGreen.write('%.16e %.16e ' % (tmpGreenLow.imag, -1 * tmpGreenLow.real))
             self.filGreen.write(' \n')
             # time estimation start
@@ -1288,7 +1291,8 @@ class mpSystem:
             self.updateOffDiagDensRed()
         if len(self.correlationsIndices) != 0:
             self.updateCorrelations()  # note that the file writing is included!
-
+        self.reduceDensityMatrixFromState()
+        print(self.expectValueRed(self.reduceMatrix(self.hamiltonian)))
     ###### the magic of time evolution
     def evolve(self):
         # check if state has been normalized yet (or initialized)
@@ -1757,6 +1761,44 @@ def getQuadraticRed(sysVar, l, m):
             row = np.append(row, sysVar.basisDictRed[tuple(tmp)])
             col = np.append(col, sysVar.basisDictRed[tuple(el)])
             data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dimRed, sysVar.dimRed), dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
+# quadratic term in 2nd quantization for creation in l -> fills zero initialized matrix
+# matrix for a_l^d (r=row, c=column) is M[r][c] = SQRT(basis[r][l])
+def getCreatorRed(sysVar, l):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros(sysVar.mRed, dtype=np.int)
+    for el in sysVar.basisRed:
+        if sum(el) != sysVar.N:
+            tmp = el.copy()
+            tmp[l] += 1
+            row = np.append(row, sysVar.basisDictRed[tuple(tmp)])
+            col = np.append(col, sysVar.basisDictRed[tuple(el)])
+            data = np.append(data, np.float64(sqrt(tmp[l])))
+
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dimRed, sysVar.dimRed), dtype=np.float64).tocsr()
+    del row, col, data, tmp
+    return retmat
+
+# quadratic term in 2nd quantization for creation in l -> fills zero initialized matrix
+# matrix for a_l^d (r=row, c=column) is M[r][c] = SQRT(basis[r][l])
+def getDestructorRed(sysVar, l):
+    data = np.zeros(0, dtype=np.float64)
+    row = np.zeros(0, dtype=np.float64)
+    col = np.zeros(0, dtype=np.float64)
+    tmp = np.zeros(sysVar.mRed, dtype=np.int)
+    for el in sysVar.basisRed:
+        if sum(el) != 0 and el[l] > 0:
+            tmp = el.copy()
+            tmp[l] -= 1
+            row = np.append(row, sysVar.basisDictRed[tuple(tmp)])
+            col = np.append(col, sysVar.basisDictRed[tuple(el)])
+            data = np.append(data, np.float64(sqrt(tmp[l])))
 
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.dimRed, sysVar.dimRed), dtype=np.float64).tocsr()
     del row, col, data, tmp
