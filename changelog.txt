@@ -3,6 +3,7 @@ change log
 ### 12.12.2017
 - changed green function definition such that both have -i in front! also there was a mistake
 - commented reduced energy in updateAll since it was only for test purposes
+- and bugfix for initial green function value false convention!
 
 ### 05.12.2017
 - added warning when correlations indices input is wrong

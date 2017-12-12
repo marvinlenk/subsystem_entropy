@@ -1200,12 +1200,12 @@ class mpSystem:
         bound = int((saves - 1) / 2)
         dt = self.timeSaves[1]
 
-        # handle the i=0 case => equal time greater is -i*n_i+1, lesser is i*n_i
+        # handle the i=0 case => equal time greater is -i*n_i+1, lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
         for ind in range(0, self.m):
             tmpexpectation = np.vdot(self.stateSaves[bound], self.operators[ind, ind].dot(self.stateSaves[bound]))
             self.filGreen.write('%.16e %.16e ' % (0, -1*(tmpexpectation.real + 1)))
-            self.filGreen.write('%.16e %.16e ' % (0, tmpexpectation.real))
+            self.filGreen.write('%.16e %.16e ' % (0, -1*tmpexpectation.real))
         self.filGreen.write(' \n')
 
         # now start from the first non-zero difference time
