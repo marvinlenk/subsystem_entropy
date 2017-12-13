@@ -1211,6 +1211,7 @@ class mpSystem:
         # now start from the first non-zero difference time
         t0 = tm.time()
         t1 = tm.time()
+        print(bound)
         tavg = 0
         bound_permil = 1000.0 / bound  # use per 1000 to get easier condition for 1% and 10%
         for i in range(1, bound + 1):
@@ -1260,6 +1261,108 @@ class mpSystem:
                         self.filProg.write('\n')
                 self.closeProgressFile()
                 # time estimation end
+        self.filGreen.close()
+
+    def evaluateGreenOffset(self, offset):
+        # offset is given in time as the first time to evaluate
+        self.filGreen = open('./data/green.txt', 'w')  # t, re, im
+        self.filGreen.write('#tau re>_1 im>_1 re<_1 im<_1...\n')
+        self.openProgressFile()
+        self.filProg.write('Starting evalutation of Green\'s function:\n' + ' 0% ')
+        print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
+        self.closeProgressFile()
+        tmpHiEvol = np.identity(self.specHiDim, dtype=self.datType)
+        tmpLoEvol = np.identity(self.specLoDim, dtype=self.datType)
+
+        time_dist = self.timeSaves[-1] - offset
+        dt = self.timeSaves[1]
+        index_dist_check = time_dist/dt
+        # center piece + multiple of two dt distance
+        if index_dist_check % 2 != 1:
+            index_dist_check -= index_dist_check % 2 - 1
+        index_dist = int(index_dist_check)
+        offset_index = len(self.timeSaves) - index_dist
+        offset_time = self.timeSaves[offset_index]
+        print('offset time is ', offset_time)
+
+        bound = int((index_dist - 1) / 2)
+
+        print('com time', offset_time + bound*dt)
+        # handle the i=0 case => equal time greater is -i*n_i+1, lesser is -i*n_i
+        self.filGreen.write('%.16e ' % 0)
+        for m in range(0, self.m):
+            # raising is the higher dimension creation operator, raising.T.c the annihilation
+            # this is the greater Green function (without factor of +-i)
+            tmpGreenHigh = multi_dot(
+                [self.stateSaves[bound + offset_index].T.conjugate(), self.specRaising[m].T.dot(tmpHiEvol),
+                 self.specRaising[m].dot(self.stateSaves[bound - offset_index])])
+            # lowering is the lower dimension annihilation operator, raising.T.c the creation
+            # this is the lesser Green function (without factor of +-i)
+            tmpGreenLow = multi_dot(
+                [self.stateSaves[bound - offset_index].T.conjugate(), self.specLowering[m].T.dot(tmpLoEvol),
+                 self.specLowering[m].dot(self.stateSaves[bound + offset_index])])
+            # note that the greater Green function is multiplied by -i, which is included in the writing below!
+            # note that the lesser Green function is multiplied by -i, which is included in the writing below!
+            # first number is real part, second imaginary
+            # there is an overall minus sign!
+            self.filGreen.write('%.16e %.16e ' % (tmpGreenHigh.imag, -1 * tmpGreenHigh.real))
+            self.filGreen.write('%.16e %.16e ' % (tmpGreenLow.imag, -1 * tmpGreenLow.real))
+        self.filGreen.write(' \n')
+
+        # now start from the first non-zero difference time
+        t0 = tm.time()
+        t1 = tm.time()
+        tavg = 0
+        bound_permil = 1000.0 / bound  # use per 1000 to get easier condition for 1% and 10%
+        for i in range(offset_index + 1, bound + 1 + offset_index):
+            tmpHiEvol = np.dot(tmpHiEvol, self.specHiEvolutionMatrix)  # they need to be the squared ones!
+            tmpLoEvol = np.dot(tmpLoEvol, self.specLoEvolutionMatrix)  # they need to be the squared ones!
+            self.filGreen.write('%.16e ' % (2 * dt * i))
+            for m in range(0, self.m):
+                # raising is the higher dimension creation operator, raising.T.c the annihilation
+                # this is the greater Green function (without factor of +-i)
+                tmpGreenHigh = multi_dot(
+                    [self.stateSaves[bound + i].T.conjugate(), self.specRaising[m].T.dot(tmpHiEvol),
+                     self.specRaising[m].dot(self.stateSaves[bound - i])])
+                # lowering is the lower dimension annihilation operator, raising.T.c the creation
+                # this is the lesser Green function (without factor of +-i)
+                tmpGreenLow = multi_dot(
+                    [self.stateSaves[bound - i].T.conjugate(), self.specLowering[m].T.dot(tmpLoEvol),
+                     self.specLowering[m].dot(self.stateSaves[bound + i])])
+                # note that the greater Green function is multiplied by -i, which is included in the writing below!
+                # note that the lesser Green function is multiplied by -i, which is included in the writing below!
+                # first number is real part, second imaginary
+                # there is an overall minus sign!
+                self.filGreen.write('%.16e %.16e ' % (tmpGreenHigh.imag, -1 * tmpGreenHigh.real))
+                self.filGreen.write('%.16e %.16e ' % (tmpGreenLow.imag, -1 * tmpGreenLow.real))
+            self.filGreen.write(' \n')
+            '''
+            # time estimation start
+            if round(i * bound_permil, 1) % 10.0 == 0:
+                self.openProgressFile()
+                self.filProg.write('.')
+                print('.', end='', flush=True)
+                if round(i * bound_permil, 1) % 100 == 0:
+                    tavg *= int(i - bound / 10)  # calculate from time/step back to unit: time
+                    tavg += tm.time() - t1  # add passed time
+                    tavg /= i  # average over total number of steps
+                    t1 = tm.time()
+                    print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0), end='',
+                          flush=True)
+
+                    self.filProg.write(
+                        ' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0))
+                    if i != bound:
+                        print(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                            int(i * bound_permil / 10)) + "% ", end='', flush=True)
+                        self.filProg.write(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                            int(i * bound_permil / 10)) + "%")
+                    else:
+                        print('\n')
+                        self.filProg.write('\n')
+                self.closeProgressFile()
+                # time estimation end
+                '''
         self.filGreen.close()
 
     # update everything EXCEPT for total entropy and energy - they are only updated 100 times
