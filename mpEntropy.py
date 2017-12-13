@@ -1450,7 +1450,9 @@ class mpSystem:
             # note that this is the only! time where the time scale is already included
             head = 'n_sys p(n_sys) /// Jt = $f' % (self.evolTime * self.plotTimeScale)
             np.savetxt('./data/entanglement_spectrum/ent_spec_%i.dat' % self.evolStep,
-                       np.column_stack((self.entanglementSpectrumOccupation, self.entanglementSpectrum)), header=head)
+                       np.sort(
+                           np.column_stack((self.entanglementSpectrumOccupation, self.entanglementSpectrum)), axis=0
+                       ), header=head)
 
         self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
 
