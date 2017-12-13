@@ -215,7 +215,7 @@ class mpSystem:
             # NOTE here it is
             if self.boolOffDiagDensRed:
                 self.offDiagDensRed = 0
-            if self.boolOffDiagDensRed or self.boolReducedEnergy:
+            if self.boolOffDiagDensRed or self.boolReducedEnergy or self.boolEntanglementSpectrum:
                 self.hamiltonianRed = coo_matrix(np.zeros((self.dimRed, self.dimRed)),
                                                  shape=(self.dimRed, self.dimRed),
                                                  dtype=np.float64).tocsr()
@@ -227,6 +227,7 @@ class mpSystem:
             elif self.boolEntanglementSpectrum:
                 # if it was not calculated here do it anyway to get the reduced operators
                 self.operatorsRed = quadraticArrayRed(self)
+            self.entanglementSpectrumIndicator = False
             self.entanglementSpectrum = np.zeros(self.dimRed)
             if self.boolEntanglementSpectrum:
                 self.entanglementSpectrumOccupation = np.zeros(self.dimRed)
@@ -480,7 +481,7 @@ class mpSystem:
         self.filProg.write('Wrote hamiltonian in ' + time_elapsed(t0, 60, 0) + '\n')
         self.closeProgressFile()
 
-        if self.boolOffDiagDensRed or self.boolReducedEnergy:
+        if self.boolOffDiagDensRed or self.boolReducedEnergy or self.boolEntanglementSpectrum:
             t1 = tm.time()
 
             self.initHamiltonianRed()
@@ -1111,14 +1112,15 @@ class mpSystem:
             self.densityMatrix)).real
 
     def updateOffDiagDensRed(self):
-        if not self.eigIndRed:
-            self.updateEigenenergiesRed()
         if self.mRed == 1:
             self.offDiagDensRed = 0 + 0j
         else:
+            if not self.eigIndRed:
+                self.updateEigenenergiesRed()
             self.offDiagDensRed = (multi_dot(
                 [np.ones(self.dimRed), self.eigVectsRed.T, self.densityMatrixRed, self.eigInvRed,
                  np.ones(self.dimRed)]) - np.trace(self.densityMatrixRed)).real
+
 
     def updateEntropy(self):
         self.entropy = 0
@@ -1131,18 +1133,20 @@ class mpSystem:
     # end of updateEntropy
 
     def updateEntanglementSpectrum(self):
-        if self.mRed != 1:
-            if self.boolEntanglementSpectrum:
-                self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
-                for i in range(0, self.dimRed):
-                    self.entanglementSpectrumOccupation[i] = \
-                        np.vdot(entanglementStates[i],
-                                self.operatorSubsystemOccupuation.dot(entanglementStates[i])).real
+        if not self.entanglementSpectrumIndicator:
+            if self.mRed != 1:
+                self.reduceDensityMatrixFromState()
+                if self.boolEntanglementSpectrum:
+                    self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
+                    for i in range(0, self.dimRed):
+                        self.entanglementSpectrumOccupation[i] = \
+                            np.vdot(entanglementStates[i],
+                                    self.hamiltonianRed.dot(entanglementStates[i])).real
+                else:
+                    self.entanglementSpectrum = la.eigvalsh(self.densityMatrixRed, check_finite=False)
             else:
-                self.entanglementSpectrum = la.eigvalsh(self.densityMatrixRed, check_finite=False)
-        else:
-            # if only one level left, density matrix is already diagonal
-            self.entanglementSpectrum = self.densityMatrixRed
+                # if only one level left, density matrix is already diagonal
+                self.entanglementSpectrum = self.densityMatrixRed
 
     def updateEntropyRed(self):
         if self.densityMatrixRed is None:
@@ -1340,6 +1344,7 @@ class mpSystem:
         for i in range(1, 11):
             # decimal loop
             for ii in range(1, 11):
+                self.entanglementSpectrumIndicator = False
                 # need only dataPoints steps of size evolStepDist
                 for j in range(0, stepNo):
                     self.updateEverything()  # update always - config file should control what to update
@@ -1440,7 +1445,8 @@ class mpSystem:
         if self.boolReducedEntropy:
             self.filEnt.write('%.16e %.16e \n' % (self.evolTime, self.entropyRed))
 
-        if self.boolEntanglementSpectrum:
+        if self.boolEntanglementSpectrum and not self.entanglementSpectrumIndicator:
+            self.entanglementSpectrumIndicator = True
             # note that this is the only! time where the time scale is already included
             head = 'n_sys p(n_sys) /// Jt = $f' % (self.evolTime * self.plotTimeScale)
             np.savetxt('./data/entanglement_spectrum/ent_spec_%i.dat' % self.evolStep,
