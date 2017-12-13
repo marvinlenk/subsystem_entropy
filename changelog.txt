@@ -3,6 +3,8 @@ change log
 ### 13.12.2017
 - replaced the evaluate green to evaluate green with offset but have  offset 0 if not specified
 - changed data storage of green function to include com time in filename
+- changed entanglement spectrum to use reduced hamiltonian instead of occupations
+- NOTE: still need to complete the change for entanglement spectrum!
 
 ### 12.12.2017
 - changed green function definition such that both have -i in front! also there was a mistake

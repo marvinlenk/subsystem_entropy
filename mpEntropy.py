@@ -224,16 +224,10 @@ class mpSystem:
                 self.eigVectsRed = np.array([])
                 self.eigInvRed = np.array([])
                 self.eigIndRed = False
-            elif self.boolEntanglementSpectrum:
-                # if it was not calculated here do it anyway to get the reduced operators
-                self.operatorsRed = quadraticArrayRed(self)
             self.entanglementSpectrumIndicator = False
             self.entanglementSpectrum = np.zeros(self.dimRed)
             if self.boolEntanglementSpectrum:
-                self.entanglementSpectrumOccupation = np.zeros(self.dimRed)
-                self.operatorSubsystemOccupuation = self.operatorsRed[0, 0]
-                for i in range(1, self.mRed):
-                    self.operatorSubsystemOccupuation += self.operatorsRed[i, i]
+                self.entanglementSpectrumEnergy = np.zeros(self.dimRed)
             # ## Spectral
             if self.boolRetgreen:
                 # lo
@@ -1133,20 +1127,19 @@ class mpSystem:
     # end of updateEntropy
 
     def updateEntanglementSpectrum(self):
-        if not self.entanglementSpectrumIndicator:
-            if self.mRed != 1:
-                self.reduceDensityMatrixFromState()
-                if self.boolEntanglementSpectrum:
-                    self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
-                    for i in range(0, self.dimRed):
-                        self.entanglementSpectrumOccupation[i] = \
-                            np.vdot(entanglementStates[i],
-                                    self.hamiltonianRed.dot(entanglementStates[i])).real
-                else:
-                    self.entanglementSpectrum = la.eigvalsh(self.densityMatrixRed, check_finite=False)
+        if self.mRed != 1:
+            self.reduceDensityMatrixFromState()
+            if self.boolEntanglementSpectrum and not self.entanglementSpectrumIndicator:
+                self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
+                for i in range(0, self.dimRed):
+                    self.entanglementSpectrumEnergy[i] = \
+                        np.vdot(entanglementStates[i],
+                                self.hamiltonianRed.dot(entanglementStates[i])).real
             else:
-                # if only one level left, density matrix is already diagonal
-                self.entanglementSpectrum = self.densityMatrixRed
+                self.entanglementSpectrum = la.eigvalsh(self.densityMatrixRed, check_finite=False)
+        else:
+            # if only one level left, density matrix is already diagonal
+            self.entanglementSpectrum = self.densityMatrixRed
 
     def updateEntropyRed(self):
         if self.densityMatrixRed is None:
@@ -1449,10 +1442,10 @@ class mpSystem:
             self.entanglementSpectrumIndicator = True
             # note that this is the only! time where the time scale is already included
             head = 'n_sys p(n_sys) /// Jt = $f' % (self.evolTime * self.plotTimeScale)
-            np.savetxt('./data/entanglement_spectrum/ent_spec_%i.dat' % self.evolStep,
-                       np.sort(
-                           np.column_stack((self.entanglementSpectrumOccupation, self.entanglementSpectrum)), axis=0
-                       ), header=head)
+            sort_indices = self.entanglementSpectrumEnergy.argsort()
+            np.savetxt('./data/entanglement_spectrum/ent_spec_%.4f.dat' % (self.evolTime * self.plotTimeScale),
+                           np.column_stack((self.entanglementSpectrumEnergy[sort_indices],
+                                            self.entanglementSpectrum[sort_indices])), header=head)
 
         self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
 
