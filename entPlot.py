@@ -54,30 +54,30 @@ def plotData(sysVar):
     pp = PdfPages('./plots/plots.pdf')
 
     if sysVar.boolOccupations:
-        occfile = './data/occupation.txt'
+        occfile = './data/occupation.dat'
         occ_array = np.loadtxt(occfile)
 
-    normfile = './data/norm.txt'
+    normfile = './data/norm.dat'
     norm_array = np.loadtxt(normfile)
     # want deviation from 1
     norm_array[:, 1] = 1 - norm_array[:, 1]
 
     if sysVar.boolReducedEntropy:
-        entfile = './data/entropy.txt'
+        entfile = './data/entropy.dat'
         ent_array = np.loadtxt(entfile)
 
     if sysVar.boolPlotEngy:
-        engies = np.loadtxt('./data/hamiltonian_eigvals.txt')
+        engies = np.loadtxt('./data/hamiltonian_eigvals.dat')
 
     if sysVar.boolPlotDecomp:
-        stfacts = np.loadtxt('./data/state.txt')
+        stfacts = np.loadtxt('./data/state.dat')
 
     if sysVar.boolTotalEntropy:
-        totentfile = './data/total_entropy.txt'
+        totentfile = './data/total_entropy.dat'
         totent_array = np.loadtxt(totentfile)
 
     if sysVar.boolTotalEnergy:
-        energyfile = './data/total_energy.txt'
+        energyfile = './data/total_energy.dat'
         en_array = np.loadtxt(energyfile)
         en0 = en_array[0, 1]
         en_array[:, 1] -= en0
@@ -85,27 +85,27 @@ def plotData(sysVar):
         # print(' - |(E0 - Emicro)/E0|: %.0e - ' % (np.abs((en0 - engies[en_micind,1])/en0)), end='' )
 
     if sysVar.boolReducedEnergy:
-        redEnergyfile = './data/reduced_energy.txt'
+        redEnergyfile = './data/reduced_energy.dat'
         redEnergy = np.loadtxt(redEnergyfile)
 
     if sysVar.boolPlotDiagExp:
-        microexpfile = './data/diagoccexpect.txt'
+        microexpfile = './data/diagoccexpect.dat'
         microexp = np.loadtxt(microexpfile)
 
     if sysVar.boolPlotOffDiagOcc:
-        offdiagoccfile = './data/offdiagocc.txt'
+        offdiagoccfile = './data/offdiagocc.dat'
         offdiagocc = np.loadtxt(offdiagoccfile)
 
     if sysVar.boolPlotOffDiagDens:
-        offdiagdensfile = './data/offdiagdens.txt'
+        offdiagdensfile = './data/offdiagdens.dat'
         offdiagdens = np.loadtxt(offdiagdensfile)
 
     if sysVar.boolPlotOffDiagDensRed:
-        offdiagdensredfile = './data/offdiagdensred.txt'
+        offdiagdensredfile = './data/offdiagdensred.dat'
         offdiagdensred = np.loadtxt(offdiagdensredfile)
 
     if sysVar.boolPlotGreen:
-        greenfile = './data/green.txt'
+        greenfile = './data/' + [s for s in os.listdir('./data/') if 'green' in s][0]
         greendat = np.loadtxt(greenfile)
 
     def complete_system_enttropy():
@@ -271,7 +271,7 @@ def plotData(sysVar):
             # ## Subsystems occupation numbers
 
         # store fluctuations in a data
-        fldat = open('./data/fluctuation.txt', 'w')
+        fldat = open('./data/fluctuation.dat', 'w')
         fldat.write('N_tot: %i\n' % (sysVar.N))
         tmp = np.zeros(len(step_array))
         for i in sysVar.kRed:
@@ -346,7 +346,7 @@ def plotData(sysVar):
             return 0
             # occupation number in levels against level index
 
-        occavg = np.loadtxt('./data/fluctuation.txt', usecols=(1,))
+        occavg = np.loadtxt('./data/fluctuation.dat', usecols=(1,))
         plt.xlim(-0.1, sysVar.m - 0.9)
         for l in range(0, sysVar.m):
             plt.errorbar(l, occavg[int(7 + 3 * l)] / sysVar.N, xerr=None, yerr=occavg[int(8 + 3 * l)] / sysVar.N,
@@ -573,159 +573,100 @@ def plotData(sysVar):
         plt.clf()
         print('.', end='', flush=True)
 
-    def greensfunction():
+    def green_function():
         return 0
-        # ## Greensfunction
+        # ## Green function
 
     if sysVar.boolPlotGreen:
-        # greenCropInd = np.power(2, int(np.log2(len(greendat[:, 0]))))
-        greenCropInd = len(greendat[:, 0])
-        # print(len(greendat[:, 0]) - greenCropInd)
-        gd = greendat[:greenCropInd, :]
-        # print(len(gd))
-        # discpoints = len(gd[:, 0])
+        if not(os.path.isfile('./data/spectral_frequency_trace.dat') and
+                   os.path.isfile('./data/statistical_frequency_trace.dat')):
+            spectral_time = []
+            statistical_time = []
+            spectral_frequency = []
+            statistical_frequency = []
+            sample_frequency = 1.0 / ((greendat[-1, 0] - greendat[0, 0]) / (len(greendat[:, 0]) - 1))
+            for i in range(0, sysVar.m):
+                ind = 1 + i * 4
+                greater = (greendat[:, ind] + 1j * greendat[:, ind + 1])  # greater green function
+                lesser = (greendat[:, ind + 2] + 1j * greendat[:, ind + 3])  # lesser green function
+                spectral_time.append(1j * (greater - lesser))  # spectral function in time space
+                statistical_time.append((greater + lesser) / 2)  # statistical function in time space
+                # spectral function in frequency space
+                spectral_frequency.append(dft.rearrange(dft.dft(spectral_time[i], sample_frequency)))
+                # statistical function in frequency space
+                statistical_frequency.append(dft.rearrange(dft.dft(statistical_time[i], sample_frequency)))
 
-        '''
-        gd = np.zeros((np.shape(greendat)[0]*2,np.shape(greendat)[1]))
-        gd[int(np.shape(greendat)[0]/2):-int(np.shape(greendat)[0]/2 + np.shape(greendat)[0]%2)] = greendat[:,:].copy()
-        '''
-        spec = []
-        print('')
-        for i in range(0, sysVar.m):
-            plt.title(r'two time Green function of level $%i$' % (i))
-            ind = 2 * i + 1
-            plt.plot(greendat[:, 0] * sysVar.plotTimeScale, greendat[:, ind], lw=0.2, color='red', label='real')
-            plt.plot(greendat[:, 0] * sysVar.plotTimeScale, greendat[:, ind + 1], lw=0.2, color='blue',
-                     label='imaginary')
-            # plt.xlim(xmax=10)
-            plt.ylabel(r'$G^R(\tau)$')
-            plt.xlabel(r'$J\,\tau$')
-            plt.legend(loc='lower right')
-            plt.grid()
-            plt.tight_layout()
-            ###
-            pp.savefig()
-            plt.clf()
-            ###
-            plt.title(r'Spectral function of level $%i$' % (i))
-            green_ret = gd[:, ind] + 1j * gd[:, ind + 1]
-            # green_ret_freq = fft(np.hanning(len(green_ret)) * green_ret, norm='ortho')
-            # green_ret_freq = fft(green_ret, norm='ortho')
-            # spec_tmp = (-2 * fftshift(green_ret_freq.imag))
-            if i == 0:
-                # samp_spacing = sysVar.deltaT * 2 * (sysVar.steps / sysVar.dataPoints) * sysVar.plotTimeScale
-                samp_spacing = (gd[-1, 0] - gd[0, 0]) / (len(green_ret) - 1)
-            green_ret_freq = dft.rearrange(dft.dft(green_ret, 1.0 / samp_spacing))
-            spec_tmp = (-2 * green_ret_freq[:, 1].imag)
-            hlpfrq = green_ret_freq[:, 0].real
-            # ## !!! normalize by hand! this might be strange but is necessary here
-            # spec_tmp /= (np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
-            if i == 0:
-                spec_total = spec_tmp[:]
-                # scale on x-axis is frequency
-            else:
-                spec_total += spec_tmp
-            spec.append(spec_tmp)
-            print(i, np.trapz(spec_tmp, x=hlpfrq) / (2 * np.pi))
-            # exit()
-            plt.plot(hlpfrq, spec_tmp, color='red', lw=0.2)
-            plt.minorticks_on()
-            plt.ylabel(r'$A$')
-            plt.xlabel(r'$\omega / J$')
+            spectral_frequency_trace = spectral_frequency[0]
+            statistical_frequency_trace = statistical_frequency[0]
+            for i in range(1, sysVar.m):
+                spectral_frequency_trace[:, 1] = spectral_frequency_trace[:, 1] + spectral_frequency[i][:, 1]
+                statistical_frequency_trace[:, 1] = statistical_frequency_trace[:, 1] + statistical_frequency[i][:, 1]
 
-            plt.grid()
-            # plt.grid(which='minor', color='blue', linestyle='dotted', lw=0.2)
-            plt.tight_layout()
-            ###
-            pp.savefig()
-            plt.clf()
-        plt.title(r'Spectral function')
-        plt.plot(hlpfrq, spec_total, color='red', lw=0.1)
-        plt.ylabel(r'$A$')
-        plt.xlabel(r'$\omega / J$')
-        # plt.xlim([-100,100])
-        plt.grid()
+            np.savetxt('./data/spectral_frequency_trace.dat',
+                       np.column_stack((spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].real,
+                                        spectral_frequency_trace[:, 1].imag)))
+            np.savetxt('./data/statistical_frequency_trace.dat',
+                       np.column_stack((statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].real,
+                                        statistical_frequency_trace[:, 1].imag)))
+        else:
+            spectral_frequency_trace_tmp = np.loadtxt('./data/spectral_frequency_trace.dat')
+            statistical_frequency_trace_tmp = np.loadtxt('./data/statistical_frequency_trace.dat')
+            spectral_frequency_trace = np.column_stack((
+                spectral_frequency_trace_tmp[:, 0],
+                (spectral_frequency_trace_tmp[:, 1] + 1j*spectral_frequency_trace_tmp[:, 2])
+            ))
+            statistical_frequency_trace = np.column_stack((
+                statistical_frequency_trace_tmp[:, 0],
+                (statistical_frequency_trace_tmp[:, 1] + 1j*statistical_frequency_trace_tmp[:, 2])
+            ))
+
+        fig = plt.figure()
+
+        ax1 = fig.add_subplot(221)
+        ax1.set_xlim(xmin=-10, xmax=100)
+        ax1.set_ylabel(r'Re $A(\omega)$')
+        ax1.set_xlabel(r'$\omega$')
+        ax1.plot(spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].real)
+
+        ax2 = fig.add_subplot(222)
+        ax2.set_xlim(xmin=-10, xmax=100)
+        ax2.set_ylabel(r'Im $A(\omega)$')
+        ax2.set_xlabel(r'$\omega$')
+        ax2.plot(spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].imag)
+
+        ax3 = fig.add_subplot(223)
+        ax3.set_xlim(xmin=-10, xmax=100)
+        ax3.set_ylabel(r'Re $F(\omega)$')
+        ax3.set_xlabel(r'$\omega$')
+        ax3.plot(statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].real)
+
+        ax4 = fig.add_subplot(224)
+        ax4.set_xlim(xmin=-10, xmax=100)
+        ax4.set_ylabel(r'Im $F(\omega)$')
+        ax4.set_xlabel(r'$\omega$')
+        ax4.plot(statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].imag)
+
         plt.tight_layout()
-        ###
-        pp.savefig()
-        plt.clf()
-        plt.plot(hlpfrq, np.abs(spec_total), color='red', lw=0.1)
-        plt.ylabel(r'$|A|$')
-        plt.xlabel(r'$\omega / J$')
-        # plt.xlim([-100,100])
-        plt.grid()
-        plt.tight_layout()
-        ###
         pp.savefig()
         plt.clf()
 
-        print('.', end='', flush=True)
+        # ## ##
 
-        print()
-        weights = np.zeros(len(spec))
-        for s in range(0, len(spec)):
-            print(np.average(hlpfrq, weights=spec[s]), np.average(hlpfrq, weights=np.abs(spec[s])))
-            weights[s] = -np.average(hlpfrq, weights=np.abs(spec[s]))
-        print('')
-        '''
-        # the integrated version
-        def occno(spec,freq,temp,mu):
-            rt = []
-            for i in range(0,len(freq)):
-                rt.append(spec[i]/(np.exp((freq[i]-mu)/temp)-1.0))
-            return np.trapz(np.array(rt), x=freq)
-        '''
+        fig = plt.figure()
 
-        # the averaged version
-        def occno(freq, temp, mu):
-            return (1 / (np.exp((freq - mu) / temp) - 1.0))
+        ax1 = fig.add_subplot(121)
+        ax1.set_xlim(xmin=-10, xmax=80)
+        ax1.set_ylabel(r'$|A(\omega)|$')
+        ax1.set_xlabel(r'$\omega$')
+        ax1.plot(spectral_frequency_trace[:, 0].real, np.abs(spectral_frequency_trace[:, 1]))
 
-        def bestatd(args):
-            temp = args[0]
-            mu = args[1]
-            ret = []
-            for i in range(0, sysVar.m):
-                ret.append(occno(weights[i], temp, mu) - occavg[int(7 + 3 * i)])
-            return np.array(ret)
+        ax2 = fig.add_subplot(122)
+        ax2.set_xlim(xmin=-10, xmax=80)
+        ax2.set_ylabel(r'$|F(\omega)|$')
+        ax2.set_xlabel(r'$\omega$')
+        ax2.plot(statistical_frequency_trace[:, 0].real, np.abs(statistical_frequency_trace[:, 1]))
 
-        def bestat(args):
-            temp = args[0]
-            mu = args[1]
-            ret = []
-            for i in range(0, sysVar.m):
-                ret.append(occno(weights[i], temp, mu))
-            return np.array(ret)
-
-        from scipy.optimize import least_squares
-        weights = np.array([13, 20, 30])
-        strt = np.array([-100, -100])
-        bnds = np.array([[-100, -500], [10000, weights[0]]])
-        rgs = least_squares(bestatd, x0=strt, bounds=bnds, loss='soft_l1')
-        print(rgs)
-        print(rgs.x)
-        print(bestat(rgs.x))
-        a = []
-        for i in range(0, sysVar.m):
-            a.append(occavg[int(7 + 3 * i)])
-        print(a)
-
-        # occupation number in levels against renormalized energy
-        plt.title('Bose-Einstein distribution fit')
-        ws = np.sort(weights)
-        lo = ws[0] - ws[0] / 100
-        hi = ws[-1] + ws[-1] / 100
-        #plt.xlim(lo, hi)
-        xvals = np.linspace(lo, hi, 1e3)
-        yvals = occno(xvals, rgs.x[0], rgs.x[1]) / sysVar.N
-        for l in range(0, sysVar.m):
-            plt.errorbar(weights[l], occavg[int(7 + 3 * l)] / sysVar.N, xerr=None,
-                         yerr=occavg[int(8 + 3 * l)] / sysVar.N, marker='o', color=cm.Set1(0))
-        plt.plot(xvals, yvals, color='blue', lw=0.4)
-        plt.ylabel(r'Relative level occupation')
-        plt.xlabel(r'energy')
-        plt.grid()
         plt.tight_layout()
-        ###
         pp.savefig()
         plt.clf()
         print('.', end='', flush=True)
@@ -851,7 +792,7 @@ def plotData(sysVar):
     if sysVar.boolPlotSpectralDensity:
         ###
         plt.title('Density matrix spectral repres. abs')
-        dabs = np.loadtxt('./data/spectral/dm.txt')
+        dabs = np.loadtxt('./data/spectral/dm.dat')
         cmapVar = plt.cm.Reds
         cmapVar.set_under(color='black')
         plt.imshow(dabs, cmap=cmapVar, interpolation='none', vmin=1e-16)
@@ -892,9 +833,9 @@ def plotDensityMatrixAnimation(steps, delta_t, files, stepsize=1, red=0, framera
         ax2.cla()
         ax3.cla()
         plt.suptitle('t = %(time).2f' % {'time': n * stor_step * delta_t * stepsize})
-        dabsfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + ".txt"
-        dimagfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + "_im.txt"
-        drealfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + "_re.txt"
+        dabsfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + ".dat"
+        dimagfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + "_im.dat"
+        drealfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + "_re.dat"
         dabs = np.loadtxt(dabsfile)
         dimag = np.loadtxt(dimagfile)
         dreal = np.loadtxt(drealfile)
@@ -926,7 +867,7 @@ def plotHamiltonian():
     pp = PdfPages('./plots/hamiltonian.pdf')
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of hamiltonian')
-    dabs = np.loadtxt('./data/hamiltonian.txt')
+    dabs = np.loadtxt('./data/hamiltonian.dat')
     plt.xlabel('column')
     plt.ylabel('row')
     cmapVar = plt.cm.Reds
@@ -940,7 +881,7 @@ def plotHamiltonian():
     plt.clf()
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of time evolution matrix')
-    dabs = np.loadtxt('./data/evolutionmatrix.txt')
+    dabs = np.loadtxt('./data/evolutionmatrix.dat')
     plt.xlabel('column')
     plt.ylabel('row')
     cmapVar = plt.cm.Reds
@@ -967,7 +908,7 @@ def plotOccs(sysVar):
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     for i in range(0, sysVar.m):
         plt.title(r'$n_' + str(i) + '$')
-        dre = np.loadtxt('./data/occ' + str(i) + '_re.txt')
+        dre = np.loadtxt('./data/occ' + str(i) + '_re.dat')
         plt.xlabel('column')
         plt.ylabel('row')
         cmapVar = plt.cm.seismic
@@ -981,7 +922,7 @@ def plotOccs(sysVar):
     # now without diagonals and abs only
     for i in range(0, sysVar.m):
         plt.title(r'$n_' + str(i) + '$')
-        dre = np.loadtxt('./data/occ' + str(i) + '_re.txt')
+        dre = np.loadtxt('./data/occ' + str(i) + '_re.dat')
         np.fill_diagonal(dre, 0)
         plt.xlabel('column')
         plt.ylabel('row')
@@ -1012,8 +953,8 @@ def plotOffDiagOccSingles(sysVar):
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
     pp = PdfPages('./plots/offdiagsingles.pdf')
 
-    singlesdat = np.loadtxt('./data/offdiagsingle.txt')
-    singlesinfo = np.loadtxt('./data/offdiagsingleinfo.txt')
+    singlesdat = np.loadtxt('./data/offdiagsingle.dat')
+    singlesinfo = np.loadtxt('./data/offdiagsingleinfo.dat')
 
     dt = singlesdat[1, 0] - singlesdat[0, 0]
     nrm = singlesdat[:, 0] / dt
@@ -1114,12 +1055,12 @@ def plotOffDiagOccSingles(sysVar):
             plt.clf()
             plt.close()
         print('.', end='', flush=True)
-    diagdat = np.loadtxt('./data/diagsingles.txt')
+    diagdat = np.loadtxt('./data/diagsingles.dat')
 
-    if os.path.isfile('./data/energy.txt') and os.path.isfile('./data/hamiltonian_eigvals.txt'):
+    if os.path.isfile('./data/energy.dat') and os.path.isfile('./data/hamiltonian_eigvals.dat'):
         ### look for energy - this works because the energies are sorted
-        engy = np.loadtxt('./data/energy.txt')
-        eigengy = np.loadtxt('./data/hamiltonian_eigvals.txt')
+        engy = np.loadtxt('./data/energy.dat')
+        eigengy = np.loadtxt('./data/hamiltonian_eigvals.dat')
         diff = 0
         for l in range(0, sysVar.dim):
             if np.abs(eigengy[l, 1] - engy[0, 1]) > diff and l != 0:
@@ -1133,7 +1074,7 @@ def plotOffDiagOccSingles(sysVar):
             loran = eind - 15
 
     for i in range(0, sysVar.m):
-        if os.path.isfile('./data/energy.txt') and os.path.isfile('./data/hamiltonian_eigvals.txt'):
+        if os.path.isfile('./data/energy.dat') and os.path.isfile('./data/hamiltonian_eigvals.dat'):
             plt.title(r'Diagonal weighted elements of $n_{%i}$ in spectral decomp.' % (i))
             lo = np.int32(sysVar.dim * i)
             hi = np.int32(lo + sysVar.dim)
@@ -1151,8 +1092,8 @@ def plotOffDiagOccSingles(sysVar):
 
             pp.savefig()
             plt.clf()
-            if os.path.isfile('./data/occ' + str(i) + '_re.txt'):
-                occmat = np.loadtxt('./data/occ' + str(i) + '_re.txt')
+            if os.path.isfile('./data/occ' + str(i) + '_re.dat'):
+                occmat = np.loadtxt('./data/occ' + str(i) + '_re.dat')
                 diags = np.zeros(sysVar.dim)
 
                 ### large plot
@@ -1202,7 +1143,7 @@ def plotTimescale(sysVar):
 
     ### get the characteristic energy difference of the system
     if sysVar.boolEngyStore:
-        engys = np.loadtxt('./data/hamiltonian_eigvals.txt')
+        engys = np.loadtxt('./data/hamiltonian_eigvals.dat')
         enscale = np.abs(engys[0, 1] - engys[-1, 1]) / sysVar.dim
         del engys
 
@@ -1210,12 +1151,12 @@ def plotTimescale(sysVar):
     loavgind = int(loavgpercent * sysVar.dataPoints)  # index to start at when calculating average and stddev
     loavgtime = np.round(loavgpercent * (sysVar.deltaT * sysVar.steps * sysVar.plotTimeScale), 2)
 
-    occfile = './data/occupation.txt'
+    occfile = './data/occupation.dat'
     occ_array = np.loadtxt(occfile)
     # multiply step array with time scale
     step_array = occ_array[:, 0] * sysVar.plotTimeScale
 
-    entfile = './data/entropy.txt'
+    entfile = './data/entropy.dat'
     ent_array = np.loadtxt(entfile)
 
     occavg = []

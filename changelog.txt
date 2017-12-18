@@ -1,5 +1,12 @@
 change log
 
+### 18.12.2017
+- changed all .txt to .dat !!!
+- fixed green function finally
+- changed init spec slightly to be more intuitive and safe
+- changed spec plotting to be reasonable
+- changed green function evaluation from multi_dot to nested dot - see if this is faster!
+
 ### 13.12.2017
 - replaced the evaluate green to evaluate green with offset but have  offset 0 if not specified
 - changed data storage of green function to include com time in filename

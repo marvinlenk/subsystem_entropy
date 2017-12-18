@@ -9,6 +9,7 @@ from numpy import log as nplog
 from numpy import sqrt
 from numpy.linalg import matrix_power as npmatrix_power
 from numpy.linalg import multi_dot
+from numpy import vdot
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse import identity as spidentity
 from scipy.special import binom
@@ -231,39 +232,39 @@ class mpSystem:
             # ## Spectral
             if self.boolRetgreen:
                 # lo
-                self.specLoDim = dimOfBasis(self.N - 1, self.m)
-                self.specLoBasis = np.zeros((self.specLoDim, self.m), dtype=np.int)
-                fillBasis(self.specLoBasis, self.N - 1, self.m)
-                self.specLoBasisDict = basis2dict(self.specLoBasis, self.specLoDim)
-                self.specLoHamiltonian = coo_matrix(np.zeros((self.specLoDim, self.specLoDim)),
-                                                    shape=(self.specLoDim, self.specLoDim), dtype=np.float64).tocsr()
-                self.specLoEigVals = np.array([])
-                self.specLoEigVects = np.array([])
-                self.specLoEigInd = False
+                self.greenLesserDim = dimOfBasis(self.N - 1, self.m)
+                self.greenLesserBasis = np.zeros((self.greenLesserDim, self.m), dtype=np.int)
+                fillBasis(self.greenLesserBasis, self.N - 1, self.m)
+                self.greenLesserBasisDict = basis2dict(self.greenLesserBasis, self.greenLesserDim)
+                self.greenLesserHamiltonian = coo_matrix(np.zeros((self.greenLesserDim, self.greenLesserDim)),
+                                                    shape=(self.greenLesserDim, self.greenLesserDim), dtype=np.float64).tocsr()
+                self.greenLesserEigVals = np.array([])
+                self.greenLesserEigVects = np.array([])
+                self.greenLesserEigInd = False
                 # hi
-                self.specHiDim = dimOfBasis(self.N + 1, self.m)
-                self.specHiBasis = np.zeros((self.specHiDim, self.m), dtype=np.int)
-                fillBasis(self.specHiBasis, self.N + 1, self.m)
-                self.specHiBasisDict = basis2dict(self.specHiBasis, self.specHiDim)
-                self.specHiHamiltonian = coo_matrix(np.zeros((self.specHiDim, self.specHiDim)),
-                                                    shape=(self.specHiDim, self.specHiDim), dtype=np.float64).tocsr()
-                self.specHiEigVals = np.array([])
-                self.specHiEigVects = np.array([])
-                self.specHiEigInd = False
+                self.greenGreaterDim = dimOfBasis(self.N + 1, self.m)
+                self.greenGreaterBasis = np.zeros((self.greenGreaterDim, self.m), dtype=np.int)
+                fillBasis(self.greenGreaterBasis, self.N + 1, self.m)
+                self.greenGreaterBasisDict = basis2dict(self.greenGreaterBasis, self.greenGreaterDim)
+                self.greenGreaterHamiltonian = coo_matrix(np.zeros((self.greenGreaterDim, self.greenGreaterDim)),
+                                                    shape=(self.greenGreaterDim, self.greenGreaterDim), dtype=np.float64).tocsr()
+                self.greenGreaterEigVals = np.array([])
+                self.greenGreaterEigVects = np.array([])
+                self.greenGreaterEigInd = False
                 # general
                 self.green = np.zeros(self.m, dtype=self.datType)
                 self.stateSaves = []  # append with time dep. state vector
                 self.timeSaves = []  # append with time of saved state vector
-                self.specLoEvolutionMatrix = None
-                self.specHiEvolutionMatrix = None
-                self.specLowering = []
-                self.specRaising = []
+                self.greenLesserEvolutionMatrix = None
+                self.greenGreaterEvolutionMatrix = None
+                self.greenLesserAnnihilation = []
+                self.greenGreaterAnnihilation = []
                 # fill'em
                 for i in range(0, self.m):
                     # note that the lowering operator transposed is the raising op. of the lower dimension space
-                    self.specLowering.append(getLoweringSpec(self, i))
+                    self.greenLesserAnnihilation.append(getLesserAnnihilation(self, i))
                     # the raising operator transposed is the lowering op. of the higher dimension space
-                    self.specRaising.append(getRaisingSpec(self, i))
+                    self.greenGreaterAnnihilation.append(getGreaterAnnihilation(self, i))
 
     # end of init
 
@@ -487,8 +488,8 @@ class mpSystem:
         if self.boolRetgreen:
             t1 = tm.time()
 
-            self.initSpecLoHamiltonian()
-            self.initSpecHiHamiltonian()
+            self.initgreenLesserHamiltonian()
+            self.initgreenGreaterHamiltonian()
 
             self.openProgressFile()
             self.filProg.write('Wrote high and low hamiltonian in ' + time_elapsed(t1, 60, 0) + '\n')
@@ -536,49 +537,49 @@ class mpSystem:
                                 self.hamiltonianRed += self.interdiff * tmp
                             del tmp
 
-    def initSpecLoHamiltonian(self):
-        tmpspecops = quadraticArraySpecLo(self)
+    def initgreenLesserHamiltonian(self):
+        tmpgreenops = quadraticArrayGreenLesser(self)
         for i in range(0, self.m):
             for j in range(0, self.m):
                 if i != j:
-                    self.specLoHamiltonian += self.hybrid * tmpspecops[i, j]
+                    self.greenLesserHamiltonian += self.hybrid * tmpgreenops[i, j]
                 else:
-                    self.specLoHamiltonian += i * self.onsite * tmpspecops[i, j]
+                    self.greenLesserHamiltonian += i * self.onsite * tmpgreenops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
             for i in range(0, self.m):
                 for j in range(0, self.m):
                     for k in range(0, self.m):
                         for l in range(0, self.m):
-                            tmp = getQuarticSpec(tmpspecops, i, j, k, l)
+                            tmp = getQuarticGreen(tmpgreenops, i, j, k, l)
                             if i == j and k == l and k == j:
-                                self.specLoHamiltonian += self.interequal * tmp
+                                self.greenLesserHamiltonian += self.interequal * tmp
                             else:
-                                self.specLoHamiltonian += self.interdiff * tmp
+                                self.greenLesserHamiltonian += self.interdiff * tmp
                             del tmp
-            del tmpspecops
+            del tmpgreenops
 
-    def initSpecHiHamiltonian(self):
-        tmpspecops = quadraticArraySpecHi(self)
+    def initgreenGreaterHamiltonian(self):
+        tmpgreenops = quadraticArrayGreenGreater(self)
         for i in range(0, self.m):
             for j in range(0, self.m):
                 if i != j:
-                    self.specHiHamiltonian += self.hybrid * tmpspecops[i, j]
+                    self.greenGreaterHamiltonian += self.hybrid * tmpgreenops[i, j]
                 else:
-                    self.specHiHamiltonian += i * self.onsite * tmpspecops[i, j]
+                    self.greenGreaterHamiltonian += i * self.onsite * tmpgreenops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
             for i in range(0, self.m):
                 for j in range(0, self.m):
                     for k in range(0, self.m):
                         for l in range(0, self.m):
-                            tmp = getQuarticSpec(tmpspecops, i, j, k, l)
+                            tmp = getQuarticGreen(tmpgreenops, i, j, k, l)
                             if i == j and k == l and k == j:
-                                self.specHiHamiltonian += self.interequal * tmp
+                                self.greenGreaterHamiltonian += self.interequal * tmp
                             else:
-                                self.specHiHamiltonian += self.interdiff * tmp
+                                self.greenGreaterHamiltonian += self.interdiff * tmp
                             del tmp
-            del tmpspecops
+            del tmpgreenops
 
     def initAllEvolutionMatrices(self):
         t0 = tm.time()
@@ -591,8 +592,8 @@ class mpSystem:
         if self.boolRetgreen:
             t1 = tm.time()
 
-            self.initSpecLoEvolutionMatrix()
-            self.initSpecHiEvolutionMatrix()
+            self.initgreenLesserEvolutionMatrix()
+            self.initgreenGreaterEvolutionMatrix()
 
             self.openProgressFile()
             self.filProg.write('Initialized high and low evolution matrices in ' + time_elapsed(t1, 60, 0) + '\n')
@@ -611,11 +612,10 @@ class mpSystem:
         for i in range(1, self.order + 1):
             self.evolutionMatrix += ((-1j) ** i) * (self.deltaT ** i) * (self.hamiltonian ** i) / factorial(i)
 
-        self.evolutionMatrix = self.evolutionMatrix.toarray()
         if self.boolHamilStore:
-            storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.txt', 1)
-            storeMatrix(self.evolutionMatrix, './data/evolutionmatrix.txt', 1)
-        self.evolutionMatrix = npmatrix_power(self.evolutionMatrix, self.evolStepDist)
+            storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.dat', 1)
+            storeMatrix(self.evolutionMatrix.toarray(), './data/evolutionmatrix.dat', 1)
+        self.evolutionMatrix = npmatrix_power(self.evolutionMatrix.toarray(), self.evolStepDist)
         # Store hamiltonian eigenvalues
         if diagonalize:
             self.updateEigenenergies()
@@ -628,12 +628,12 @@ class mpSystem:
     #### IMPORTANT NOTE - complex conjugate will be needed for Green function ####
     #### FURTHER: need only 2*delta_T for green function, so added sq=True ####
     #### ALSO: delta_T here is actually the delta_T of time-steps, so the wide steps!!! ####
-    def initSpecLoEvolutionMatrix(self, diagonalize=False, conj=True, sq=True):
+    def initgreenLesserEvolutionMatrix(self, diagonalize=False, conj=True, sq=True):
         if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if not np.allclose(self.specLoHamiltonian.toarray(), self.specLoHamiltonian.toarray().T.conj()):
+        if not np.allclose(self.greenLesserHamiltonian.toarray(), self.greenLesserHamiltonian.toarray().T.conj()):
             print('Warning - hamiltonian is not hermitian!')
-        self.specLoEvolutionMatrix = spidentity(self.specLoDim, dtype=self.datType, format='csr')
+        self.greenLesserEvolutionMatrix = spidentity(self.greenLesserDim, dtype=self.datType, format='csr')
 
         if conj:
             pre = 1j
@@ -641,26 +641,26 @@ class mpSystem:
             pre = (-1j)
 
         for i in range(1, self.loOrder + 1):
-            self.specLoEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.specLoHamiltonian ** i) / factorial(i)
+            self.greenLesserEvolutionMatrix += (pre ** i) * (self.deltaT ** i)\
+                                               * (self.greenLesserHamiltonian ** i) / factorial(i)
         if diagonalize:
             self.updateLoEigenenergies()
         # bring it to the same timestep distance as the state vector
-        self.specLoEvolutionMatrix = self.specLoEvolutionMatrix.toarray()
-        self.specLoEvolutionMatrix = npmatrix_power(self.specLoEvolutionMatrix, self.evolStepDist)
+        self.greenLesserEvolutionMatrix = npmatrix_power(self.greenLesserEvolutionMatrix.toarray(), self.evolStepDist)
         if sq:
-            self.specLoEvolutionMatrix = npmatrix_power(self.specLoEvolutionMatrix, 2)
+            self.greenLesserEvolutionMatrix = npmatrix_power(self.greenLesserEvolutionMatrix, 2)
 
     # end
 
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initSpecHiEvolutionMatrix(self, diagonalize=False, conj=False, sq=True):
+    def initgreenGreaterEvolutionMatrix(self, diagonalize=False, conj=False, sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
-        if not np.allclose(self.specHiHamiltonian.toarray(), self.specHiHamiltonian.toarray().T.conj()):
+        if not np.allclose(self.greenGreaterHamiltonian.toarray(), self.greenGreaterHamiltonian.toarray().T.conj()):
             print('Warning - hamiltonian is not hermitian!')
-        self.specHiEvolutionMatrix = spidentity(self.specHiDim, dtype=self.datType, format='csr')
+        self.greenGreaterEvolutionMatrix = spidentity(self.greenGreaterDim, dtype=self.datType, format='csr')
 
         if conj:
             pre = 1j
@@ -668,13 +668,12 @@ class mpSystem:
             pre = (-1j)
 
         for i in range(1, self.hiOrder + 1):
-            self.specHiEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.specHiHamiltonian ** i) / factorial(i)
+            self.greenGreaterEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.greenGreaterHamiltonian ** i) / factorial(i)
         if diagonalize:
             self.updateHiEigenenergies()
-        self.specHiEvolutionMatrix = self.specHiEvolutionMatrix.toarray()
-        self.specHiEvolutionMatrix = npmatrix_power(self.specHiEvolutionMatrix, self.evolStepDist)
+        self.greenGreaterEvolutionMatrix = npmatrix_power(self.greenGreaterEvolutionMatrix.toarray(), self.evolStepDist)
         if sq:
-            self.specHiEvolutionMatrix = npmatrix_power(self.specHiEvolutionMatrix, 2)
+            self.greenGreaterEvolutionMatrix = npmatrix_power(self.greenGreaterEvolutionMatrix, 2)
 
     # end
 
@@ -855,7 +854,7 @@ class mpSystem:
         if operator.shape != (self.dim, self.dim):
             exit('Operator shape is' + str(np.shape(operator)) + 'but' + str((self.dim, self.dim)) + 'is needed!')
         # return multi_dot([np.conjugate(np.array(self.state)[:,0]), operator, np.array(self.state)[:,0]])
-        return np.vdot(self.state, operator.dot(self.state))
+        return vdot(self.state, operator.dot(self.state))
 
     # note that - in principle - the expectation value can be complex! (though it shouldn't be)
     def expectValueDM(self, operator):
@@ -885,20 +884,20 @@ class mpSystem:
             self.eigInvRed = la.inv(np.matrix(self.eigVectsRed.T))
             self.eigIndRed = True
             # TMP TMP TMP
-            tmpfil = open('./data/eigenvaluesRed.txt', 'w')
+            tmpfil = open('./data/eigenvaluesRed.dat', 'w')
             for i in range(0, self.dimRed):
                 tmpfil.write("%i %.16e\n" % (i, self.eigValsRed[i]))
             tmpfil.close()
 
     def updateLoEigenenergies(self):
-        if not self.specLoEigInd:
-            self.specLoEigVals, self.specLoEigVects = la.eigh(self.specLoHamiltonian.toarray())
-            self.specLoEigInd = True
+        if not self.greenLesserEigInd:
+            self.greenLesserEigVals, self.greenLesserEigVects = la.eigh(self.greenLesserHamiltonian.toarray())
+            self.greenLesserEigInd = True
 
     def updateHiEigenenergies(self):
-        if not self.specHiEigInd:
-            self.specHiEigVals, self.specHiEigVects = la.eigh(self.specHiHamiltonian.toarray())
-            self.specHiEigInd = True
+        if not self.greenGreaterEigInd:
+            self.greenGreaterEigVals, self.greenGreaterEigVects = la.eigh(self.greenGreaterHamiltonian.toarray())
+            self.greenGreaterEigInd = True
 
             ## will free the memory!!!
 
@@ -915,7 +914,7 @@ class mpSystem:
             t0 = tm.time()
 
             # decomposition in energy space       
-            tfil = open('./data/hamiltonian_eigvals.txt', 'w')
+            tfil = open('./data/hamiltonian_eigvals.dat', 'w')
             if self.boolDecompStore:
                 tmpAbsSq = np.zeros(self.dim)
                 # generate all overlaps at once
@@ -947,7 +946,7 @@ class mpSystem:
             tfil.close()
 
             # decomposition in fock space
-            sfil = open('./data/state.txt', 'w')
+            sfil = open('./data/state.dat', 'w')
             for i in range(0, self.dim):
                 tmpAbsSqFck = np.abs(self.state[i]) ** 2
                 if tmpAbsSqFck != 0:
@@ -982,7 +981,7 @@ class mpSystem:
 
             if self.boolDiagExpStore:
                 # diagonals in expectation value    
-                ethfil = open('./data/diagoccexpect.txt', 'w')
+                ethfil = open('./data/diagoccexpect.dat', 'w')
                 for i in range(0, self.m):
                     if self.boolOffDiagOcc:
                         # first store everything, later delete diagonal elements
@@ -1000,7 +999,7 @@ class mpSystem:
 
             # now store the diagonals in one file for comparison to the off diagonals later
             if self.boolOffDiagOcc:
-                diagfil = open('./data/diagoccsingles.txt', 'w')
+                diagfil = open('./data/diagoccsingles.dat', 'w')
                 for i in range(0, self.m):
                     # if the matrices have not yet been constructed - do this
                     if not self.boolDiagExpStore:
@@ -1020,11 +1019,11 @@ class mpSystem:
             for i in range(0, self.m):
                 if self.boolOffDiagOcc:
                     # note that the off diag mat still contains the diagonals right now!
-                    storeMatrix(self.offDiagOccMat[i], './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False,
+                    storeMatrix(self.offDiagOccMat[i], './data/occ' + str(i) + '.dat', absOnly=0, stre=True, stim=False,
                                 stabs=False)
                 else:
                     storeMatrix(np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv)),
-                                './data/occ' + str(i) + '.txt', absOnly=0, stre=True, stim=False, stabs=False)
+                                './data/occ' + str(i) + '.dat', absOnly=0, stre=True, stim=False, stabs=False)
             print("Occupation number matrices stored in " + time_elapsed(t0, 60, 1))
 
         # now we remove the diagonal elements
@@ -1034,7 +1033,7 @@ class mpSystem:
 
         if self.occEnSingle and self.boolOffDiagOcc:
             t0 = tm.time()
-            infofile = open('./data/offdiagoccsinglesinfo.txt', 'w')
+            infofile = open('./data/offdiagoccsinglesinfo.dat', 'w')
             if not (self.boolDiagExpStore or self.boolOffDiagOcc):
                 if self.boolDecompStore:
                     self.enState = tmp
@@ -1086,7 +1085,7 @@ class mpSystem:
         self.enState = np.dot(self.eigVects.T, self.state)
 
         for i in range(0, self.m):
-            self.offDiagOcc[i] = np.vdot(self.enState, self.offDiagOccMat[i].dot(self.enState))
+            self.offDiagOcc[i] = vdot(self.enState, self.offDiagOccMat[i].dot(self.enState))
 
             # check for imaginary part -> would give an indication for errors
             if self.offDiagOcc[i].imag > 1e-6:
@@ -1133,7 +1132,7 @@ class mpSystem:
                 self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
                 for i in range(0, self.dimRed):
                     self.entanglementSpectrumEnergy[i] = \
-                        np.vdot(entanglementStates[i],
+                        vdot(entanglementStates[i],
                                 self.hamiltonianRed.dot(entanglementStates[i])).real
             else:
                 self.entanglementSpectrum = la.eigvalsh(self.densityMatrixRed, check_finite=False)
@@ -1189,43 +1188,55 @@ class mpSystem:
         self.filProg.write('Starting evalutation of Green\'s function:\n' + ' 0% ')
         print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
         self.closeProgressFile()
-        tmpHiEvol = np.identity(self.specHiDim, dtype=self.datType)
-        tmpLoEvol = np.identity(self.specLoDim, dtype=self.datType)
 
+        # initialize the evolution operators as the identity (which corresponds to tau=0)
+        tmpGreaterEvol = np.identity(self.greenGreaterDim, dtype=self.datType)
+        tmpLesserEvol = np.identity(self.greenLesserDim, dtype=self.datType)
+        # the time distance (in tau) to sum over is given by the maximum time - the offset time
         time_dist = self.timeSaves[-1] - offset
-        dt = self.timeSaves[1]
-        index_dist_check = time_dist/dt
-        # center piece + multiple of two dt distance
-        if index_dist_check % 2 != 1:
-            index_dist_check -= index_dist_check % 2 - 1
+        # the time steps are (equidistant) given by just the first time step
+        dt = self.timeSaves[1] - self.timeSaves[0]
+        # the additional dt is needed since the first time element is not counted otherwise
+        index_dist_check = int(round((time_dist + dt)/dt))
+        # center piece + multiple of two dt distance has to be used since tau comes in steps of 2dt
+        if index_dist_check % 2 != 0:
+            index_dist_check -= 1
         index_dist = int(index_dist_check)
-        offset_index = len(self.timeSaves) - index_dist
+        # the index of the lowest time coordinate (the offset) - 1
+        # (because we start at the middle index_dist is 1 too short)
+        offset_index = len(self.timeSaves) - index_dist - 1
+        # the actual time offset
         offset_time = self.timeSaves[offset_index]
+        # the range to sum up
+        bound = int(index_dist / 2)
 
-        bound = int((index_dist - 1) / 2)
-
-        self.filGreen = open('./data/green_com%.2f.dat'% (offset_time + bound*dt) , 'w')  # t, re, im
+        # open the green function file for writing
+        self.filGreen = open('./data/green_com%.2f.dat' % (offset_time + bound*dt), 'w')  # t, re, im
         self.filGreen.write('#tau re>_1 im>_1 re<_1 im<_1... COM time is $f\n' % (offset_time + bound*dt))
 
-        # handle the i=0 case => equal time greater is -i*n_i+1, lesser is -i*n_i
+        # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
         for m in range(0, self.m):
             # raising is the higher dimension creation operator, raising.T.c the annihilation
             # this is the greater Green function (without factor of +-i)
-            tmpGreenHigh = multi_dot(
-                [self.stateSaves[bound + offset_index].T.conjugate(), self.specRaising[m].T.dot(tmpHiEvol),
-                 self.specRaising[m].dot(self.stateSaves[bound - offset_index])])
-            # lowering is the lower dimension annihilation operator, raising.T.c the creation
+            tmpGreenGreater = vdot(self.stateSaves[bound + offset_index],
+                                   self.greenGreaterAnnihilation[m].T.dot(
+                                       self.greenGreaterAnnihilation[m].dot(
+                                           self.stateSaves[bound + offset_index]))
+                                   )
+            # lowering is the lower dimension annihilation operator, lowering.T.c the creation
             # this is the lesser Green function (without factor of +-i)
-            tmpGreenLow = multi_dot(
-                [self.stateSaves[bound - offset_index].T.conjugate(), self.specLowering[m].T.dot(tmpLoEvol),
-                 self.specLowering[m].dot(self.stateSaves[bound + offset_index])])
+            tmpGreenLesser = vdot(self.stateSaves[bound + offset_index],
+                                  self.greenLesserAnnihilation[m].T.dot(
+                                      self.greenLesserAnnihilation[m].dot(
+                                          self.stateSaves[bound + offset_index]))
+                                  )
             # note that the greater Green function is multiplied by -i, which is included in the writing below!
             # note that the lesser Green function is multiplied by -i, which is included in the writing below!
             # first number is real part, second imaginary
             # there is an overall minus sign!
-            self.filGreen.write('%.16e %.16e ' % (tmpGreenHigh.imag, -1 * tmpGreenHigh.real))
-            self.filGreen.write('%.16e %.16e ' % (tmpGreenLow.imag, -1 * tmpGreenLow.real))
+            self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
+            self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
         self.filGreen.write(' \n')
 
         # now start from the first non-zero difference time
@@ -1233,50 +1244,56 @@ class mpSystem:
         t1 = tm.time()
         tavg = 0
         bound_permil = 1000.0 / bound  # use per 1000 to get easier condition for 1% and 10%
-        for i in range(offset_index + 1, bound + 1 + offset_index):
-            tmpHiEvol = np.dot(tmpHiEvol, self.specHiEvolutionMatrix)  # they need to be the squared ones!
-            tmpLoEvol = np.dot(tmpLoEvol, self.specLoEvolutionMatrix)  # they need to be the squared ones!
+        for i in range(1, bound + 1):
+            # shift i by the offset to move to the correct com
+            ind = offset_index + i
+            tmpGreaterEvol = tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix)  # they need to be the squared ones!
+            tmpLesserEvol = tmpLesserEvol.dot(self.greenLesserEvolutionMatrix)  # they need to be the squared ones!
             self.filGreen.write('%.16e ' % (2 * dt * i))
             for m in range(0, self.m):
                 # raising is the higher dimension creation operator, raising.T.c the annihilation
                 # this is the greater Green function (without factor of +-i)
-                tmpGreenHigh = multi_dot(
-                    [self.stateSaves[bound + i].T.conjugate(), self.specRaising[m].T.dot(tmpHiEvol),
-                     self.specRaising[m].dot(self.stateSaves[bound - i])])
-                # lowering is the lower dimension annihilation operator, raising.T.c the creation
+                tmpGreenGreater = vdot(self.stateSaves[bound + ind],
+                                          self.greenGreaterAnnihilation[m].T.dot(
+                                              tmpGreaterEvol.dot(
+                                                  self.greenGreaterAnnihilation[m].dot(
+                                                      self.stateSaves[bound - ind])))
+                                          )
+                # lowering is the lower dimension annihilation operator, lowering.T.c the creation
                 # this is the lesser Green function (without factor of +-i)
-                tmpGreenLow = multi_dot(
-                    [self.stateSaves[bound - i].T.conjugate(), self.specLowering[m].T.dot(tmpLoEvol),
-                     self.specLowering[m].dot(self.stateSaves[bound + i])])
+                tmpGreenLesser = vdot(self.stateSaves[bound - ind],
+                                         self.greenLesserAnnihilation[m].T.dot(tmpLesserEvol.dot(
+                                             self.greenLesserAnnihilation[m].dot(
+                                                 self.stateSaves[bound + ind])))
+                                         )
                 # note that the greater Green function is multiplied by -i, which is included in the writing below!
                 # note that the lesser Green function is multiplied by -i, which is included in the writing below!
                 # first number is real part, second imaginary
                 # there is an overall minus sign!
-                self.filGreen.write('%.16e %.16e ' % (tmpGreenHigh.imag, -1 * tmpGreenHigh.real))
-                self.filGreen.write('%.16e %.16e ' % (tmpGreenLow.imag, -1 * tmpGreenLow.real))
+                self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
+                self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
             self.filGreen.write(' \n')
 
             # time estimation start
-            i_shift = i - offset_index
-            if round(i_shift * bound_permil, 1) % 10.0 == 0:
+            if round(i * bound_permil, 1) % 10.0 == 0:
                 self.openProgressFile()
                 self.filProg.write('.')
                 print('.', end='', flush=True)
-                if round(i_shift * bound_permil, 1) % 100 == 0:
-                    tavg *= int(i_shift - bound / 10)  # calculate from time/step back to unit: time
+                if round(i * bound_permil, 1) % 100 == 0:
+                    tavg *= int(i - bound / 10)  # calculate from time/step back to unit: time
                     tavg += tm.time() - t1  # add passed time
-                    tavg /= i_shift  # average over total number of steps
+                    tavg /= i  # average over total number of steps
                     t1 = tm.time()
-                    print(' ' + str(int(i_shift * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0),
+                    print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0),
                           end='', flush=True)
 
                     self.filProg.write(
-                        ' ' + str(int(i_shift * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0))
-                    if i_shift != bound:
-                        print(" ###### eta: " + time_form(tavg * (bound - i_shift)) + "\n" + str(
-                            int(i_shift * bound_permil / 10)) + "% ", end='', flush=True)
-                        self.filProg.write(" ###### eta: " + time_form(tavg * (bound - i_shift)) + "\n" + str(
-                            int(i_shift * bound_permil / 10)) + "%")
+                        ' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0))
+                    if i != bound:
+                        print(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                            int(i * bound_permil / 10)) + "% ", end='', flush=True)
+                        self.filProg.write(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                            int(i * bound_permil / 10)) + "%")
                     else:
                         print('\n')
                         self.filProg.write('\n')
@@ -1411,10 +1428,10 @@ class mpSystem:
                 self.dmFileFactor = 1
                 if not self.boolOnlyRed:
                     if self.boolDMStore:
-                        storeMatrix(self.densityMatrix, './data/density/densmat' + str(int(self.dmcount)) + '.txt')
+                        storeMatrix(self.densityMatrix, './data/density/densmat' + str(int(self.dmcount)) + '.dat')
                     if self.boolDMRedStore:
                         storeMatrix(self.densityMatrixRed,
-                                    './data/red_density/densmat' + str(int(self.dmcount)) + '.txt')
+                                    './data/red_density/densmat' + str(int(self.dmcount)) + '.dat')
                     self.dmcount += 1
             else:
                 self.dmFileFactor += 1
@@ -1468,25 +1485,25 @@ class mpSystem:
         self.filProg.close()
 
     def openFiles(self):
-        self.filNorm = open('./data/norm.txt', 'w')
+        self.filNorm = open('./data/norm.dat', 'w')
         if self.boolReducedEntropy:
-            self.filEnt = open('./data/entropy.txt', 'w')
+            self.filEnt = open('./data/entropy.dat', 'w')
         if self.boolOccupations:
-            self.filOcc = open('./data/occupation.txt', 'w')
+            self.filOcc = open('./data/occupation.dat', 'w')
         if self.boolTotalEntropy:
-            self.filTotEnt = open('./data/total_entropy.txt', 'w')
+            self.filTotEnt = open('./data/total_entropy.dat', 'w')
         if self.boolTotalEnergy:
-            self.filTotalEnergy = open('./data/total_energy.txt', 'w')
+            self.filTotalEnergy = open('./data/total_energy.dat', 'w')
         if self.boolReducedEnergy:
-            self.filRedEnergy = open('./data/reduced_energy.txt', 'w')
+            self.filRedEnergy = open('./data/reduced_energy.dat', 'w')
         if self.boolOffDiagOcc:
-            self.filOffDiagOcc = open('./data/offdiagocc.txt', 'w')
+            self.filOffDiagOcc = open('./data/offdiagocc.dat', 'w')
             if self.occEnSingle:
-                self.filOffDiagOccSingles = open('./data/offdiagoccsingle.txt', 'w')
+                self.filOffDiagOccSingles = open('./data/offdiagoccsingle.dat', 'w')
         if self.boolOffDiagDens:
-            self.filOffDiagDens = open('./data/offdiagdens.txt', 'w')
+            self.filOffDiagDens = open('./data/offdiagdens.dat', 'w')
         if self.boolOffDiagDensRed:
-            self.filOffDiagDensRed = open('./data/offdiagdensred.txt', 'w')
+            self.filOffDiagDensRed = open('./data/offdiagdensred.dat', 'w')
 
     # close all files
     def closeFiles(self):
@@ -1583,13 +1600,13 @@ def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecb
         os.mkdir("./plots/")
     # remove the old stuff
     if clearbool:
-        if os.path.isfile("./data/density/densmat0.txt"):
+        if os.path.isfile("./data/density/densmat0.dat"):
             for root, dirs, files in os.walk('./data/density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
             print("Cleared density folder")
 
-        if os.path.isfile("./data/red_density/densmat0.txt"):
+        if os.path.isfile("./data/red_density/densmat0.dat"):
             for root, dirs, files in os.walk('./data/red_density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
@@ -1726,29 +1743,29 @@ def quadraticArrayRed(sysVar):
     return retArr
 
 
-def quadraticArraySpecLo(sysVar):
+def quadraticArrayGreenLesser(sysVar):
     retArr = np.empty((sysVar.m, sysVar.m), dtype=csr_matrix)
     # off diagonal
     for i in range(0, sysVar.m):
         for j in range(0, i):
-            retArr[i, j] = getQuadraticSpecLo(sysVar, i, j)
+            retArr[i, j] = getQuadraticGreenLesser(sysVar, i, j)
             retArr[j, i] = retArr[i, j].transpose()
     # diagonal terms
     for i in range(0, sysVar.m):
-        retArr[i, i] = getQuadraticSpecLo(sysVar, i, i)
+        retArr[i, i] = getQuadraticGreenLesser(sysVar, i, i)
     return retArr
 
 
-def quadraticArraySpecHi(sysVar):
+def quadraticArrayGreenGreater(sysVar):
     retArr = np.empty((sysVar.m, sysVar.m), dtype=csr_matrix)
     # off diagonal
     for i in range(0, sysVar.m):
         for j in range(0, i):
-            retArr[i, j] = getQuadraticSpecHi(sysVar, i, j)
+            retArr[i, j] = getQuadraticGreenGreater(sysVar, i, j)
             retArr[j, i] = retArr[i, j].transpose()
     # diagonal terms
     for i in range(0, sysVar.m):
-        retArr[i, i] = getQuadraticSpecHi(sysVar, i, i)
+        retArr[i, i] = getQuadraticGreenGreater(sysVar, i, i)
     return retArr
 
 
@@ -1832,40 +1849,40 @@ def getDestructorRed(sysVar, l):
     return retmat
 
 
-def getQuadraticSpecLo(sysVar, l, m):
+def getQuadraticGreenLesser(sysVar, l, m):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
-    for el in sysVar.specLoBasis:
+    for el in sysVar.greenLesserBasis:
         if el[m] != 0:
             tmp = el.copy()
             tmp[m] -= 1
             tmp[l] += 1
-            row = np.append(row, sysVar.specLoBasisDict[tuple(tmp)])
-            col = np.append(col, sysVar.specLoBasisDict[tuple(el)])
+            row = np.append(row, sysVar.greenLesserBasisDict[tuple(tmp)])
+            col = np.append(col, sysVar.greenLesserBasisDict[tuple(el)])
             data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
 
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specLoDim, sysVar.specLoDim), dtype=np.float64).tocsr()
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenLesserDim, sysVar.greenLesserDim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
 
-def getQuadraticSpecHi(sysVar, l, m):
+def getQuadraticGreenGreater(sysVar, l, m):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
-    for el in sysVar.specHiBasis:
+    for el in sysVar.greenGreaterBasis:
         if el[m] != 0:
             tmp = el.copy()
             tmp[m] -= 1
             tmp[l] += 1
-            row = np.append(row, sysVar.specHiBasisDict[tuple(tmp)])
-            col = np.append(col, sysVar.specHiBasisDict[tuple(el)])
+            row = np.append(row, sysVar.greenGreaterBasisDict[tuple(tmp)])
+            col = np.append(col, sysVar.greenGreaterBasisDict[tuple(el)])
             data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
 
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specHiDim, sysVar.specHiDim), dtype=np.float64).tocsr()
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenGreaterDim, sysVar.greenGreaterDim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
@@ -1911,7 +1928,7 @@ def getQuarticRed(sysVar, k, l, m, n):
             (getQuadraticRed(sysVar, k, m).dot(getQuadraticRed(sysVar, l, n))) - getQuadraticRed(sysVar, k, n)).copy()
 
 
-def getQuarticSpec(quadops, k, l, m, n):
+def getQuarticGreen(quadops, k, l, m, n):
     if l != m:
         return (quadops[k, m].dot(quadops[l, n])).copy()
     else:
@@ -1920,7 +1937,7 @@ def getQuarticSpec(quadops, k, l, m, n):
 
 # destruction operator (N -> N-1)
 # adjoint of this is creation on N-1
-def getLoweringSpec(sysVar, l):
+def getLesserAnnihilation(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
@@ -1929,18 +1946,18 @@ def getLoweringSpec(sysVar, l):
         if el[l] != 0:
             tmp = el.copy()
             tmp[l] -= 1
-            row = np.append(row, sysVar.specLoBasisDict[tuple(tmp)])
+            row = np.append(row, sysVar.greenLesserBasisDict[tuple(tmp)])
             col = np.append(col, sysVar.basisDict[tuple(el)])
             data = np.append(data, np.sqrt(el[l], dtype=np.float64))
 
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specLoDim, sysVar.dim), dtype=np.float64).tocsr()
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenLesserDim, sysVar.dim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
 
 # creation operator (N -> N+1)
 # adjoint of this is annihilation on N+1
-def getRaisingSpec(sysVar, l):
+def getGreaterAnnihilation(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
@@ -1948,36 +1965,36 @@ def getRaisingSpec(sysVar, l):
     for el in sysVar.basis:
         tmp = el.copy()
         tmp[l] += 1
-        row = np.append(row, sysVar.specHiBasisDict[tuple(tmp)])
+        row = np.append(row, sysVar.greenGreaterBasisDict[tuple(tmp)])
         col = np.append(col, sysVar.basisDict[tuple(el)])
         data = np.append(data, np.sqrt(tmp[l], dtype=np.float64))
 
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.specHiDim, sysVar.dim), dtype=np.float64).tocsr()
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenGreaterDim, sysVar.dim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
 
 # annihilation operator on N+1
-def getRaisingSpecAdj(sysVar, l):
+def getGreaterAnnihilationAdj(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
-    for el in sysVar.specHiBasis:
+    for el in sysVar.greenGreaterBasis:
         if el[l] != 0:
             tmp = el.copy()
             tmp[l] -= 1
-            col = np.append(col, sysVar.specHiBasisDict[tuple(el)])
+            col = np.append(col, sysVar.greenGreaterBasisDict[tuple(el)])
             row = np.append(row, sysVar.basisDict[tuple(tmp)])
             data = np.append(data, np.float64(sqrt(el[l])))
 
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.specHiDim), dtype=np.float64).tocsr()
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.greenGreaterDim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
 
 # inverse of creation operator (have to multiply from left...)
-def getRaisingSpecInv(sysVar, l):
+def getGreaterAnnihilationInv(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
@@ -1985,11 +2002,11 @@ def getRaisingSpecInv(sysVar, l):
     for el in sysVar.basis:
         tmp = el.copy()
         tmp[l] += 1
-        col = np.append(col, sysVar.specHiBasisDict[tuple(tmp)])
+        col = np.append(col, sysVar.greenGreaterBasisDict[tuple(tmp)])
         row = np.append(row, sysVar.basisDict[tuple(el)])
         data = np.append(data, np.float64(1 / sqrt(tmp[l])))
 
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.specHiDim), dtype=np.float64).tocsr()
+    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.greenGreaterDim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
@@ -2042,7 +2059,7 @@ def time_form(seconds):
 def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
     matDim = mat.shape[0]
     if absOnly == 0:
-        # assume dot + 3 letter ending e.g. .txt
+        # assume dot + 3 letter ending e.g. .dat
         fname = fil[:-4]
         fend = fil[-4:]
         if stabs:
@@ -2073,7 +2090,7 @@ def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
             freal.close()
     else:
         f = open(fil, 'w')
-        # assume dot + 3 letter ending e.g. .txt
+        # assume dot + 3 letter ending e.g. .dat
         for n in range(0, matDim):
             for nn in range(0, matDim - 1):
                 f.write('%.16e ' % np.abs(mat[(n, nn)]))
