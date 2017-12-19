@@ -123,7 +123,7 @@ class mpSystem:
         self.mask = np.ones(self.m, dtype=bool)
         for k in self.kRed:
             self.mask[k] = False
-
+        self.systemLevelIterator = np.linspace(0, self.m-1, self.m)[self.mask]
         self.dim = dimOfBasis(self.N, self.m)  # dimension of basis
         # system variables
         if not plotOnly:
@@ -228,6 +228,11 @@ class mpSystem:
             self.entanglementSpectrum = np.zeros(self.dimRed)
             if self.boolEntanglementSpectrum:
                 self.entanglementSpectrumEnergy = np.zeros(self.dimRed)
+                self.systemOccupationOperator = self.operatorsRed[0, 0]
+                for i in range(1, self.mRed):
+                    self.systemOccupationOperator += self.operatorsRed[i, i]
+                self.reducedHamiltonian = np.zeros(self.dimRed)
+                self.reducedHamiltonianInd = False
             # ## Spectral
             if self.boolRetgreen:
                 # lo
@@ -522,7 +527,7 @@ class mpSystem:
                 if i != j:
                     self.hamiltonianRed += self.hybrid * self.operatorsRed[i, j]
                 else:
-                    self.hamiltonianRed += i * self.onsite * self.operatorsRed[i, j]
+                    self.hamiltonianRed += int(self.systemLevelIterator[i]) * self.onsite * self.operatorsRed[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
             for i in range(0, self.mRed):
@@ -1130,16 +1135,38 @@ class mpSystem:
         if self.mRed != 1:
             self.reduceDensityMatrixFromState()
             if self.boolEntanglementSpectrum and not self.entanglementSpectrumIndicator:
+                if not self.reducedHamiltonianInd:
+                    self.reducedHamiltonian = self.reduceMatrix(self.hamiltonian)
                 self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
                 for i in range(0, self.dimRed):
+                    '''
                     self.entanglementSpectrumEnergy[i] = \
                         np.vdot(entanglementStates[i],
                                 self.hamiltonianRed.dot(entanglementStates[i])).real
+                    '''
+                    self.entanglementSpectrumEnergy[i] = \
+                        np.vdot(entanglementStates[i],
+                                self.hamiltonianRed.dot(entanglementStates[i])).real
+                # this is the chemical potential search stuff!
+                tmpinv = la.inv(np.matrix(entanglementStates.T))
+                trans_hamil = \
+                    np.dot(entanglementStates.T, self.reduceMatrix(self.hamiltonian).dot(tmpinv))
+                trans_hamil -= np.identity(self.dimRed) * trans_hamil.diagonal()
+
             else:
                 self.entanglementSpectrum = la.eigvalsh(self.densityMatrixRed, check_finite=False)
         else:
             # if only one level left, density matrix is already diagonal
-            self.entanglementSpectrum = self.densityMatrixRed
+            self.reduceDensityMatrixFromState()
+            self.entanglementSpectrum = self.densityMatrixRed.real
+            if self.boolEntanglementSpectrum and not self.entanglementSpectrumIndicator:
+                #tmp = self.systemOccupationOperator.toarray().diagonal().real
+                tmp = self.onsite * self.systemLevelIterator[0] * self.operatorsRed[0, 0]\
+                       + self.interequal * self.operatorsRed[0, 0] * self.operatorsRed[0, 0]
+                for i in range(1, len(self.systemLevelIterator)):
+                    tmp += self.onsite * self.systemLevelIterator[i] * self.operatorsRed[i, i]\
+                        + self.interequal * self.operatorsRed[i, i] * self.operatorsRed[i, i]
+                self.entanglementSpectrumEnergy = tmp.diagonal().real
 
     def updateEntropyRed(self):
         if self.densityMatrixRed is None:
