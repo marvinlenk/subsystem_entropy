@@ -2,11 +2,13 @@ change log
 
 ### 02.01.2018
 - happy new year
-- added occendiag to store the diagonal in energy basis
+- added occendiag to store the diagonal in energy basis (weighted and unweighted matrix elements)
+- added occendiag to plot the diagonal in energy basis (weighted and unweighted matrix elements)
 - also removed the old diagonal expectation storage since it was irritating
 - changed file for occupation operator matrix in energy basis from occ%i to occ_energynasis_%i
 - slight overhaul of the whole energy basis calculation to be marginally more intuitive
 - renamed diagexp to occendiagexp
+- changed all range(0, n) to range(n)
 
 ### 18.12.2017
 - changed all .txt to .dat !!!

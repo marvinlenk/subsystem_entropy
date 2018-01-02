@@ -88,8 +88,15 @@ def plotData(sysVar):
         redEnergyfile = './data/reduced_energy.dat'
         redEnergy = np.loadtxt(redEnergyfile)
 
-    if sysVar.boolPlotDiagExp:
-        microexpfile = './data/diagoccexpect.dat'
+    if sysVar.boolPlotOccEnDiag:
+        occendiag = []
+        occendiagweighted = []
+        for i in range(sysVar.m):
+            occendiag.append(np.loadtxt('./data/occ_energybasis_diagonals_%i.dat' % i))
+            occendiagweighted.append(np.loadtxt('./data/occ_energybasis_diagonals_weighted_%i.dat' % i))
+
+    if sysVar.boolPlotOccEnDiagExp:
+        microexpfile = './data/occ_energybasis_diagonals_expectation.dat'
         microexp = np.loadtxt(microexpfile)
 
     if sysVar.boolPlotOffDiagOcc:
@@ -184,12 +191,12 @@ def plotData(sysVar):
 
     if sysVar.boolOccupations:
         step_array = occ_array[:, 0] * sysVar.plotTimeScale
-        for i in range(0, sysVar.m):
+        for i in range(sysVar.m):
             plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.5)
             if sysVar.boolPlotAverages:
                 tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
                 plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
-            if sysVar.boolPlotDiagExp:
+            if sysVar.boolPlotOccEnDiagExp:
                 plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
 
         plt.ylabel(r'Occupation number')
@@ -228,7 +235,7 @@ def plotData(sysVar):
         # ## Traced out (bath) occupation numbers
         for i in sysVar.kRed:
             plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
-            if sysVar.boolPlotDiagExp:
+            if sysVar.boolPlotOccEnDiagExp:
                 plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
             if sysVar.boolPlotAverages:
                 tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
@@ -250,7 +257,7 @@ def plotData(sysVar):
 
         for i in np.arange(sysVar.m)[sysVar.mask]:
             plt.plot(step_array, occ_array[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.6)
-            if sysVar.boolPlotDiagExp:
+            if sysVar.boolPlotOccEnDiagExp:
                 plt.axhline(y=microexp[i, 1], color='purple', linewidth=expectsize, linestyle=expectstyle)
             if sysVar.boolPlotAverages:
                 tavg = savgol_filter(occ_array[:, i + 1], fwidth, ford)
@@ -282,7 +289,7 @@ def plotData(sysVar):
             tavg = savgol_filter(tmp, fwidth, ford)
             plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
 
-        if sysVar.boolPlotDiagExp:
+        if sysVar.boolPlotOccEnDiagExp:
             mictmp = 0
             for i in sysVar.kRed:
                 mictmp += microexp[i, 1]
@@ -304,7 +311,7 @@ def plotData(sysVar):
             tavg = savgol_filter(tmp, fwidth, ford)
             plt.plot(step_array[loavgind:], tavg[loavgind:], linewidth=avgsize, linestyle=avgstyle, color='black')
 
-        if sysVar.boolPlotDiagExp:
+        if sysVar.boolPlotOccEnDiagExp:
             mictmp = 0
             for i in np.arange(sysVar.m)[sysVar.mask]:
                 mictmp += microexp[i, 1]
@@ -348,7 +355,7 @@ def plotData(sysVar):
 
         occavg = np.loadtxt('./data/fluctuation.dat', usecols=(1,))
         plt.xlim(-0.1, sysVar.m - 0.9)
-        for l in range(0, sysVar.m):
+        for l in range(sysVar.m):
             plt.errorbar(l, occavg[int(7 + 3 * l)] / sysVar.N, xerr=None, yerr=occavg[int(8 + 3 * l)] / sysVar.N,
                          marker='o', color=cm.Set1(0))
         plt.ylabel(r'Relative level occupation')
@@ -365,7 +372,7 @@ def plotData(sysVar):
         # sum of off diagonal elements in energy eigenbasis
 
     if sysVar.boolPlotOffDiagOcc:
-        for i in range(0, sysVar.m):
+        for i in range(sysVar.m):
             plt.plot(step_array, offdiagocc[:, i + 1], label=r'$n_' + str(i) + '$', linewidth=0.5)
         plt.ylabel(r'Sum of off diagonals')
         plt.xlabel(r'$J\,t$')
@@ -379,7 +386,7 @@ def plotData(sysVar):
         dt = offdiagocc[1, 0] - offdiagocc[0, 0]
         nrm = offdiagocc[:, 0] / dt
         nrm[1:] = 1 / nrm[1:]
-        for i in range(0, sysVar.m):
+        for i in range(sysVar.m):
             # ##### only sum (subsystem-thermalization)
             plt.ylabel('Sum of off diagonals in $n^{%i}$' % (i))
             # start at 10% of the whole x-axis
@@ -419,7 +426,7 @@ def plotData(sysVar):
             f, (ax1, ax2) = plt.subplots(2, sharex=False, sharey=False)
             tmp = cumtrapz(offdiagocc[:, i + 1], offdiagocc[:, 0], initial=offdiagocc[0, i + 1])
             tmp = np.multiply(tmp, nrm)
-            f.text(0.03, 0.5, 'Average of summed off diagonals in $n^{%i}$' % (i), ha='center', va='center',
+            f.text(0.03, 0.5, 'Average of summed off diagonals in $n^{%i}$' % i, ha='center', va='center',
                    rotation='vertical')
             ax1.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
             ax1.plot(offdiagocc[:, 0], tmp, linewidth=0.5)
@@ -462,6 +469,29 @@ def plotData(sysVar):
         ###
         pp.savefig()
         plt.clf()
+
+    def occupation_energybasis_diagonals():
+        return 0
+
+    if sysVar.boolPlotOccEnDiag:
+        for i in range(sysVar.m):
+            plt.plot(occendiag[i][:, 1], occendiag[i][:, 2], marker='o', markersize=0.5, linestyle=None)
+            plt.ylabel(r'matrix element of $n_%i$' % i)
+            plt.xlabel(r'$E / J$')
+            plt.grid()
+            plt.tight_layout()
+            ###
+            pp.savefig()
+            plt.clf()
+            ###
+            plt.plot(occendiagweighted[i][:, 1], occendiagweighted[i][:, 2], marker='o', markersize=0.5, linestyle=None)
+            plt.ylabel(r'weighted matrix element of $n_%i$' % i)
+            plt.xlabel(r'$E / J$')
+            plt.grid()
+            plt.tight_layout()
+            ###
+            pp.savefig()
+            plt.clf()
 
     def total_energy():
         return 0
@@ -585,7 +615,7 @@ def plotData(sysVar):
             spectral_frequency = []
             statistical_frequency = []
             sample_frequency = 1.0 / ((greendat[-1, 0] - greendat[0, 0]) / (len(greendat[:, 0]) - 1))
-            for i in range(0, sysVar.m):
+            for i in range(sysVar.m):
                 ind = 1 + i * 4
                 greater = (greendat[:, ind] + 1j * greendat[:, ind + 1])  # greater green function
                 lesser = (greendat[:, ind + 2] + 1j * greendat[:, ind + 3])  # lesser green function
@@ -855,7 +885,7 @@ def plotDensityMatrixAnimation(steps, delta_t, files, stepsize=1, red=0, framera
             print('.', end='', flush=True)
         return im
 
-    ani = animation.FuncAnimation(fig, iterate, np.arange(0, files, stepsize))
+    ani = animation.FuncAnimation(fig, iterate, np.arange(files, stepsize))
     # ani.save('./plots/density.gif', writer='imagemagick')
     ani.save('./plots/' + rdstr + 'density.mp4', fps=framerate, extra_args=['-vcodec', 'libx264'], bitrate=-1)
     plt.close()
@@ -906,9 +936,9 @@ def plotOccs(sysVar):
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
     plt.figure(num=None, figsize=(10, 10), dpi=300)
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         plt.title(r'$n_' + str(i) + '$')
-        dre = np.loadtxt('./data/occ' + str(i) + '_re.dat')
+        dre = np.loadtxt('./data/occ_energybasis_%i_re.dat' % i)
         plt.xlabel('column')
         plt.ylabel('row')
         cmapVar = plt.cm.seismic
@@ -920,9 +950,9 @@ def plotOccs(sysVar):
         print('.', end='', flush=True)
 
     # now without diagonals and abs only
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         plt.title(r'$n_' + str(i) + '$')
-        dre = np.loadtxt('./data/occ' + str(i) + '_re.dat')
+        dre = np.loadtxt('./data/occ_energybasis_%i_re.dat' % i)
         np.fill_diagonal(dre, 0)
         plt.xlabel('column')
         plt.ylabel('row')
@@ -993,8 +1023,8 @@ def plotOffDiagOccSingles(sysVar):
             plt.clf()
         print('.',end='',flush=True)
     '''
-    for i in range(0, sysVar.m):
-        for j in range(0, sysVar.occEnSingle):
+    for i in range(sysVar.m):
+        for j in range(sysVar.occEnSingle):
             infoind = 1 + 4 * j + 2  # so we start at the first energy
             # fetch the exponents. if abs(ordr)==1 set to zero for more readability
             f, (ax1, ax2) = plt.subplots(2, sharex=True, sharey=False)
@@ -1062,7 +1092,7 @@ def plotOffDiagOccSingles(sysVar):
         engy = np.loadtxt('./data/energy.dat')
         eigengy = np.loadtxt('./data/hamiltonian_eigvals.dat')
         diff = 0
-        for l in range(0, sysVar.dim):
+        for l in range(sysVar.dim):
             if np.abs(eigengy[l, 1] - engy[0, 1]) > diff and l != 0:
                 eind = l - 1
                 break
@@ -1073,7 +1103,7 @@ def plotOffDiagOccSingles(sysVar):
         else:
             loran = eind - 15
 
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         if os.path.isfile('./data/energy.dat') and os.path.isfile('./data/hamiltonian_eigvals.dat'):
             plt.title(r'Diagonal weighted elements of $n_{%i}$ in spectral decomp.' % (i))
             lo = np.int32(sysVar.dim * i)
@@ -1100,7 +1130,7 @@ def plotOffDiagOccSingles(sysVar):
                 plt.title(r'Diagonal elements of $n_{%i}$ in spectral decomposition' % (i))
                 plt.ylabel(r'$|n%i_{E}|$' % (i))
                 plt.xlabel(r'$E / J$')
-                for el in range(0, sysVar.dim):
+                for el in range(sysVar.dim):
                     diags[el] = occmat[el, el]
 
                 plt.plot(diagdat[lo + loran:hi, 1][:30], diags[loran:][:30], marker='o', ms=2)
@@ -1160,18 +1190,18 @@ def plotTimescale(sysVar):
     ent_array = np.loadtxt(entfile)
 
     occavg = []
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         occavg.append(np.mean(occ_array[loavgind:, i + 1], dtype=np.float64))
 
     entavg = np.mean(ent_array[loavgind:, 1], dtype=np.float64)
 
     odiff = []
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         odiff.append(occ_array[:, i + 1] - occavg[i])
 
     entdiff = ent_array[:, 1] - entavg
 
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         plt.ylabel(r'$\Delta n_%i$' % (i))
         plt.xlabel(r'$J\,t$')
         plt.plot(occ_array[:, 0], odiff[i], lw=0.5)

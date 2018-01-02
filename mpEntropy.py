@@ -76,13 +76,14 @@ class mpSystem:
         self.boolPlotDMAnimation = False
         self.boolPlotDMRedAnimation = False
         self.boolPlotOccEn = False
+        self.boolPlotOccEnDiag = False
+        self.boolPlotOccEnDiagExp = False
         self.boolPlotOffDiagOcc = False
         self.boolPlotOffDiagOccSingles = False
         self.boolPlotOffDiagDens = False
         self.boolPlotOffDiagDensRed = False
         self.boolPlotEngy = False
         self.boolPlotDecomp = False
-        self.boolPlotDiagExp = False
         self.boolPlotTimescale = False
         self.boolPlotDOS = False
         self.boolPlotSpectralDensity = False
@@ -266,7 +267,7 @@ class mpSystem:
                 self.greenLesserAnnihilation = []
                 self.greenGreaterAnnihilation = []
                 # fill'em
-                for i in range(0, self.m):
+                for i in range(self.m):
                     # note that the lowering operator transposed is the raising op. of the lower dimension space
                     self.greenLesserAnnihilation.append(getLesserAnnihilation(self, i))
                     # the raising operator transposed is the lowering op. of the higher dimension space
@@ -358,13 +359,14 @@ class mpSystem:
         self.boolPlotDMAnimation = configParser.getboolean('plotbools', 'densistymatrix')
         self.boolPlotDMRedAnimation = configParser.getboolean('plotbools', 'reducedmatrix')
         self.boolPlotOccEn = configParser.getboolean('plotbools', 'occen')
+        self.boolPlotOccEnDiag = configParser.getboolean('plotbools', 'occendiag')
+        self.boolPlotOccEnDiagExp = configParser.getboolean('plotbools', 'occendiagexp')
         self.boolPlotOffDiagOcc = configParser.getboolean('plotbools', 'offdiagocc')
         self.boolPlotOffDiagOccSingles = configParser.getboolean('plotbools', 'offdiagoccsingles')
         self.boolPlotOffDiagDens = configParser.getboolean('plotbools', 'offdiagdens')
         self.boolPlotOffDiagDensRed = configParser.getboolean('plotbools', 'offdiagdensred')
         self.boolPlotEngy = configParser.getboolean('plotbools', 'energies')
         self.boolPlotDecomp = configParser.getboolean('plotbools', 'decomposition')
-        self.boolPlotDiagExp = configParser.getboolean('plotbools', 'diagexp')
         self.boolPlotTimescale = configParser.getboolean('plotbools', 'timescale')
         self.boolPlotDOS = configParser.getboolean('plotbools', 'dos')
         self.boolPlotSpectralDensity = configParser.getboolean('plotbools', 'spectraldensity')
@@ -408,7 +410,7 @@ class mpSystem:
     def initIteratorRed(self):
         el1 = np.zeros(self.m, dtype=np.int)
         el2 = np.zeros(self.m, dtype=np.int)
-        for i in reversed(range(0, self.N + 1)):
+        for i in reversed(range(self.N + 1)):
             for j in range(self.offsetsRed[i], self.offsetsRed[i - 1]):
                 for jj in range(j, self.offsetsRed[i - 1]):
                     for k in range(self.offsetsRedComp[self.N - i], self.offsetsRedComp[self.N - i - 1]):
@@ -465,7 +467,7 @@ class mpSystem:
     def reduceMatrix(self, matrx):
         tmpret = np.zeros((self.dimRed, self.dimRed))
         if self.m == 2 and self.mRed == 1:
-            for i in range(0, self.dimRed):
+            for i in range(self.dimRed):
                 tmpret[i, i] = matrx[i]
         else:
             for el in self.iteratorRed:
@@ -505,18 +507,18 @@ class mpSystem:
 
     # hamiltonian with equal index interaction different to non equal index interaction
     def initHamiltonian(self):
-        for i in range(0, self.m):
-            for j in range(0, self.m):
+        for i in range(self.m):
+            for j in range(self.m):
                 if i != j:
                     self.hamiltonian += self.hybrid * self.operators[i, j]
                 else:
                     self.hamiltonian += i * self.onsite * self.operators[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
-            for i in range(0, self.m):
-                for j in range(0, self.m):
-                    for k in range(0, self.m):
-                        for l in range(0, self.m):
+            for i in range(self.m):
+                for j in range(self.m):
+                    for k in range(self.m):
+                        for l in range(self.m):
                             tmp = getQuartic(self, i, j, k, l)
                             if i == j and k == l and k == j:
                                 self.hamiltonian += self.interequal * tmp
@@ -525,18 +527,18 @@ class mpSystem:
                             del tmp
 
     def initHamiltonianRed(self):
-        for i in range(0, self.mRed):
-            for j in range(0, self.mRed):
+        for i in range(self.mRed):
+            for j in range(self.mRed):
                 if i != j:
                     self.hamiltonianRed += self.hybrid * self.operatorsRed[i, j]
                 else:
                     self.hamiltonianRed += int(self.systemLevelIterator[i]) * self.onsite * self.operatorsRed[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
-            for i in range(0, self.mRed):
-                for j in range(0, self.mRed):
-                    for k in range(0, self.mRed):
-                        for l in range(0, self.mRed):
+            for i in range(self.mRed):
+                for j in range(self.mRed):
+                    for k in range(self.mRed):
+                        for l in range(self.mRed):
                             tmp = getQuarticRed(self, i, j, k, l)
                             if i == j and k == l and k == j:
                                 self.hamiltonianRed += self.interequal * tmp
@@ -546,18 +548,18 @@ class mpSystem:
 
     def initgreenLesserHamiltonian(self):
         tmpgreenops = quadraticArrayGreenLesser(self)
-        for i in range(0, self.m):
-            for j in range(0, self.m):
+        for i in range(self.m):
+            for j in range(self.m):
                 if i != j:
                     self.greenLesserHamiltonian += self.hybrid * tmpgreenops[i, j]
                 else:
                     self.greenLesserHamiltonian += i * self.onsite * tmpgreenops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
-            for i in range(0, self.m):
-                for j in range(0, self.m):
-                    for k in range(0, self.m):
-                        for l in range(0, self.m):
+            for i in range(self.m):
+                for j in range(self.m):
+                    for k in range(self.m):
+                        for l in range(self.m):
                             tmp = getQuarticGreen(tmpgreenops, i, j, k, l)
                             if i == j and k == l and k == j:
                                 self.greenLesserHamiltonian += self.interequal * tmp
@@ -568,18 +570,18 @@ class mpSystem:
 
     def initgreenGreaterHamiltonian(self):
         tmpgreenops = quadraticArrayGreenGreater(self)
-        for i in range(0, self.m):
-            for j in range(0, self.m):
+        for i in range(self.m):
+            for j in range(self.m):
                 if i != j:
                     self.greenGreaterHamiltonian += self.hybrid * tmpgreenops[i, j]
                 else:
                     self.greenGreaterHamiltonian += i * self.onsite * tmpgreenops[i, j]
 
         if self.interequal != 0 and self.interdiff != 0:
-            for i in range(0, self.m):
-                for j in range(0, self.m):
-                    for k in range(0, self.m):
-                        for l in range(0, self.m):
+            for i in range(self.m):
+                for j in range(self.m):
+                    for k in range(self.m):
+                        for l in range(self.m):
                             tmp = getQuarticGreen(tmpgreenops, i, j, k, l)
                             if i == j and k == l and k == j:
                                 self.greenGreaterHamiltonian += self.interequal * tmp
@@ -722,7 +724,7 @@ class mpSystem:
 
         self.state.fill(0)
 
-        for i in range(0, len(muperc)):
+        for i in range(len(muperc)):
             if dist[i] == 'std':
                 dind = 1
             elif dist[i] == 'rect':
@@ -756,7 +758,7 @@ class mpSystem:
 
             # mu is given in percent so get mu in energy space - also offsets are taken into account
             mu = self.eigVals[0] + (muperc[i] / 100) * (self.eigVals[-1] - self.eigVals[0])
-            for k in range(0, self.dim):
+            for k in range(self.dim):
                 if skipArray[k]:
                     if dind == 1:
                         self.state += peakamps[i] * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], mu, sigma[i],
@@ -816,7 +818,7 @@ class mpSystem:
             skipArray = np.zeros(self.dim)
             skipArray[::int(skip)] = 1
 
-        for k in range(0, self.dim):
+        for k in range(self.dim):
             if skipArray[k]:
                 if dind == 1:
                     self.state[:] += peakamps * np.exp(1j * phaseArray[k]) * gaussian(self.eigVals[k], avgen, sigma,
@@ -892,7 +894,7 @@ class mpSystem:
             self.eigIndRed = True
             # TMP TMP TMP
             tmpfil = open('./data/eigenvaluesRed.dat', 'w')
-            for i in range(0, self.dimRed):
+            for i in range(self.dimRed):
                 tmpfil.write("%i %.16e\n" % (i, self.eigValsRed[i]))
             tmpfil.close()
 
@@ -930,10 +932,10 @@ class mpSystem:
 
                 # also calculate all occupation numbers at once
                 enoccs = np.zeros((self.m, self.dim))
-                for j in range(0, self.m):
+                for j in range(self.m):
                     enoccs[j] = np.diag(np.dot(self.eigVects.T.conj(), self.operators[j, j].dot(self.eigVects))).real
 
-                for i in range(0, self.dim):
+                for i in range(self.dim):
                     # absolute value of overlap
                     tmpAbsSq[i] = np.abs(self.enState[i]) ** 2
                     if tmpAbsSq[i] != 0:
@@ -944,17 +946,17 @@ class mpSystem:
 
                     # occupation numbers of the eigenvalues
                     tfil.write('%i %.16e %.16e %.16e ' % (i, self.eigVals[i], tmpAbsSq[i], tmpPhase))
-                    for j in range(0, self.m):
+                    for j in range(self.m):
                         tfil.write('%.16e ' % (enoccs[j, i]))
                     tfil.write('\n')
             else:
-                for i in range(0, self.dim):
+                for i in range(self.dim):
                     tfil.write('%i %.16e\n' % (i, self.eigVals[i]))
             tfil.close()
 
             # decomposition in fock space
             sfil = open('./data/state.dat', 'w')
-            for i in range(0, self.dim):
+            for i in range(self.dim):
                 tmpAbsSqFck = np.abs(self.state[i]) ** 2
                 if tmpAbsSqFck != 0:
                     tmpPhase = np.angle(self.state[i]) / (2 * np.pi)  # angle in complex plane in units of two pi
@@ -962,7 +964,7 @@ class mpSystem:
                     tmpPhase = 0
                 # occupation numbers of the eigenvalues
                 sfil.write('%i %.16e %.16e ' % (i, tmpAbsSqFck, tmpPhase))
-                for j in range(0, self.m):
+                for j in range(self.m):
                     sfil.write('%i ' % self.basis[i, j])
                 sfil.write('\n')
             sfil.close()
@@ -977,7 +979,7 @@ class mpSystem:
 
         # first store occupation matrices in energy basis if needed
         if self.boolDiagExpStore or self.boolOffDiagOcc or self.boolOccEnStore or self.boolOccEnDiag:
-            for i in range(0, self.m):
+            for i in range(self.m):
                 self.offDiagOccMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
 
         # expectation values in diagonal representation (ETH)
@@ -991,8 +993,8 @@ class mpSystem:
 
             if self.boolDiagExpStore:
                 # diagonals in expectation value    
-                ethfil = open('./data/diagoccexpect.dat', 'w')
-                for i in range(0, self.m):
+                ethfil = open('./data/occ_energybasis_diagonals_expectation.dat', 'w')
+                for i in range(self.m):
                     tmpocc = np.dot(np.abs(self.enState) ** 2, self.offDiagOccMat[i].diagonal()).real
                     ethfil.write('%i %.16e \n' % (i, tmpocc))
                 print("Occupation matrices transformed " + time_elapsed(t0, 60, 1))
@@ -1004,7 +1006,7 @@ class mpSystem:
         # store the actual matrix to a file (might become very large!)
         if self.boolOccEnStore:
             t0 = tm.time()
-            for i in range(0, self.m):
+            for i in range(self.m):
                 # note that the off diag mat still contains the diagonals right now!
                 storeMatrix(self.offDiagOccMat[i], './data/occ_energybasis_%i.dat' % i, absOnly=0, stre=True, stim=False,
                             stabs=False)
@@ -1015,20 +1017,20 @@ class mpSystem:
             t0 = tm.time()
             head = "index energy matrix_element"
             head_weight = "index energy weighted_matrix_element"
-            for i in range(0, self.m):
+            for i in range(self.m):
                 # note that the off diag mat still contains the diagonals right now!
                 # since the occupation numbers are real valued it is sufficient to only store the real part
                 np.savetxt('./data/occ_energybasis_diagonal_%i.dat' % i,
                            np.column_stack(
                                (
-                                   np.arange(0, self.dim, 1), self.eigVals, self.offDiagOccMat[i].diagonal().real
+                                   np.arange(self.dim, 1), self.eigVals, self.offDiagOccMat[i].diagonal().real
                                )
                            ), header=head)
                 # store the matrix elements weighted by the state decompisitopn factor abs()^2
                 np.savetxt('./data/occ_energybasis_diagonal_weighted_%i.dat' % i,
                            np.column_stack(
                                (
-                                   np.arange(0, self.dim, 1), self.eigVals,
+                                   np.arange(self.dim, 1), self.eigVals,
                                    # note: the following should multiply element-wise!
                                    self.offDiagOccMat[i].diagonal() * np.abs(self.enState)**2
                                )
@@ -1037,7 +1039,7 @@ class mpSystem:
 
         # now we remove the diagonal elements
         if self.boolOffDiagOcc:
-            for i in range(0, self.m):
+            for i in range(self.m):
                 np.fill_diagonal(self.offDiagOccMat[i], 0)
 
         if self.occEnSingle and self.boolOffDiagOcc:
@@ -1051,7 +1053,7 @@ class mpSystem:
             # props to Warren Weckesser https://stackoverflow.com/questions/20825990/find-multiple-maximum-values-in-a-2d-array-fast
             # Get the indices for the largest `num_largest` values.
             num_largest = self.occEnSingle
-            for i in range(0, self.m):
+            for i in range(self.m):
                 # this is not optimized but one has to store it as a matrix for correct searching
                 tmpmat = np.einsum('l,lj,j -> lj', self.enState.conj(), self.offDiagOccMat[i], self.enState,
                                    optimize=True)
@@ -1060,7 +1062,7 @@ class mpSystem:
                 # to use argpartition correctly we must treat the matrix as an array
                 indices = tmpmat.argpartition(tmpmat.size - num_largest, axis=None)[-num_largest:]
                 self.occEnInds[i, 0], self.occEnInds[i, 1] = np.unravel_index(indices, tmpmat.shape)
-                for j in range(0, self.occEnSingle):
+                for j in range(self.occEnSingle):
                     infofile.write('%i %i %.16e %16e ' % (
                         self.occEnInds[i, 0, j], self.occEnInds[i, 1, j], self.eigVals[self.occEnInds[i, 0, j]].real,
                         self.eigVals[self.occEnInds[i, 1, j]].real))
@@ -1090,7 +1092,7 @@ class mpSystem:
         # calculate all overlaps at once
         self.enState = np.dot(self.eigVects.T, self.state)
 
-        for i in range(0, self.m):
+        for i in range(self.m):
             self.offDiagOcc[i] = vdot(self.enState, self.offDiagOccMat[i].dot(self.enState))
 
             # check for imaginary part -> would give an indication for errors
@@ -1098,8 +1100,8 @@ class mpSystem:
                 print('The offdiagonal expectation value has an imaginary part of ', self.offDiagOcc[i].imag)
 
         if self.occEnSingle:
-            for i in range(0, self.m):
-                for j in range(0, self.occEnSingle):
+            for i in range(self.m):
+                for j in range(self.occEnSingle):
                     x = int(self.occEnInds[i, 0, j])
                     y = int(self.occEnInds[i, 1, j])
                     self.offDiagOccSingles[i, j] = self.enState[x].conj() * self.offDiagOccMat[i][x, y] * self.enState[
@@ -1138,7 +1140,7 @@ class mpSystem:
                 if not self.reducedHamiltonianInd:
                     self.reducedHamiltonian = self.reduceMatrix(self.hamiltonian)
                 self.entanglementSpectrum, entanglementStates = la.eigh(self.densityMatrixRed, check_finite=False)
-                for i in range(0, self.dimRed):
+                for i in range(self.dimRed):
                     '''
                     self.entanglementSpectrumEnergy[i] = \
                         np.vdot(entanglementStates[i],
@@ -1181,7 +1183,7 @@ class mpSystem:
     # end of updateEntropyRed
 
     def updateOccNumbers(self):
-        for m in range(0, self.m):
+        for m in range(self.m):
             self.occNo[m] = (self.expectValue(self.operators[m, m])).real
 
     # end of updateOccNumbers
@@ -1244,7 +1246,7 @@ class mpSystem:
 
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
-        for m in range(0, self.m):
+        for m in range(self.m):
             # raising is the higher dimension creation operator, raising.T.c the annihilation
             # this is the greater Green function (without factor of +-i)
             tmpGreenGreater = vdot(self.stateSaves[bound + offset_index],
@@ -1278,7 +1280,7 @@ class mpSystem:
             tmpGreaterEvol = tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix)  # they need to be the squared ones!
             tmpLesserEvol = tmpLesserEvol.dot(self.greenLesserEvolutionMatrix)  # they need to be the squared ones!
             self.filGreen.write('%.16e ' % (2 * dt * i))
-            for m in range(0, self.m):
+            for m in range(self.m):
                 # raising is the higher dimension creation operator, raising.T.c the annihilation
                 # this is the greater Green function (without factor of +-i)
                 tmpGreenGreater = vdot(self.stateSaves[bound + ind],
@@ -1384,7 +1386,7 @@ class mpSystem:
             for ii in range(1, 11):
                 self.entanglementSpectrumIndicator = False
                 # need only dataPoints steps of size evolStepDist
-                for j in range(0, stepNo):
+                for j in range(stepNo):
                     self.updateEverything()  # update always - config file should control what to update
                     if self.boolDataStore:
                         self.writeData()
@@ -1469,13 +1471,13 @@ class mpSystem:
 
         if self.boolOffDiagOcc:
             self.filOffDiagOcc.write('%.16e ' % self.evolTime)
-            for i in range(0, self.m):
+            for i in range(self.m):
                 self.filOffDiagOcc.write('%.16e ' % self.offDiagOcc[i].real)
             self.filOffDiagOcc.write('\n')
             if self.occEnSingle:
                 self.filOffDiagOccSingles.write('%.16e ' % self.evolTime)
-                for i in range(0, self.m):
-                    for j in range(0, self.occEnSingle):
+                for i in range(self.m):
+                    for j in range(self.occEnSingle):
                         self.filOffDiagOccSingles.write(
                             '%.16e %.16e ' % (self.offDiagOccSingles[i, j].real, self.offDiagOccSingles[i, j].imag))
                 self.filOffDiagOccSingles.write('\n')
@@ -1496,7 +1498,7 @@ class mpSystem:
 
         if self.boolOccupations:
             self.filOcc.write('%.16e ' % self.evolTime)
-        for m in range(0, self.m):
+        for m in range(self.m):
             self.filOcc.write('%.16e ' % self.occNo[m])
         self.filOcc.write('\n')
 
@@ -1650,7 +1652,7 @@ def dimOfBasis(N, m):
 def fillBasis(basis, N, m, offset=0):
     if m != 1:
         counter = [offset]
-        for n in range(0, m - 1):
+        for n in range(m - 1):
             counter[0] = offset
             a(N, m, n, basis, N, m, counter)
         counter[0] = offset
@@ -1697,7 +1699,7 @@ def basisOffsets(N, m):
 
 
 def fillReducedBasis(basis, N, m, offsets):
-    for i in range(0, N + 1):
+    for i in range(N + 1):
         fillBasis(basis, i, m, offsets[i])
         # end
 
@@ -1705,14 +1707,14 @@ def fillReducedBasis(basis, N, m, offsets):
 # filling arrays for l != m-1
 def a(N, m, l, basis, Nsys, msys, counter):
     if m == msys - l:
-        for n in range(0, N + 1):
+        for n in range(N + 1):
             nn = 0
             while nn < dimOfBasis(n, m - 1):
                 basis[counter[0]][l] = int(N - n)
                 counter[0] += 1
                 nn += 1
     else:
-        for n in reversed(range(0, N + 1)):
+        for n in reversed(range(N + 1)):
             a(N - n, m - 1, l, basis, Nsys, msys, counter)
             # end
 
@@ -1722,11 +1724,11 @@ def am(N, m, l, basis, Nsys, msys, counter):
     if m == msys:
         am(N, m - 1, l, basis, Nsys, msys, counter)
     elif m == msys - l:
-        for n in reversed(range(0, N + 1)):
+        for n in reversed(range(N + 1)):
             basis[counter[0]][l] = int(N - n)
             counter[0] += 1
     else:
-        for n in reversed(range(0, N + 1)):
+        for n in reversed(range(N + 1)):
             am(N - n, m - 1, l, basis, Nsys, msys, counter)
             # end
 
@@ -1736,7 +1738,7 @@ def basis2dict(basis, dim):
     tup = tuple(tuple(el) for el in basis)
     dRet = dict.fromkeys(tup)
     # for correct correspondence go through the basis tuple and put in the vector-number corresponding to the given tuple
-    for i in range(0, dim):
+    for i in range(dim):
         dRet[tup[i]] = i
     return dRet
 
@@ -1745,12 +1747,12 @@ def basis2dict(basis, dim):
 def quadraticArray(sysVar):
     retArr = np.empty((sysVar.m, sysVar.m), dtype=csr_matrix)
     # off diagonal
-    for i in range(0, sysVar.m):
-        for j in range(0, i):
+    for i in range(sysVar.m):
+        for j in range(i):
             retArr[i, j] = getQuadratic(sysVar, i, j)
             retArr[j, i] = retArr[i, j].transpose()
     # diagonal terms
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         retArr[i, i] = getQuadratic(sysVar, i, i)
     return retArr
 
@@ -1761,12 +1763,12 @@ def quadraticArray(sysVar):
 def quadraticArrayRed(sysVar):
     retArr = np.empty((sysVar.mRed, sysVar.mRed), dtype=csr_matrix)
     # off diagonal
-    for i in range(0, sysVar.mRed):
-        for j in range(0, i):
+    for i in range(sysVar.mRed):
+        for j in range(i):
             retArr[i, j] = getQuadraticRed(sysVar, i, j)
             retArr[j, i] = retArr[i, j].transpose()
     # diagonal terms
-    for i in range(0, sysVar.mRed):
+    for i in range(sysVar.mRed):
         retArr[i, i] = getQuadraticRed(sysVar, i, i)
     return retArr
 
@@ -1774,12 +1776,12 @@ def quadraticArrayRed(sysVar):
 def quadraticArrayGreenLesser(sysVar):
     retArr = np.empty((sysVar.m, sysVar.m), dtype=csr_matrix)
     # off diagonal
-    for i in range(0, sysVar.m):
-        for j in range(0, i):
+    for i in range(sysVar.m):
+        for j in range(i):
             retArr[i, j] = getQuadraticGreenLesser(sysVar, i, j)
             retArr[j, i] = retArr[i, j].transpose()
     # diagonal terms
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         retArr[i, i] = getQuadraticGreenLesser(sysVar, i, i)
     return retArr
 
@@ -1787,12 +1789,12 @@ def quadraticArrayGreenLesser(sysVar):
 def quadraticArrayGreenGreater(sysVar):
     retArr = np.empty((sysVar.m, sysVar.m), dtype=csr_matrix)
     # off diagonal
-    for i in range(0, sysVar.m):
-        for j in range(0, i):
+    for i in range(sysVar.m):
+        for j in range(i):
             retArr[i, j] = getQuadraticGreenGreater(sysVar, i, j)
             retArr[j, i] = retArr[i, j].transpose()
     # diagonal terms
-    for i in range(0, sysVar.m):
+    for i in range(sysVar.m):
         retArr[i, i] = getQuadraticGreenGreater(sysVar, i, i)
     return retArr
 
@@ -1920,10 +1922,10 @@ def getQuadraticGreenGreater(sysVar, l, m):
 def quarticArray(sysVar):
     retArr = np.empty((sysVar.m, sysVar.m, sysVar.m, sysVar.m), dtype=csr_matrix)
     # TODO: use transpose property
-    for k in range(0, sysVar.m):
-        for l in range(0, sysVar.m):
-            for m in range(0, sysVar.m):
-                for n in range(0, sysVar.m):
+    for k in range(sysVar.m):
+        for l in range(sysVar.m):
+            for m in range(sysVar.m):
+                for n in range(sysVar.m):
                     retArr[k, l, m, n] = getQuartic(sysVar, k, l, m, n)
     return retArr
 
@@ -1933,10 +1935,10 @@ def quarticArray(sysVar):
 def quarticArrayRed(sysVar):
     retArr = np.empty((sysVar.mRed, sysVar.mRed, sysVar.mRed, sysVar.mRed), dtype=csr_matrix)
     # TODO: use transpose property
-    for k in range(0, sysVar.mRed):
-        for l in range(0, sysVar.mRed):
-            for m in range(0, sysVar.mRed):
-                for n in range(0, sysVar.mRed):
+    for k in range(sysVar.mRed):
+        for l in range(sysVar.mRed):
+            for m in range(sysVar.mRed):
+                for n in range(sysVar.mRed):
                     retArr[k, l, m, n] = getQuarticRed(sysVar, k, l, m, n)
     return retArr
 
@@ -2096,8 +2098,8 @@ def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
             fimag = open(fname + '_im' + fend, 'w')
         if stre:
             freal = open(fname + '_re' + fend, 'w')
-        for n in range(0, matDim):
-            for nn in range(0, matDim - 1):
+        for n in range(matDim):
+            for nn in range(matDim - 1):
                 if stabs:
                     f.write('%.16e ' % np.abs(mat[(n, nn)]))
                 if stim:
@@ -2119,8 +2121,8 @@ def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
     else:
         f = open(fil, 'w')
         # assume dot + 3 letter ending e.g. .dat
-        for n in range(0, matDim):
-            for nn in range(0, matDim - 1):
+        for n in range(matDim):
+            for nn in range(matDim - 1):
                 f.write('%.16e ' % np.abs(mat[(n, nn)]))
             f.write('%.16e\n' % np.abs(mat[(n, matDim - 1)]))
         f.close()
