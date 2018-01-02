@@ -1,5 +1,13 @@
 change log
 
+### 02.01.2018
+- happy new year
+- added occendiag to store the diagonal in energy basis
+- also removed the old diagonal expectation storage since it was irritating
+- changed file for occupation operator matrix in energy basis from occ%i to occ_energynasis_%i
+- slight overhaul of the whole energy basis calculation to be marginally more intuitive
+- renamed diagexp to occendiagexp
+
 ### 18.12.2017
 - changed all .txt to .dat !!!
 - fixed green function finally

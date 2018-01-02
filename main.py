@@ -58,7 +58,7 @@ if args.plot_odsingles:
 print("Dimension of the basis:", sysVar.dim)
 
 # initially occupied states with relative weight (entanglement of starting state):
-initstates = [[(sysVar.N, 0, 0, 0, 0), 1]]
+initstates = [[(sysVar.N, 0, 0, 0), 1]]
 
 sysVar.initAllHamiltonians()
 sysVar.initAllEvolutionMatrices()
@@ -68,8 +68,6 @@ for el in initstates:
     tmp = sysVar.basisDict[el[0]]
     sysVar.state[tmp] = el[1]
 sysVar.normalize(True)
-
-# sysVar.stateEnergy(muperc=[50,20,25],sigma=[100,0.5,0.5],phase=['rnd','none','none'],skip=[0,0,0],dist=['rnd','std','std'],peakamps=[0.1,1,0.8],skew=[0,0,0])
 
 sysVar.evolve()
 

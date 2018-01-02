@@ -51,6 +51,7 @@ class mpSystem:
         self.boolDMRedStore = False
         self.boolHamilStore = False
         self.boolOccEnStore = False
+        self.boolOccEnDiag = False
         self.occEnSingle = 0
         self.boolOffDiagOcc = False
         self.boolOffDiagDens = False
@@ -116,7 +117,7 @@ class mpSystem:
 
         self.loadConfig()
         if not plotOnly:
-            prepFolders(0, self.boolDMStore, self.boolDMRedStore, self.boolOccEnStore,
+            prepFolders(0, self.boolDMStore, self.boolDMRedStore, self.boolOccEnStore or self.boolOccEnDiag,
                         self.boolEntanglementSpectrum, self.boolCleanFiles)
             # touch the progress file
             open('./data/progress.log', 'w').close()
@@ -170,10 +171,10 @@ class mpSystem:
             self.entropyRed = 0
 
             # ##### energy eigenbasis stuff
-            if self.boolOffDiagOcc or self.boolDiagExpStore:
+            if self.boolOffDiagOcc or self.boolDiagExpStore or self.boolOccEnStore or self.boolOccEnDiag:
                 self.enState = np.zeros(self.dim, dtype=self.datType)
-            if self.boolOffDiagOcc:
                 self.offDiagOccMat = np.empty(self.m, dtype=object)
+            if self.boolOffDiagOcc:
                 self.offDiagOcc = np.zeros(self.m, dtype=self.datType)
                 if self.occEnSingle > 0:
                     self.occEnInds = np.zeros((self.m, 2, self.occEnSingle), dtype=np.int16)
@@ -315,13 +316,14 @@ class mpSystem:
         self.boolDMRedStore = configParser.getboolean('filemanagement', 'dmredstore')
         self.boolHamilStore = configParser.getboolean('filemanagement', 'hamilstore')
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
+        self.boolOccEnDiag = configParser.getboolean('filemanagement', 'occendiag')
+        self.boolDiagExpStore = configParser.getboolean('filemanagement', 'occendiagexp')
         self.occEnSingle = configParser.getint('filemanagement', 'offdiagoccsingles')
         self.boolOffDiagOcc = configParser.getboolean('filemanagement', 'offdiagocc')
         self.boolOffDiagDens = configParser.getboolean('filemanagement', 'offdiagdens')
         self.boolOffDiagDensRed = configParser.getboolean('filemanagement', 'offdiagdensred')
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
-        self.boolDiagExpStore = configParser.getboolean('filemanagement', 'diagexp')
         self.boolRetgreen = configParser.getboolean('filemanagement', 'retgreen')
         # ## calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
@@ -907,8 +909,8 @@ class mpSystem:
             ## will free the memory!!!
 
     def updateEigendecomposition(self, clear=True):
-        tmp = None
         tmpmat = None
+        eivectinv = None
         if self.boolEngyStore:
             t0 = tm.time()
             self.updateEigenenergies()
@@ -924,7 +926,7 @@ class mpSystem:
                 tmpAbsSq = np.zeros(self.dim)
                 # generate all overlaps at once
                 # note that conj() is optional since the vectors can be chosen to be real
-                tmp = np.dot(self.eigVects.T.conj(), self.state)
+                self.enState = self.eigVects.T.conj().dot(self.state)
 
                 # also calculate all occupation numbers at once
                 enoccs = np.zeros((self.m, self.dim))
@@ -933,10 +935,10 @@ class mpSystem:
 
                 for i in range(0, self.dim):
                     # absolute value of overlap
-                    tmpAbsSq[i] = np.abs(tmp[i]) ** 2
+                    tmpAbsSq[i] = np.abs(self.enState[i]) ** 2
                     if tmpAbsSq[i] != 0:
                         # if nonzero we want to have the angle in the complex plane in units of two pi
-                        tmpPhase = np.angle(tmp[i]) / (2 * np.pi)
+                        tmpPhase = np.angle(self.enState[i]) / (2 * np.pi)
                     else:
                         tmpPhase = 0
 
@@ -968,33 +970,30 @@ class mpSystem:
             self.filProg.write('Eigendecomposition completed in ' + time_elapsed(t0, 60, 0) + '\n')
             self.closeProgressFile()
             print("Eigendecomposition completed in " + time_elapsed(t0, 60, 0))
-        if self.boolDiagExpStore or self.boolOccEnStore or self.boolOffDiagOcc or self.boolOffDiagDens:
+        if self.boolDiagExpStore or self.boolOccEnStore or self.boolOccEnDiag or self.boolOffDiagOcc or self.boolOffDiagDens:
             self.updateEigenenergies()
-            eivectinv = la.inv(np.matrix(self.eigVects.T))  # this will later be stored in the class if needed
+            eivectinv = la.inv(self.eigVects.T)  # this will later be stored in the class if needed
+
+
+        # first store occupation matrices in energy basis if needed
+        if self.boolDiagExpStore or self.boolOffDiagOcc or self.boolOccEnStore or self.boolOccEnDiag:
+            for i in range(0, self.m):
+                self.offDiagOccMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
 
         # expectation values in diagonal representation (ETH)
-
         if self.boolDiagExpStore or self.boolOffDiagOcc:
             t0 = tm.time()
-            # if the tmp array has already been calculated this step can be omitted - see top of this method
-            if self.boolDecompStore:
-                self.enState = tmp
-            else:
+            # if the state_energy_basis array has already been calculated this step can be omitted
+            if not self.boolDecompStore:
                 # generate all overlaps at once
                 # note that conj() is optional since the vectors can be chosen to be real
-                self.enState = np.dot(self.eigVects.T.conj(), self.state)
+                self.enState = self.eigVects.T.conj().dot(self.state)
 
             if self.boolDiagExpStore:
                 # diagonals in expectation value    
                 ethfil = open('./data/diagoccexpect.dat', 'w')
                 for i in range(0, self.m):
-                    if self.boolOffDiagOcc:
-                        # first store everything, later delete diagonal elements
-                        self.offDiagOccMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
-                        tmpocc = np.dot(np.abs(self.enState) ** 2, np.diag(self.offDiagOccMat[i])).real
-                    else:
-                        tmpocc = multi_dot([self.enState.conj(), self.eigVects.T, self.operators[i, i].dot(eivectinv),
-                                            self.enState]).real
+                    tmpocc = np.dot(np.abs(self.enState) ** 2, self.offDiagOccMat[i].diagonal()).real
                     ethfil.write('%i %.16e \n' % (i, tmpocc))
                 print("Occupation matrices transformed " + time_elapsed(t0, 60, 1))
                 self.openProgressFile()
@@ -1002,34 +1001,39 @@ class mpSystem:
                 self.closeProgressFile()
                 ethfil.close()
 
-            # now store the diagonals in one file for comparison to the off diagonals later
-            if self.boolOffDiagOcc:
-                diagfil = open('./data/diagoccsingles.dat', 'w')
-                for i in range(0, self.m):
-                    # if the matrices have not yet been constructed - do this
-                    if not self.boolDiagExpStore:
-                        # first store everything, later delete diagonal elements
-                        self.offDiagOccMat[i] = np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv))
-
-                    # now get the single off diagonals
-                    tmpdiag = np.einsum('l,ll,l -> l', self.enState.conj(), self.offDiagOccMat[i], self.enState,
-                                        optimize=True).real
-                    for j in range(0, self.dim):
-                        diagfil.write('%i %.16e %.16e \n' % (i, self.eigVals[j], tmpdiag[j]))
-                diagfil.close()
-
         # store the actual matrix to a file (might become very large!)
         if self.boolOccEnStore:
             t0 = tm.time()
             for i in range(0, self.m):
-                if self.boolOffDiagOcc:
-                    # note that the off diag mat still contains the diagonals right now!
-                    storeMatrix(self.offDiagOccMat[i], './data/occ' + str(i) + '.dat', absOnly=0, stre=True, stim=False,
-                                stabs=False)
-                else:
-                    storeMatrix(np.dot(self.eigVects.T, self.operators[i, i].dot(eivectinv)),
-                                './data/occ' + str(i) + '.dat', absOnly=0, stre=True, stim=False, stabs=False)
+                # note that the off diag mat still contains the diagonals right now!
+                storeMatrix(self.offDiagOccMat[i], './data/occ_energybasis_%i.dat' % i, absOnly=0, stre=True, stim=False,
+                            stabs=False)
             print("Occupation number matrices stored in " + time_elapsed(t0, 60, 1))
+
+        # store the matrix diagonals in a file
+        if self.boolOccEnDiag:
+            t0 = tm.time()
+            head = "index energy matrix_element"
+            head_weight = "index energy weighted_matrix_element"
+            for i in range(0, self.m):
+                # note that the off diag mat still contains the diagonals right now!
+                # since the occupation numbers are real valued it is sufficient to only store the real part
+                np.savetxt('./data/occ_energybasis_diagonal_%i.dat' % i,
+                           np.column_stack(
+                               (
+                                   np.arange(0, self.dim, 1), self.eigVals, self.offDiagOccMat[i].diagonal().real
+                               )
+                           ), header=head)
+                # store the matrix elements weighted by the state decompisitopn factor abs()^2
+                np.savetxt('./data/occ_energybasis_diagonal_weighted_%i.dat' % i,
+                           np.column_stack(
+                               (
+                                   np.arange(0, self.dim, 1), self.eigVals,
+                                   # note: the following should multiply element-wise!
+                                   self.offDiagOccMat[i].diagonal() * np.abs(self.enState)**2
+                               )
+                           ), header=head_weight)
+            print("Occupation number matrix diagonals stored in " + time_elapsed(t0, 60, 1))
 
         # now we remove the diagonal elements
         if self.boolOffDiagOcc:
@@ -1039,13 +1043,10 @@ class mpSystem:
         if self.occEnSingle and self.boolOffDiagOcc:
             t0 = tm.time()
             infofile = open('./data/offdiagoccsinglesinfo.dat', 'w')
-            if not (self.boolDiagExpStore or self.boolOffDiagOcc):
-                if self.boolDecompStore:
-                    self.enState = tmp
-                else:
-                    # generate all overlaps at once
-                    # note that conj() is optional since the vectors can be chosen to be real
-                    self.enState = np.dot(self.eigVects.T.conj(), self.state)
+            if not (self.boolDiagExpStore or self.boolOffDiagOcc or self.boolDecompStore):
+                # generate all overlaps at once
+                # note that conj() is optional since the vectors can be chosen to be real
+                self.enState = self.eigVects.T.conj().dot(self.state)
 
             # props to Warren Weckesser https://stackoverflow.com/questions/20825990/find-multiple-maximum-values-in-a-2d-array-fast
             # Get the indices for the largest `num_largest` values.
