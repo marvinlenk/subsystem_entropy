@@ -1023,14 +1023,14 @@ class mpSystem:
                 np.savetxt('./data/occ_energybasis_diagonal_%i.dat' % i,
                            np.column_stack(
                                (
-                                   np.arange(self.dim, 1), self.eigVals, self.offDiagOccMat[i].diagonal().real
+                                   np.arange(self.dim), self.eigVals, self.offDiagOccMat[i].diagonal().real
                                )
                            ), header=head)
                 # store the matrix elements weighted by the state decompisitopn factor abs()^2
                 np.savetxt('./data/occ_energybasis_diagonal_weighted_%i.dat' % i,
                            np.column_stack(
                                (
-                                   np.arange(self.dim, 1), self.eigVals,
+                                   np.arange(self.dim), self.eigVals,
                                    # note: the following should multiply element-wise!
                                    self.offDiagOccMat[i].diagonal() * np.abs(self.enState)**2
                                )

@@ -1,5 +1,8 @@
 change log
 
+### 03.01.2018
+- changed arange(self.dim, 1) to arange(self.dim) in order to produce a correct array... stepsize 1 is automatic
+
 ### 02.01.2018
 - happy new year
 - added occendiag to store the diagonal in energy basis (weighted and unweighted matrix elements)
