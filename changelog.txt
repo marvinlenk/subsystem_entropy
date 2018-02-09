@@ -1,5 +1,8 @@
 change log
 
+### 04.01.2018
+- added time-symmetric option for dft (only forward dft up to now)
+
 ### 03.01.2018
 - changed arange(self.dim, 1) to arange(self.dim) in order to produce a correct array... stepsize 1 is automatic
 

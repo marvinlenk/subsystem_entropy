@@ -1,0 +1,25 @@
+VERY URGENT:
+- nothing
+
+URGENT:
+- parallelize partial trace using e.g. .map() - see https://stackoverflow.com/questions/13068760/parallelise-python-loop-with-numpy-arrays-and-shared-memory
+
+High priority:
+- clean up the mess
+- comment code
+- work out documentation
+- add complete state save after every 10% progress option for security reasons and eventual later review of data
+-> possibly also save the occupation number operators in sparse format, partial trace array and even basis dictionary!
+--> possibly add the option to load this stuff in, since it would SIGNIFICANTLY reduce the setup time for large system calculations
+--> also possibly add the option to load a hamiltonian in sparse format in... check if this is even sensible in sense of memory usage
+- add loading of 
+
+Medium priority:
+- clarify codewords in the config file
+- check out if green function stuff can be improved even further
+- improve
+
+Low priority:
+- add possibility of efficiently calculating different com time green functions
+- include spectral and keldysh green function evaluation in the class methods
+- add automatic backup option for long time work on clusters
