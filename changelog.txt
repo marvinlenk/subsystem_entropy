@@ -1,5 +1,10 @@
 change log
 
+### 21.02.2018
+- ffs the damn green function stuff was totally messed up...
+    evolution matrices were conjugate, time steps were going in the exact
+    greater annihilation was actually the creation operator!
+
 ### 04.01.2018
 - added time-symmetric option for dft (only forward dft up to now)
 

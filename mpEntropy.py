@@ -265,13 +265,13 @@ class mpSystem:
                 self.greenLesserEvolutionMatrix = None
                 self.greenGreaterEvolutionMatrix = None
                 self.greenLesserAnnihilation = []
-                self.greenGreaterAnnihilation = []
+                self.greenGreaterCreation = []
                 # fill'em
                 for i in range(self.m):
                     # note that the lowering operator transposed is the raising op. of the lower dimension space
                     self.greenLesserAnnihilation.append(getLesserAnnihilation(self, i))
                     # the raising operator transposed is the lowering op. of the higher dimension space
-                    self.greenGreaterAnnihilation.append(getGreaterAnnihilation(self, i))
+                    self.greenGreaterCreation.append(getGreaterCreation(self, i))
 
     # end of init
 
@@ -637,7 +637,7 @@ class mpSystem:
     #### IMPORTANT NOTE - complex conjugate will be needed for Green function ####
     #### FURTHER: need only 2*delta_T for green function, so added sq=True ####
     #### ALSO: delta_T here is actually the delta_T of time-steps, so the wide steps!!! ####
-    def initgreenLesserEvolutionMatrix(self, diagonalize=False, conj=True, sq=True):
+    def initgreenLesserEvolutionMatrix(self, diagonalize=False, conj=False, sq=True):
         if self.loOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if not np.allclose(self.greenLesserHamiltonian.toarray(), self.greenLesserHamiltonian.toarray().T.conj()):
@@ -664,7 +664,7 @@ class mpSystem:
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initgreenGreaterEvolutionMatrix(self, diagonalize=False, conj=False, sq=True):
+    def initgreenGreaterEvolutionMatrix(self, diagonalize=False, conj=True, sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if not np.allclose(self.greenGreaterHamiltonian.toarray(), self.greenGreaterHamiltonian.toarray().T.conj()):
@@ -1250,8 +1250,8 @@ class mpSystem:
             # raising is the higher dimension creation operator, raising.T.c the annihilation
             # this is the greater Green function (without factor of +-i)
             tmpGreenGreater = vdot(self.stateSaves[bound + offset_index],
-                                   self.greenGreaterAnnihilation[m].T.dot(
-                                       self.greenGreaterAnnihilation[m].dot(
+                                   self.greenGreaterCreation[m].T.dot(
+                                       self.greenGreaterCreation[m].dot(
                                            self.stateSaves[bound + offset_index]))
                                    )
             # lowering is the lower dimension annihilation operator, lowering.T.c the creation
@@ -1283,18 +1283,18 @@ class mpSystem:
             for m in range(self.m):
                 # raising is the higher dimension creation operator, raising.T.c the annihilation
                 # this is the greater Green function (without factor of +-i)
-                tmpGreenGreater = vdot(self.stateSaves[bound + ind],
-                                          self.greenGreaterAnnihilation[m].T.dot(
+                tmpGreenGreater = vdot(self.stateSaves[bound - ind],
+                                          self.greenGreaterCreation[m].T.dot(
                                               tmpGreaterEvol.dot(
-                                                  self.greenGreaterAnnihilation[m].dot(
-                                                      self.stateSaves[bound - ind])))
+                                                  self.greenGreaterCreation[m].dot(
+                                                      self.stateSaves[bound + ind])))
                                           )
                 # lowering is the lower dimension annihilation operator, lowering.T.c the creation
                 # this is the lesser Green function (without factor of +-i)
-                tmpGreenLesser = vdot(self.stateSaves[bound - ind],
+                tmpGreenLesser = vdot(self.stateSaves[bound + ind],
                                          self.greenLesserAnnihilation[m].T.dot(tmpLesserEvol.dot(
                                              self.greenLesserAnnihilation[m].dot(
-                                                 self.stateSaves[bound + ind])))
+                                                 self.stateSaves[bound - ind])))
                                          )
                 # note that the greater Green function is multiplied by -i, which is included in the writing below!
                 # note that the lesser Green function is multiplied by -i, which is included in the writing below!
@@ -1987,7 +1987,7 @@ def getLesserAnnihilation(sysVar, l):
 
 # creation operator (N -> N+1)
 # adjoint of this is annihilation on N+1
-def getGreaterAnnihilation(sysVar, l):
+def getGreaterCreation(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
@@ -2005,7 +2005,7 @@ def getGreaterAnnihilation(sysVar, l):
 
 
 # annihilation operator on N+1
-def getGreaterAnnihilationAdj(sysVar, l):
+def getGreaterCreationAdj(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
@@ -2024,7 +2024,7 @@ def getGreaterAnnihilationAdj(sysVar, l):
 
 
 # inverse of creation operator (have to multiply from left...)
-def getGreaterAnnihilationInv(sysVar, l):
+def getGreaterCreationInv(sysVar, l):
     data = np.zeros(0, dtype=np.float64)
     row = np.zeros(0, dtype=np.float64)
     col = np.zeros(0, dtype=np.float64)
