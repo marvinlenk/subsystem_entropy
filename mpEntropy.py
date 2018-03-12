@@ -648,9 +648,11 @@ class mpSystem:
             # for greenOnly, perform the WHOLE time evolution in one step (holy moly)
             # otherwise use the time step distance as prepared in __init__
             if self.greenOnly:
-                self.evolutionMatrix = npmatrix_power(self.evolutionMatrix.toarray(), self.steps)
+                self.evolutionMatrix = np.asfortranarray(
+                    npmatrix_power(self.evolutionMatrix.toarray(), self.steps), dtype=self.datType)
             else:
-                self.evolutionMatrix = npmatrix_power(self.evolutionMatrix.toarray(), self.evolStepDist)
+                self.evolutionMatrix = np.asfortranarray(
+                    npmatrix_power(self.evolutionMatrix.toarray(), self.evolStepDist), dtype=self.datType)
 
             # Store hamiltonian eigenvalues
             if diagonalize:
@@ -659,7 +661,8 @@ class mpSystem:
         else:
             for i in range(1, self.order + 1):
                 self.evolutionMatrix += ((-1j) ** i) * (self.deltaTgreen ** i) * (self.hamiltonian ** i) / factorial(i)
-            self.evolutionMatrix = npmatrix_power(self.evolutionMatrix.toarray(), self.greenStepDist / 2)
+            self.evolutionMatrix = np.asfortranarray(
+                npmatrix_power(self.evolutionMatrix.toarray(), self.greenStepDist / 2), dtype=self.datType)
     # end
 
     # The matrix already inherits the identity so step is just mutliplication
@@ -689,18 +692,18 @@ class mpSystem:
                 self.updateLoEigenenergies()
 
             # bring it to the same timestep distance as the state vector
-            self.greenLesserEvolutionMatrix = \
-                npmatrix_power(self.greenLesserEvolutionMatrix.toarray(), self.evolStepDist)
+            self.greenLesserEvolutionMatrix = np.asfortranarray(
+                npmatrix_power(self.greenLesserEvolutionMatrix.toarray(), self.evolStepDist), dtype=self.datType)
             if sq and not self.greenOnly:
                 self.greenLesserEvolutionMatrix = npmatrix_power(self.greenLesserEvolutionMatrix, 2)
         # green only time evolution operator for deltaTgreen
         else:
             for i in range(1, self.loOrder + 1):
-                self.greenLesserEvolutionMatrix += (pre ** i) * (self.deltaT ** i)\
-                                                   * (self.greenLesserHamiltonian ** i) / factorial(i)
+                self.greenLesserEvolutionMatrix += (pre ** i) * (self.deltaT ** i) *\
+                                                   (self.greenLesserHamiltonian ** i) / factorial(i)
             # raise to appropriate power
-            self.greenLesserEvolutionMatrix = \
-                npmatrix_power(self.greenLesserEvolutionMatrix.toarray(), self.greenStepDist)
+            self.greenLesserEvolutionMatrix = np.asfortranarray(
+                npmatrix_power(self.greenLesserEvolutionMatrix.toarray(), self.greenStepDist), dtype=self.datType)
 
     # end
 
@@ -722,10 +725,12 @@ class mpSystem:
         # normal green function evolution operator for deltaT
         if not self.greenOnly:
             for i in range(1, self.hiOrder + 1):
-                self.greenGreaterEvolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.greenGreaterHamiltonian ** i) / factorial(i)
+                self.greenGreaterEvolutionMatrix += (pre ** i) * (self.deltaT ** i) *\
+                                                    (self.greenGreaterHamiltonian ** i) / factorial(i)
             if diagonalize:
                 self.updateHiEigenenergies()
-            self.greenGreaterEvolutionMatrix = npmatrix_power(self.greenGreaterEvolutionMatrix.toarray(), self.evolStepDist)
+            self.greenGreaterEvolutionMatrix = np.asfortranarray(
+                npmatrix_power(self.greenGreaterEvolutionMatrix.toarray(), self.evolStepDist), dtype=self.datType)
             if sq:
                 self.greenGreaterEvolutionMatrix = npmatrix_power(self.greenGreaterEvolutionMatrix, 2)
         # green only time evolution operator for deltaTgreen
@@ -734,8 +739,8 @@ class mpSystem:
                 self.greenGreaterEvolutionMatrix += (pre ** i) * (self.deltaT ** i) \
                                                        * (self.greenGreaterHamiltonian ** i) / factorial(i)
             # raise to appropriate power
-            self.greenGreaterEvolutionMatrix = \
-                npmatrix_power(self.greenGreaterEvolutionMatrix.toarray(), self.greenStepDist)
+            self.greenGreaterEvolutionMatrix = np.asfortranarray(
+                npmatrix_power(self.greenGreaterEvolutionMatrix.toarray(), self.greenStepDist), dtype=self.datType)
     # end
 
     def timeStep(self):
@@ -1384,7 +1389,7 @@ class mpSystem:
 
         self.filGreen.close()
 
-    def evaluateGreenOnly(self, offset=0):
+    def evaluateGreenOnly(self):
         if not self.greenOnly:
             print("WARNING: Green only is not set - several features will not automatically be adjusted.")
         # offset is given in time as the first time to evaluate
@@ -1393,89 +1398,70 @@ class mpSystem:
         print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
         self.closeProgressFile()
 
+        # first do the time evolution
+        self.state = self.evolutionMatrix.dot(self.state)
+        self.normalize()
+        self.initEvolutionMatrix(greenstep=True)
+
+        # this is the negative time state
+        tmpState = self.state
+        tmpEvolutionMatrix = self.evolutionMatrix.conjugate().T.copy()
+
         # initialize the evolution operators as the identity (which corresponds to tau=0)
-        tmpGreaterEvol = np.identity(self.greenGreaterDim, dtype=self.datType)
-        tmpLesserEvol = np.identity(self.greenLesserDim, dtype=self.datType)
-        # the time distance (in tau) to sum over is given by the maximum time - the offset time
-        time_dist = self.timeSaves[-1] - offset
-        # the time steps are (equidistant) given by just the first time step
-        dt = self.timeSaves[1] - self.timeSaves[0]
-        # the additional dt is needed since the first time element is not counted otherwise
-        index_dist_check = int(round((time_dist + dt)/dt))
-        # center piece + multiple of two dt distance has to be used since tau comes in steps of 2dt
-        if index_dist_check % 2 != 0:
-            index_dist_check -= 1
-        index_dist = int(index_dist_check)
-        # the index of the lowest time coordinate (the offset) - 1
-        # (because we start at the middle index_dist is 1 too short)
-        offset_index = len(self.timeSaves) - index_dist - 1
-        # the actual time offset
-        offset_time = self.timeSaves[offset_index]
-        # the range to sum up
-        bound = int(index_dist / 2)
+        tmpGreaterEvol = np.asfortranarray(np.identity(self.greenGreaterDim, dtype=self.datType), dtype=self.datType)
+        tmpLesserEvol = np.asfortranarray(np.identity(self.greenLesserDim, dtype=self.datType), dtype=self.datType)
 
         # open the green function file for writing
-        self.filGreen = open('./data/green_com%.2f.dat' % (offset_time + bound*dt), 'w')  # t, re, im
-        self.filGreen.write('#tau re>_1 im>_1 re<_1 im<_1... COM time is $f\n' % (offset_time + bound*dt))
+        self.filGreen = open('./data/green_com%.2f.dat' % (int(self.steps * self.deltaT)), 'w')  # t, re, im
+        self.filGreen.write('#tau re> im> re< im<, COM time is $f\n' % (int(self.steps * self.deltaT)))
 
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
-        for m in range(self.m):
-            # raising is the higher dimension creation operator, raising.T.c the annihilation
-            # this is the greater Green function (without factor of +-i)
-            tmpGreenGreater = vdot(self.stateSaves[bound + offset_index],
-                                   self.greenGreaterCreation[m].T.dot(
-                                       self.greenGreaterCreation[m].dot(
-                                           self.stateSaves[bound + offset_index]))
-                                   )
-            # lowering is the lower dimension annihilation operator, lowering.T.c the creation
-            # this is the lesser Green function (without factor of +-i)
-            tmpGreenLesser = vdot(self.stateSaves[bound + offset_index],
-                                  self.greenLesserAnnihilation[m].T.dot(
-                                      self.greenLesserAnnihilation[m].dot(
-                                          self.stateSaves[bound + offset_index]))
-                                  )
-            # note that the greater Green function is multiplied by -i, which is included in the writing below!
-            # note that the lesser Green function is multiplied by -i, which is included in the writing below!
-            # first number is real part, second imaginary
-            # there is an overall minus sign!
-            self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
-            self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
+        tmpGreaterOp = self.greenGreaterCreation[0].T.dot(self.greenGreaterCreation[0])
+        tmpLesserOp = self.greenLesserAnnihilation[0].T.dot(self.greenLesserAnnihilation[0])
+        for m in range(1, self.m):
+            tmpGreaterOp += self.greenGreaterCreation[m].T.dot(self.greenGreaterCreation[m])
+            tmpLesserOp += self.greenLesserAnnihilation[m].T.dot(self.greenLesserAnnihilation[m])
+        tmpGreenGreater = vdot(self.state, tmpGreaterOp.dot(self.state))
+        tmpGreenLesser = vdot(self.state, tmpLesserOp.dot(self.state))
+        # note that the both Green functions are multiplied by -i, which is included in the writing below!
+        # first number is real part, second imaginary
+        # there is an overall minus sign!
+        self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
+        self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
         self.filGreen.write(' \n')
 
         # now start from the first non-zero difference time
         t0 = tm.time()
         t1 = tm.time()
         tavg = 0
-        bound_permil = 1000.0 / bound  # use per 1000 to get easier condition for 1% and 10%
-        for i in range(1, bound + 1):
-            # shift i by the offset to move to the correct com
-            ind = offset_index + i
-            tmpGreaterEvol = tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix)  # they need to be the squared ones!
-            tmpLesserEvol = tmpLesserEvol.dot(self.greenLesserEvolutionMatrix)  # they need to be the squared ones!
-            self.filGreen.write('%.16e ' % (2 * dt * i))
-            for m in range(self.m):
-                # raising is the higher dimension creation operator, raising.T.c the annihilation
-                # this is the greater Green function (without factor of +-i)
-                tmpGreenGreater = vdot(self.stateSaves[bound - ind],
-                                          self.greenGreaterCreation[m].T.dot(
-                                              tmpGreaterEvol.dot(
-                                                  self.greenGreaterCreation[m].dot(
-                                                      self.stateSaves[bound + ind])))
-                                          )
-                # lowering is the lower dimension annihilation operator, lowering.T.c the creation
-                # this is the lesser Green function (without factor of +-i)
-                tmpGreenLesser = vdot(self.stateSaves[bound + ind],
-                                         self.greenLesserAnnihilation[m].T.dot(tmpLesserEvol.dot(
-                                             self.greenLesserAnnihilation[m].dot(
-                                                 self.stateSaves[bound - ind])))
-                                         )
-                # note that the greater Green function is multiplied by -i, which is included in the writing below!
-                # note that the lesser Green function is multiplied by -i, which is included in the writing below!
-                # first number is real part, second imaginary
-                # there is an overall minus sign!
-                self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
-                self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
+        bound_permil = 1000.0 / self.greensteps  # use per 1000 to get easier condition for 1% and 10%
+        for i in range(1, self.greensteps + 1):
+            # raise the green evolution operator a deltaTau more
+            tmpGreaterEvol = tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix)
+            tmpLesserEvol = tmpLesserEvol.dot(self.greenLesserEvolutionMatrix)
+            # evolve the state in time
+            self.state = self.evolutionMatrix.dot(self.state)
+            self.normalize()
+            # evolve the tmp state backwards in time
+            tmpState = tmpEvolutionMatrix.dot(tmpState)
+            tmpState /= la.norm(tmpState)
+
+            tmpGreaterOp = self.greenGreaterCreation[0].T.dot(tmpGreaterEvol.dot(self.greenGreaterCreation[0]))
+            tmpLesserOp = self.greenLesserAnnihilation[0].T.dot(tmpLesserEvol.dot(self.greenLesserAnnihilation[0]))
+            for m in range(1, self.m):
+                tmpGreaterOp += self.greenGreaterCreation[m].T.dot(tmpGreaterEvol.dot(self.greenGreaterCreation[m]))
+                tmpLesserOp += self.greenLesserAnnihilation[m].T.dot(tmpLesserEvol.dot(self.greenLesserAnnihilation[m]))
+            tmpGreenGreater = vdot(tmpState, tmpGreaterOp.dot(self.state))
+            tmpGreenLesser = vdot(self.state, tmpLesserOp.dot(tmpState))
+            self.filGreen.write('%.16e ' % (self.deltaTaugreen * i))
+
+            # note that the greater Green function is multiplied by -i, which is included in the writing below!
+            # note that the lesser Green function is multiplied by -i, which is included in the writing below!
+            # first number is real part, second imaginary
+            # there is an overall minus sign!
+            self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
+            self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
             self.filGreen.write(' \n')
 
             # time estimation start

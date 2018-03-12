@@ -3,6 +3,9 @@ change log
 ### 12.03.2018
 - continued working on the previous task
     - finished config and time evolution init part
+    - finished evaluation part
+    - NEED TO TEST NOW!
+- changed evolution matrices to be in fortran data format
 
 ### 09.03.2018
 - added a green function only flag which should do the following:
