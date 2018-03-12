@@ -23,8 +23,9 @@ import entPlot as ep
 # noinspection PyTypeChecker
 class mpSystem:
     # N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
-    def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False):
+    def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False, greenOnly=False):
         self.confFile = cFile
+        self.greenOnly = greenOnly
 
         # here comes a ridiculously long list of variables which are initialized for loading the config
         self.N = 0
@@ -624,7 +625,14 @@ class mpSystem:
         if self.boolHamilStore:
             storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.dat', 1)
             storeMatrix(self.evolutionMatrix.toarray(), './data/evolutionmatrix.dat', 1)
-        self.evolutionMatrix = npmatrix_power(self.evolutionMatrix.toarray(), self.evolStepDist)
+
+        # for greenOnly, perform the WHOLE time evolution in one step (holy moly)
+        # otherwise use the time step distance as prepared in __init__
+        if self.greenOnly:
+            self.evolutionMatrix = npmatrix_power(self.evolutionMatrix.toarray(), self.steps)
+        else:
+            self.evolutionMatrix = npmatrix_power(self.evolutionMatrix.toarray(), self.evolStepDist)
+
         # Store hamiltonian eigenvalues
         if diagonalize:
             self.updateEigenenergies()
@@ -656,7 +664,7 @@ class mpSystem:
             self.updateLoEigenenergies()
         # bring it to the same timestep distance as the state vector
         self.greenLesserEvolutionMatrix = npmatrix_power(self.greenLesserEvolutionMatrix.toarray(), self.evolStepDist)
-        if sq:
+        if sq and not self.greenOnly:
             self.greenLesserEvolutionMatrix = npmatrix_power(self.greenLesserEvolutionMatrix, 2)
 
     # end
