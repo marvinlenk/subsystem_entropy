@@ -393,12 +393,12 @@ class mpSystem:
 
         # the green function time step size
         if self.deltaTgreen != 0 and self.deltaTaugreen != 0:
-            self.greenStepDist = int(self.deltaTaugreen / self.deltaTgreen)
+            self.greenStepDist = int(round(self.deltaTaugreen / self.deltaTgreen))
             if self.deltaTaugreen % self.deltaTgreen >= 1:
                 print("WARNING: There was a residue while dividing deltaTaugreen by deltaTgreen!")
             if self.greenStepDist % 2 != 0:
                 print("WARNING: The green step distance is not dividable by two without residue!"
-                      " This might cause problems in the green function calculation.")
+                      " This might cause problems in the green function calculation. It is: %f" % self.greenStepDist)
 
         # calculate the time steps that are taken at once
         self.evolStepDist = int(self.steps / self.dataPoints)
@@ -662,7 +662,7 @@ class mpSystem:
             for i in range(1, self.order + 1):
                 self.evolutionMatrix += ((-1j) ** i) * (self.deltaTgreen ** i) * (self.hamiltonian ** i) / factorial(i)
             self.evolutionMatrix = np.asfortranarray(
-                npmatrix_power(self.evolutionMatrix.toarray(), self.greenStepDist / 2), dtype=self.datType)
+                npmatrix_power(self.evolutionMatrix.toarray(), int(self.greenStepDist / 2)), dtype=self.datType)
     # end
 
     # The matrix already inherits the identity so step is just mutliplication
@@ -1299,7 +1299,7 @@ class mpSystem:
 
         # open the green function file for writing
         self.filGreen = open('./data/green_com%.2f.dat' % (offset_time + bound*dt), 'w')  # t, re, im
-        self.filGreen.write('#tau re>_1 im>_1 re<_1 im<_1... COM time is $f\n' % (offset_time + bound*dt))
+        self.filGreen.write('#tau re>_1 im>_1 re<_1 im<_1... COM time is %f\n' % (offset_time + bound*dt))
 
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
@@ -1394,12 +1394,12 @@ class mpSystem:
             print("WARNING: Green only is not set - several features will not automatically be adjusted.")
         # offset is given in time as the first time to evaluate
         self.openProgressFile()
-        self.filProg.write('Starting evalutation of Green\'s function:\n' + ' 0% ')
-        print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
-        self.closeProgressFile()
+
 
         # first do the time evolution
         self.state = self.evolutionMatrix.dot(self.state)
+        print("1 - Norm: %.16f \n" % (1.0 - la.norm(self.state)))
+        self.filProg.write("1 - Norm: %.16f \n" % (1.0 - la.norm(self.state)))
         self.normalize()
         self.initEvolutionMatrix(greenstep=True)
 
@@ -1408,22 +1408,26 @@ class mpSystem:
         tmpEvolutionMatrix = self.evolutionMatrix.conjugate().T.copy()
 
         # initialize the evolution operators as the identity (which corresponds to tau=0)
-        tmpGreaterEvol = np.asfortranarray(np.identity(self.greenGreaterDim, dtype=self.datType), dtype=self.datType)
-        tmpLesserEvol = np.asfortranarray(np.identity(self.greenLesserDim, dtype=self.datType), dtype=self.datType)
+        tmpGreaterEvol = np.identity(self.greenGreaterDim, dtype=self.datType)
+        tmpLesserEvol = np.identity(self.greenLesserDim, dtype=self.datType)
+
+        self.filProg.write('Starting evalutation of Green\'s function:\n' + ' 0% ')
+        print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
+        self.closeProgressFile()
 
         # open the green function file for writing
         self.filGreen = open('./data/green_com%.2f.dat' % (int(self.steps * self.deltaT)), 'w')  # t, re, im
-        self.filGreen.write('#tau re> im> re< im<, COM time is $f\n' % (int(self.steps * self.deltaT)))
+        self.filGreen.write('#tau re> im> re< im<, COM time is %f\n' % (self.steps * self.deltaT))
 
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
-        tmpGreaterOp = self.greenGreaterCreation[0].T.dot(self.greenGreaterCreation[0])
-        tmpLesserOp = self.greenLesserAnnihilation[0].T.dot(self.greenLesserAnnihilation[0])
+        tmpGreaterState = self.greenGreaterCreation[0].T.dot(self.greenGreaterCreation[0].dot(self.state))
+        tmpLesserState = self.greenLesserAnnihilation[0].T.dot(self.greenLesserAnnihilation[0].dot(self.state))
         for m in range(1, self.m):
-            tmpGreaterOp += self.greenGreaterCreation[m].T.dot(self.greenGreaterCreation[m])
-            tmpLesserOp += self.greenLesserAnnihilation[m].T.dot(self.greenLesserAnnihilation[m])
-        tmpGreenGreater = vdot(self.state, tmpGreaterOp.dot(self.state))
-        tmpGreenLesser = vdot(self.state, tmpLesserOp.dot(self.state))
+            tmpGreaterState += self.greenGreaterCreation[m].T.dot(self.greenGreaterCreation[m].dot(self.state))
+            tmpLesserState += self.greenLesserAnnihilation[m].T.dot(self.greenLesserAnnihilation[m].dot(self.state))
+        tmpGreenGreater = vdot(self.state, tmpGreaterState)
+        tmpGreenLesser = vdot(self.state, tmpLesserState)
         # note that the both Green functions are multiplied by -i, which is included in the writing below!
         # first number is real part, second imaginary
         # there is an overall minus sign!
@@ -1447,13 +1451,32 @@ class mpSystem:
             tmpState = tmpEvolutionMatrix.dot(tmpState)
             tmpState /= la.norm(tmpState)
 
-            tmpGreaterOp = self.greenGreaterCreation[0].T.dot(tmpGreaterEvol.dot(self.greenGreaterCreation[0]))
-            tmpLesserOp = self.greenLesserAnnihilation[0].T.dot(tmpLesserEvol.dot(self.greenLesserAnnihilation[0]))
+            # the dots only work via contraction with a state vector!
+            tmpGreaterState = \
+                self.greenGreaterCreation[0].T.dot(
+                    tmpGreaterEvol.dot(
+                        self.greenGreaterCreation[0].dot(
+                            self.state)))
+            tmpLesserState =\
+                self.greenLesserAnnihilation[0].T.dot(
+                    tmpLesserEvol.dot(
+                        self.greenLesserAnnihilation[0].dot(
+                            tmpState)))
+
             for m in range(1, self.m):
-                tmpGreaterOp += self.greenGreaterCreation[m].T.dot(tmpGreaterEvol.dot(self.greenGreaterCreation[m]))
-                tmpLesserOp += self.greenLesserAnnihilation[m].T.dot(tmpLesserEvol.dot(self.greenLesserAnnihilation[m]))
-            tmpGreenGreater = vdot(tmpState, tmpGreaterOp.dot(self.state))
-            tmpGreenLesser = vdot(self.state, tmpLesserOp.dot(tmpState))
+                tmpGreaterState += \
+                    self.greenGreaterCreation[m].T.dot(
+                        tmpGreaterEvol.dot(
+                            self.greenGreaterCreation[m].dot(
+                                self.state)))
+                tmpLesserState += \
+                    self.greenLesserAnnihilation[m].T.dot(
+                        tmpLesserEvol.dot(
+                            self.greenLesserAnnihilation[m].dot(
+                                tmpState)))
+
+            tmpGreenGreater = vdot(tmpState, tmpGreaterState)
+            tmpGreenLesser = vdot(self.state, tmpLesserState)
             self.filGreen.write('%.16e ' % (self.deltaTaugreen * i))
 
             # note that the greater Green function is multiplied by -i, which is included in the writing below!
@@ -1470,7 +1493,7 @@ class mpSystem:
                 self.filProg.write('.')
                 print('.', end='', flush=True)
                 if round(i * bound_permil, 1) % 100 == 0:
-                    tavg *= int(i - bound / 10)  # calculate from time/step back to unit: time
+                    tavg *= int(i - self.greensteps / 10)  # calculate from time/step back to unit: time
                     tavg += tm.time() - t1  # add passed time
                     tavg /= i  # average over total number of steps
                     t1 = tm.time()
@@ -1479,10 +1502,10 @@ class mpSystem:
 
                     self.filProg.write(
                         ' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0))
-                    if i != bound:
-                        print(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                    if i != self.greensteps:
+                        print(" ###### eta: " + time_form(tavg * (self.greensteps - i)) + "\n" + str(
                             int(i * bound_permil / 10)) + "% ", end='', flush=True)
-                        self.filProg.write(" ###### eta: " + time_form(tavg * (bound - i)) + "\n" + str(
+                        self.filProg.write(" ###### eta: " + time_form(tavg * (self.greensteps - i)) + "\n" + str(
                             int(i * bound_permil / 10)) + "%")
                     else:
                         print('\n')
