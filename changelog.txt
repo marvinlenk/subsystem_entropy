@@ -1,5 +1,25 @@
 change log
 
+### 13.03.2018
+- a formatting error was hidden in the green file header, cleared this
+- apparrently the np.dot must have a C-Array as output, so the temporary green evolution matrix is C as well
+- changed green step distance to round before converting to int (brought up error, since it was division on two floats)
+
+### 12.03.2018
+- continued working on the previous task
+    - finished config and time evolution init part
+    - finished evaluation part
+    - NEED TO TEST NOW!
+- changed evolution matrices to be in fortran data format
+
+### 09.03.2018
+- added a green function only flag which should do the following:
+    1. perform the time evolution of the state vector to COM time in ONE step and normalize (maybe too much?)
+    2. initialize the greater and lesser time evolution matrices with a different deltaT
+        and raise it to an appropriate power for smaller difference time steps
+    3. re-initialize the state time evolution operator for the smaller time step
+    4. calculate the TRACE of the greater and lesser green function step by step
+
 ### 21.02.2018
 - ffs the damn green function stuff was totally messed up...
     evolution matrices were conjugate, time steps were going in the exact

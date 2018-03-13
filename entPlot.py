@@ -608,98 +608,100 @@ def plotData(sysVar):
         # ## Green function
 
     if sysVar.boolPlotGreen:
-        if not(os.path.isfile('./data/spectral_frequency_trace.dat') and
-                   os.path.isfile('./data/statistical_frequency_trace.dat')):
-            spectral_time = []
-            statistical_time = []
-            spectral_frequency = []
-            statistical_frequency = []
-            sample_frequency = 1.0 / ((greendat[-1, 0] - greendat[0, 0]) / (len(greendat[:, 0]) - 1))
-            for i in range(sysVar.m):
-                ind = 1 + i * 4
-                greater = (greendat[:, ind] + 1j * greendat[:, ind + 1])  # greater green function
-                lesser = (greendat[:, ind + 2] + 1j * greendat[:, ind + 3])  # lesser green function
-                spectral_time.append(1j * (greater - lesser))  # spectral function in time space
-                statistical_time.append((greater + lesser) / 2)  # statistical function in time space
-                # spectral function in frequency space
-                spectral_frequency.append(dft.rearrange(dft.dft(spectral_time[i], sample_frequency)))
-                # statistical function in frequency space
-                statistical_frequency.append(dft.rearrange(dft.dft(statistical_time[i], sample_frequency)))
 
-            spectral_frequency_trace = spectral_frequency[0]
-            statistical_frequency_trace = statistical_frequency[0]
-            for i in range(1, sysVar.m):
-                spectral_frequency_trace[:, 1] = spectral_frequency_trace[:, 1] + spectral_frequency[i][:, 1]
-                statistical_frequency_trace[:, 1] = statistical_frequency_trace[:, 1] + statistical_frequency[i][:, 1]
+        if False:
+            if not(os.path.isfile('./data/spectral_frequency_trace.dat') and
+                       os.path.isfile('./data/statistical_frequency_trace.dat')):
+                spectral_time = []
+                statistical_time = []
+                spectral_frequency = []
+                statistical_frequency = []
+                sample_frequency = 1.0 / ((greendat[-1, 0] - greendat[0, 0]) / (len(greendat[:, 0]) - 1))
+                for i in range(sysVar.m):
+                    ind = 1 + i * 4
+                    greater = (greendat[:, ind] + 1j * greendat[:, ind + 1])  # greater green function
+                    lesser = (greendat[:, ind + 2] + 1j * greendat[:, ind + 3])  # lesser green function
+                    spectral_time.append(1j * (greater - lesser))  # spectral function in time space
+                    statistical_time.append((greater + lesser) / 2)  # statistical function in time space
+                    # spectral function in frequency space
+                    spectral_frequency.append(dft.rearrange(dft.dft(spectral_time[i], sample_frequency)))
+                    # statistical function in frequency space
+                    statistical_frequency.append(dft.rearrange(dft.dft(statistical_time[i], sample_frequency)))
 
-            np.savetxt('./data/spectral_frequency_trace.dat',
-                       np.column_stack((spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].real,
-                                        spectral_frequency_trace[:, 1].imag)))
-            np.savetxt('./data/statistical_frequency_trace.dat',
-                       np.column_stack((statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].real,
-                                        statistical_frequency_trace[:, 1].imag)))
-        else:
-            spectral_frequency_trace_tmp = np.loadtxt('./data/spectral_frequency_trace.dat')
-            statistical_frequency_trace_tmp = np.loadtxt('./data/statistical_frequency_trace.dat')
-            spectral_frequency_trace = np.column_stack((
-                spectral_frequency_trace_tmp[:, 0],
-                (spectral_frequency_trace_tmp[:, 1] + 1j*spectral_frequency_trace_tmp[:, 2])
-            ))
-            statistical_frequency_trace = np.column_stack((
-                statistical_frequency_trace_tmp[:, 0],
-                (statistical_frequency_trace_tmp[:, 1] + 1j*statistical_frequency_trace_tmp[:, 2])
-            ))
+                spectral_frequency_trace = spectral_frequency[0]
+                statistical_frequency_trace = statistical_frequency[0]
+                for i in range(1, sysVar.m):
+                    spectral_frequency_trace[:, 1] = spectral_frequency_trace[:, 1] + spectral_frequency[i][:, 1]
+                    statistical_frequency_trace[:, 1] = statistical_frequency_trace[:, 1] + statistical_frequency[i][:, 1]
 
-        fig = plt.figure()
+                np.savetxt('./data/spectral_frequency_trace.dat',
+                           np.column_stack((spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].real,
+                                            spectral_frequency_trace[:, 1].imag)))
+                np.savetxt('./data/statistical_frequency_trace.dat',
+                           np.column_stack((statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].real,
+                                            statistical_frequency_trace[:, 1].imag)))
+            else:
+                spectral_frequency_trace_tmp = np.loadtxt('./data/spectral_frequency_trace.dat')
+                statistical_frequency_trace_tmp = np.loadtxt('./data/statistical_frequency_trace.dat')
+                spectral_frequency_trace = np.column_stack((
+                    spectral_frequency_trace_tmp[:, 0],
+                    (spectral_frequency_trace_tmp[:, 1] + 1j*spectral_frequency_trace_tmp[:, 2])
+                ))
+                statistical_frequency_trace = np.column_stack((
+                    statistical_frequency_trace_tmp[:, 0],
+                    (statistical_frequency_trace_tmp[:, 1] + 1j*statistical_frequency_trace_tmp[:, 2])
+                ))
 
-        ax1 = fig.add_subplot(221)
-        ax1.set_xlim(xmin=-10, xmax=100)
-        ax1.set_ylabel(r'Re $A(\omega)$')
-        ax1.set_xlabel(r'$\omega$')
-        ax1.plot(spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].real)
+            fig = plt.figure()
 
-        ax2 = fig.add_subplot(222)
-        ax2.set_xlim(xmin=-10, xmax=100)
-        ax2.set_ylabel(r'Im $A(\omega)$')
-        ax2.set_xlabel(r'$\omega$')
-        ax2.plot(spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].imag)
+            ax1 = fig.add_subplot(221)
+            ax1.set_xlim(xmin=-10, xmax=100)
+            ax1.set_ylabel(r'Re $A(\omega)$')
+            ax1.set_xlabel(r'$\omega$')
+            ax1.plot(spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].real)
 
-        ax3 = fig.add_subplot(223)
-        ax3.set_xlim(xmin=-10, xmax=100)
-        ax3.set_ylabel(r'Re $F(\omega)$')
-        ax3.set_xlabel(r'$\omega$')
-        ax3.plot(statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].real)
+            ax2 = fig.add_subplot(222)
+            ax2.set_xlim(xmin=-10, xmax=100)
+            ax2.set_ylabel(r'Im $A(\omega)$')
+            ax2.set_xlabel(r'$\omega$')
+            ax2.plot(spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].imag)
 
-        ax4 = fig.add_subplot(224)
-        ax4.set_xlim(xmin=-10, xmax=100)
-        ax4.set_ylabel(r'Im $F(\omega)$')
-        ax4.set_xlabel(r'$\omega$')
-        ax4.plot(statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].imag)
+            ax3 = fig.add_subplot(223)
+            ax3.set_xlim(xmin=-10, xmax=100)
+            ax3.set_ylabel(r'Re $F(\omega)$')
+            ax3.set_xlabel(r'$\omega$')
+            ax3.plot(statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].real)
 
-        plt.tight_layout()
-        pp.savefig()
-        plt.clf()
+            ax4 = fig.add_subplot(224)
+            ax4.set_xlim(xmin=-10, xmax=100)
+            ax4.set_ylabel(r'Im $F(\omega)$')
+            ax4.set_xlabel(r'$\omega$')
+            ax4.plot(statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].imag)
 
-        # ## ##
+            plt.tight_layout()
+            pp.savefig()
+            plt.clf()
 
-        fig = plt.figure()
+            # ## ##
 
-        ax1 = fig.add_subplot(121)
-        ax1.set_xlim(xmin=-10, xmax=80)
-        ax1.set_ylabel(r'$|A(\omega)|$')
-        ax1.set_xlabel(r'$\omega$')
-        ax1.plot(spectral_frequency_trace[:, 0].real, np.abs(spectral_frequency_trace[:, 1]))
+            fig = plt.figure()
 
-        ax2 = fig.add_subplot(122)
-        ax2.set_xlim(xmin=-10, xmax=80)
-        ax2.set_ylabel(r'$|F(\omega)|$')
-        ax2.set_xlabel(r'$\omega$')
-        ax2.plot(statistical_frequency_trace[:, 0].real, np.abs(statistical_frequency_trace[:, 1]))
+            ax1 = fig.add_subplot(121)
+            ax1.set_xlim(xmin=-10, xmax=80)
+            ax1.set_ylabel(r'$|A(\omega)|$')
+            ax1.set_xlabel(r'$\omega$')
+            ax1.plot(spectral_frequency_trace[:, 0].real, np.abs(spectral_frequency_trace[:, 1]))
 
-        plt.tight_layout()
-        pp.savefig()
-        plt.clf()
-        print('.', end='', flush=True)
+            ax2 = fig.add_subplot(122)
+            ax2.set_xlim(xmin=-10, xmax=80)
+            ax2.set_ylabel(r'$|F(\omega)|$')
+            ax2.set_xlabel(r'$\omega$')
+            ax2.plot(statistical_frequency_trace[:, 0].real, np.abs(statistical_frequency_trace[:, 1]))
+
+            plt.tight_layout()
+            pp.savefig()
+            plt.clf()
+            print('.', end='', flush=True)
 
     if sysVar.boolPlotDecomp:
         def eigendecomposition():
