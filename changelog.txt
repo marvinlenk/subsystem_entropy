@@ -1,5 +1,9 @@
 change log
 
+### 14.06.2018
+- changed the way indices were used in the normal green function evaluation (BAD PROBLEM)
+    there was a mistake which (only in very special cases) did lead to almost the correct result!
+
 ### 13.03.2018
 - a formatting error was hidden in the green file header, cleared this
 - apparrently the np.dot must have a C-Array as output, so the temporary green evolution matrix is C as well

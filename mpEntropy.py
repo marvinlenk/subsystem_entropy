@@ -1303,20 +1303,21 @@ class mpSystem:
 
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
+        ind = bound + offset_index
         for m in range(self.m):
             # raising is the higher dimension creation operator, raising.T.c the annihilation
             # this is the greater Green function (without factor of +-i)
-            tmpGreenGreater = vdot(self.stateSaves[bound + offset_index],
+            tmpGreenGreater = vdot(self.stateSaves[ind],
                                    self.greenGreaterCreation[m].T.dot(
                                        self.greenGreaterCreation[m].dot(
-                                           self.stateSaves[bound + offset_index]))
+                                           self.stateSaves[ind]))
                                    )
             # lowering is the lower dimension annihilation operator, lowering.T.c the creation
             # this is the lesser Green function (without factor of +-i)
-            tmpGreenLesser = vdot(self.stateSaves[bound + offset_index],
+            tmpGreenLesser = vdot(self.stateSaves[ind],
                                   self.greenLesserAnnihilation[m].T.dot(
                                       self.greenLesserAnnihilation[m].dot(
-                                          self.stateSaves[bound + offset_index]))
+                                          self.stateSaves[ind]))
                                   )
             # note that the greater Green function is multiplied by -i, which is included in the writing below!
             # note that the lesser Green function is multiplied by -i, which is included in the writing below!
@@ -1332,26 +1333,24 @@ class mpSystem:
         tavg = 0
         bound_permil = 1000.0 / bound  # use per 1000 to get easier condition for 1% and 10%
         for i in range(1, bound + 1):
-            # shift i by the offset to move to the correct com
-            ind = offset_index + i
             tmpGreaterEvol = tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix)  # they need to be the squared ones!
             tmpLesserEvol = tmpLesserEvol.dot(self.greenLesserEvolutionMatrix)  # they need to be the squared ones!
             self.filGreen.write('%.16e ' % (2 * dt * i))
             for m in range(self.m):
                 # raising is the higher dimension creation operator, raising.T.c the annihilation
                 # this is the greater Green function (without factor of +-i)
-                tmpGreenGreater = vdot(self.stateSaves[bound - ind],
+                tmpGreenGreater = vdot(self.stateSaves[ind - i],
                                           self.greenGreaterCreation[m].T.dot(
                                               tmpGreaterEvol.dot(
                                                   self.greenGreaterCreation[m].dot(
-                                                      self.stateSaves[bound + ind])))
+                                                      self.stateSaves[ind + i])))
                                           )
                 # lowering is the lower dimension annihilation operator, lowering.T.c the creation
                 # this is the lesser Green function (without factor of +-i)
-                tmpGreenLesser = vdot(self.stateSaves[bound + ind],
+                tmpGreenLesser = vdot(self.stateSaves[ind + i],
                                          self.greenLesserAnnihilation[m].T.dot(tmpLesserEvol.dot(
                                              self.greenLesserAnnihilation[m].dot(
-                                                 self.stateSaves[bound - ind])))
+                                                 self.stateSaves[ind - i])))
                                          )
                 # note that the greater Green function is multiplied by -i, which is included in the writing below!
                 # note that the lesser Green function is multiplied by -i, which is included in the writing below!

@@ -1,5 +1,7 @@
 VERY URGENT:
-- nothing
+- check if deltaT in init evolution matrices for greej are actually correct! (deltaTgreen?)
+- add a norm check at the end of green function evaluation (or inbetween as well) to check consistency
+    i.e. state - tau/2 exp(i tau H) state + tau/2 sth like that.
 
 URGENT:
 - parallelize partial trace using e.g. .map() - see https://stackoverflow.com/questions/13068760/parallelise-python-loop-with-numpy-arrays-and-shared-memory
