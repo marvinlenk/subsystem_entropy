@@ -10,7 +10,7 @@ from numpy import sqrt
 from numpy.linalg import matrix_power as npmatrix_power
 from numpy.linalg import multi_dot
 from numpy import vdot
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import coo_matrix, csr_matrix, block_diag, save_npz
 from scipy.sparse import identity as spidentity
 from scipy.special import binom
 from scipy.special import erf
@@ -53,6 +53,7 @@ class mpSystem:
         self.boolDataStore = False
         self.boolDMStore = False
         self.boolDMRedStore = False
+        self.boolDMRedDiagStore = False
         self.boolHamilStore = False
         self.boolOccEnStore = False
         self.boolOccEnDiag = False
@@ -123,7 +124,7 @@ class mpSystem:
 
         self.loadConfig()
         if not plotOnly:
-            prepFolders(0, self.boolDMStore, self.boolDMRedStore, self.boolOccEnStore or self.boolOccEnDiag,
+            prepFolders(0, self.boolDMStore, (self.boolDMRedStore or self.boolDMRedDiagStore), self.boolOccEnStore or self.boolOccEnDiag,
                         self.boolEntanglementSpectrum, self.boolCleanFiles)
             # touch the progress file
             open('./data/progress.log', 'w').close()
@@ -220,7 +221,11 @@ class mpSystem:
                 if not (self.m == 2 and self.mRed == 1):
                     self.initIteratorRed()
 
-            # NOTE here it is
+            if self.boolDMRedDiagStore:
+                self.densityMatrixRedEigenvalues = None
+                self.densityMatrixRedEigenvectors = None
+
+            # NOTE here is the density matrix offdiagonal stuff
             if self.boolOffDiagDensRed:
                 self.offDiagDensRed = 0
             if self.boolOffDiagDensRed or self.boolReducedEnergy or self.boolEntanglementSpectrum:
@@ -317,18 +322,19 @@ class mpSystem:
 
         # ## file management
         self.dataPoints = int(configParser.getfloat('filemanagement', 'datapoints'))
-        self.dmFilesSkipFactor = int(configParser.getfloat('filemanagement', 'dmfile_skipfactor'))
+        self.boolDataStore = configParser.getboolean('filemanagement', 'datastore')
         self.boolClear = configParser.getboolean('filemanagement', 'clear')
         self.boolCleanFiles = configParser.getboolean('filemanagement', 'cleanfiles')
-        self.boolDataStore = configParser.getboolean('filemanagement', 'datastore')
+        self.dmFilesSkipFactor = int(configParser.getfloat('filemanagement', 'dmfile_skipfactor'))
         self.boolDMStore = configParser.getboolean('filemanagement', 'dmstore')
         self.boolDMRedStore = configParser.getboolean('filemanagement', 'dmredstore')
+        self.boolDMRedDiagStore = configParser.getboolean('filemanagement', 'dmreddiag')
         self.boolHamilStore = configParser.getboolean('filemanagement', 'hamilstore')
         self.boolOccEnStore = configParser.getboolean('filemanagement', 'occenstore')
         self.boolOccEnDiag = configParser.getboolean('filemanagement', 'occendiag')
         self.boolDiagExpStore = configParser.getboolean('filemanagement', 'occendiagexp')
-        self.occEnSingle = configParser.getint('filemanagement', 'offdiagoccsingles')
         self.boolOffDiagOcc = configParser.getboolean('filemanagement', 'offdiagocc')
+        self.occEnSingle = configParser.getint('filemanagement', 'offdiagoccsingles')
         self.boolOffDiagDens = configParser.getboolean('filemanagement', 'offdiagdens')
         self.boolOffDiagDensRed = configParser.getboolean('filemanagement', 'offdiagdensred')
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
@@ -493,6 +499,34 @@ class mpSystem:
                 if el[0] != el[1]:
                     tmpret[el[1], el[0]] += matrx[el[3], el[2]]
         return tmpret
+
+    # diagonalizes a reduced matrix respecting the block form, returns matrix of type sparse
+    def diagonalizeReducedMatrix(self, reduced_matrix):
+        if not np.allclose(reduced_matrix, reduced_matrix.T.conjugate()):
+            print('Warning - reduced matrix for diagonalization is not hermitian')
+            return None
+
+        block_matrix_array = []
+        eigenvalue_array = np.array([])
+        #start from N particle space to zero, just as in the reduction algorithm
+        for i in reversed(range(self.N)):
+            lo = self.offsetsRed[i]
+            hi = self.offsetsRed[i-1]
+            tmpvals, tmpmat = la.eigh(reduced_matrix[lo:hi, lo:hi])
+            block_matrix_array.append(tmpmat)
+            eigenvalue_array = np.append(eigenvalue_array, tmpvals)
+        return eigenvalue_array, block_diag(block_matrix_array)
+
+    def diagonalizeReducedDensityMatrix(self):
+        self.densityMatrixRedEigenvalues, self.densityMatrixRedEigenvectors =\
+            self.diagonalizeReducedMatrix(self.densityMatrixRed)
+
+    def saveReducedHamiltonian(self):
+        redham = self.reduceMatrix(self.hamiltonian.toarray())
+        save_npz("./data/reduced_hamiltonian.npz", coo_matrix(redham))
+        tmpvals, tmpvects = self.diagonalizeReducedMatrix(redham)
+        np.savetxt("./data/reduced_hamiltonian_eigenvalues.dat", tmpvals)
+        save_npz("./data/reduced_hamiltonian_eigenvectors.npz", tmpvects)
 
     def initAllHamiltonians(self):
         t0 = tm.time()
@@ -742,11 +776,6 @@ class mpSystem:
             self.greenGreaterEvolutionMatrix = np.asfortranarray(
                 npmatrix_power(self.greenGreaterEvolutionMatrix.toarray(), self.greenStepDist), dtype=self.datType)
     # end
-
-    def timeStep(self):
-        self.state = self.evolutionMatrix.dot(self.state)
-
-    # end of timeStep
 
     def greenStoreState(self):
         self.stateSaves.append(self.state)
@@ -1517,14 +1546,23 @@ class mpSystem:
     # update everything EXCEPT for total entropy and energy - they are only updated 100 times
     def updateEverything(self):
         self.evolTime += (self.evolStep - self.evolStepTmp) * self.deltaT
+        self.evolTime = np.round(self.evolTime, abs(int(np.log10(self.deltaT))))
         self.evolStepTmp = self.evolStep
         self.normalize()
-        if self.boolReducedEntropy or self.boolReducedEnergy:  # only calculate reduced if needed
+        # only calculate reduced if needed (if just for storing, check if it will be skipped anyways)
+        if self.boolReducedEntropy or self.boolReducedEnergy or \
+                ((self.boolDMRedStore or self.boolDMRedDiagStore) and
+                 (self.dmFileFactor == self.dmFilesSkipFactor or self.dmFileFactor == 0)):
             if self.boolOnlyRed:
                 self.reduceDensityMatrixFromState()
             else:
                 self.updateDensityMatrix()
                 self.reduceDensityMatrix()
+            if self.boolDMRedDiagStore:
+                self.diagonalizeReducedDensityMatrix()
+        elif self.boolDMStore and (self.dmFileFactor == self.dmFilesSkipFactor or self.dmFileFactor == 0):
+            self.updateDensityMatrix()
+
         if self.boolOccupations:
             self.updateOccNumbers()
         if self.boolReducedEntropy:
@@ -1543,8 +1581,12 @@ class mpSystem:
             self.updateOffDiagDensRed()
         if len(self.correlationsIndices) != 0:
             self.updateCorrelations()  # note that the file writing is included!
-        #self.reduceDensityMatrixFromState()
-        #print(self.expectValueRed(self.reduceMatrix(self.hamiltonian)))
+
+    def timeStep(self):
+        self.state = self.evolutionMatrix.dot(self.state)
+
+    # end of timeStep
+
     ###### the magic of time evolution
     def evolve(self):
         # check if state has been normalized yet (or initialized)
@@ -1635,15 +1677,20 @@ class mpSystem:
     # end
 
     def writeData(self):
-        if self.boolDMStore or self.boolDMRedStore:
+        if self.boolDMStore or self.boolDMRedStore or self.boolDMRedDiagStore:
             if self.dmFileFactor == self.dmFilesSkipFactor or self.dmFileFactor == 0:
                 self.dmFileFactor = 1
                 if not self.boolOnlyRed:
                     if self.boolDMStore:
-                        storeMatrix(self.densityMatrix, './data/density/densmat' + str(int(self.dmcount)) + '.dat')
+                        storeMatrix(self.densityMatrix, './data/density/densitymatrix_t%u.dat' % self.evolTime)
                     if self.boolDMRedStore:
                         storeMatrix(self.densityMatrixRed,
-                                    './data/red_density/densmat' + str(int(self.dmcount)) + '.dat')
+                                    './data/red_density/reduced_densitymatrix_t%u.dat' % self.evolTime)
+                    if self.boolDMRedDiagStore:
+                        np.savetxt('./data/red_density/reduced_densitymatrix_eigenvalues_t%u.dat' % self.evolTime,
+                                   self.densityMatrixRedEigenvalues)
+                        save_npz('./data/red_density/reduced_densitymatrix_eigenstates_t%u.npz' % self.evolTime,
+                                 self.densityMatrixRedEigenvectors)
                     self.dmcount += 1
             else:
                 self.dmFileFactor += 1
@@ -1680,9 +1727,9 @@ class mpSystem:
 
         if self.boolOccupations:
             self.filOcc.write('%.16e ' % self.evolTime)
-        for m in range(self.m):
-            self.filOcc.write('%.16e ' % self.occNo[m])
-        self.filOcc.write('\n')
+            for m in range(self.m):
+                self.filOcc.write('%.16e ' % self.occNo[m])
+            self.filOcc.write('\n')
 
         if self.boolOffDiagDens:
             self.filOffDiagDens.write('%.16e %.16e \n' % (self.evolTime, self.offDiagDens))

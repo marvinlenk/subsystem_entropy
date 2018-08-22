@@ -1,5 +1,10 @@
 change log
 
+### 22.08.2018
+- added dmreddiag to store the diagonalized reduced densitymatrix separated into blocks
+- added save reduced hamiltonian routine
+- fixed bug where occupations would still be written even if it has been turned of
+
 ### 14.06.2018
 - changed the way indices were used in the normal green function evaluation (BAD PROBLEM)
     there was a mistake which (only in very special cases) did lead to almost the correct result!
