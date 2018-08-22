@@ -22,7 +22,7 @@ if args.plot or args.plot_data or args.plot_animation or args.plot_occen or args
 else:
     plotBool = False
 
-sysVar = mpSystem("default.ini", plotOnly=plotBool)
+sysVar = mpSystem("default.ini", plotOnly=plotBool, greenOnly=False)
 
 if args.plot:
     sysVar.plot()
