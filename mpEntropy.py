@@ -10,7 +10,7 @@ from numpy import sqrt
 from numpy.linalg import matrix_power as npmatrix_power
 from numpy.linalg import multi_dot
 from numpy import vdot
-from scipy.sparse import coo_matrix, csr_matrix, block_diag, save_npz
+from scipy.sparse import coo_matrix, csr_matrix, block_diag, save_npz, issparse
 from scipy.sparse import identity as spidentity
 from scipy.special import binom
 from scipy.special import erf
@@ -505,6 +505,11 @@ class mpSystem:
         if not np.allclose(reduced_matrix, reduced_matrix.T.conjugate()):
             print('Warning - reduced matrix for diagonalization is not hermitian')
             return None
+        if self.dimRed == 1:
+            if issparse(reduced_matrix):
+                return reduced_matrix.toarray(), reduced_matrix
+            else:
+                return reduced_matrix, block_diag(reduced_matrix)
 
         block_matrix_array = []
         eigenvalue_array = np.array([])

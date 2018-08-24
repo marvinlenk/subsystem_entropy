@@ -1,5 +1,8 @@
 change log
 
+### 24.08.2018
+- diagonalization of reduced matrixes now able to handle matrices that are reduced to 1D (saved as arrays)
+
 ### 22.08.2018
 - added dmreddiag to store the diagonalized reduced densitymatrix separated into blocks
 - added save reduced hamiltonian routine
