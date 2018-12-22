@@ -6,6 +6,7 @@ VERY URGENT:
     .format(num=self.evolTime, precision=abs(np.log10(self.deltaT)))
 
 URGENT:
+- add negative tau version of "normal" green function evaluation as well
 - parallelize partial trace using e.g. .map() - see https://stackoverflow.com/questions/13068760/parallelise-python-loop-with-numpy-arrays-and-shared-memory
 
 High priority:
