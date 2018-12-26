@@ -1,5 +1,9 @@
 change log
 
+### 26.12.2018
+- changed default in greater evolution matrix to be conj=False and switched cases in exponent sign choice
+- negative tau option for evaluateGreenOnly should now work
+
 ### 22.12.2018
 - added option to conjugate "normal" time evolution operator as well
 - added negative tau option to evaluateGreenOnly

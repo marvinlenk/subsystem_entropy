@@ -762,17 +762,21 @@ class mpSystem:
     # The matrix already inherits the identity so step is just mutliplication
     # time evolution order given by order of the exponential series
     # this one will be only in sparse container since it is meant for sparse matrix mult.
-    def initgreenGreaterEvolutionMatrix(self, diagonalize=False, conj=True, sq=True):
+    #### IMPORTANT NOTE - complex conjugate will be needed for Green function ####
+    #### FURTHER: need only 2*delta_T for green function, so added sq=True ####
+    #### ALSO: delta_T here is actually the delta_T of time-steps, so the wide steps!!! ####
+    def initgreenGreaterEvolutionMatrix(self, diagonalize=False, conj=False, sq=True):
         if self.hiOrder == 0:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if not np.allclose(self.greenGreaterHamiltonian.toarray(), self.greenGreaterHamiltonian.toarray().T.conj()):
             print('Warning - hamiltonian is not hermitian!')
         self.greenGreaterEvolutionMatrix = spidentity(self.greenGreaterDim, dtype=self.datType, format='csr')
 
+    # in contrast to the greater evolution matrix the default here is positive exponent
         if conj:
-            pre = 1j
-        else:
             pre = (-1j)
+        else:
+            pre = 1j
 
         # normal green function evolution operator for deltaT
         if not self.greenOnly:
