@@ -128,7 +128,7 @@ class mpSystem:
         if not plotOnly:
             prepFolders(0, self.boolDMStore, (self.boolDMRedStore or self.boolDMRedDiagStore),
                         self.boolOccEnStore or self.boolOccEnDiag,
-                        self.boolEntanglementSpectrum, self.boolCleanFiles)
+                        self.boolEntanglementSpectrum, self.boolCleanFiles, self.dataFolder)
             # touch the progress file
             open(self.dataFolder + 'progress.log', 'w').close()
         # mask selects only not traced out states
@@ -1857,11 +1857,11 @@ class mpSystem:
         if self.boolPlotOffDiagOccSingles:
             self.plotOffDiagOccSingles()
         if self.boolClear:
-            prepFolders(True)  # clear out all the density matrix folders
+            prepFolders(True, folderpath=self.dataFolder)  # clear out all the density matrix folders
 
     @staticmethod
     def clearDensityData():
-        prepFolders(True)
+        prepFolders(True, folderpath=self.dataFolder)
 
 
 def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecbool=0, cleanbeforebool=0,
