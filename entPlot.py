@@ -51,7 +51,7 @@ def plotData(sysVar):
     plt.rcParams.update(params)
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
-    pp = PdfPages('./plots/plots.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'plots.pdf')
 
     if sysVar.boolOccupations:
         occfile = './data/occupation.dat'
@@ -888,15 +888,15 @@ def plotDensityMatrixAnimation(steps, delta_t, files, stepsize=1, red=0, framera
         return im
 
     ani = animation.FuncAnimation(fig, iterate, np.arange(files, stepsize))
-    # ani.save('./plots/density.gif', writer='imagemagick')
-    ani.save('./plots/' + rdstr + 'density.mp4', fps=framerate, extra_args=['-vcodec', 'libx264'], bitrate=-1)
+    # ani.save(sysVar.dataFolder + 'density.gif', writer='imagemagick')
+    ani.save(sysVar.dataFolder + rdstr + 'density.mp4', fps=framerate, extra_args=['-vcodec', 'libx264'], bitrate=-1)
     plt.close()
     print("done!")
 
 
 def plotHamiltonian():
     print("Plotting hamiltonian to pdf.", end='', flush=True)
-    pp = PdfPages('./plots/hamiltonian.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'hamiltonian.pdf')
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of hamiltonian')
     dabs = np.loadtxt('./data/hamiltonian.dat')
@@ -929,7 +929,7 @@ def plotHamiltonian():
 
 def plotOccs(sysVar):
     print("Plotting occupations to pdf.", end='', flush=True)
-    pp = PdfPages('./plots/occs.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'occs.pdf')
     params = {
         'mathtext.default': 'rm'  # see http://matplotlib.org/users/customizing.html
     }
@@ -983,7 +983,7 @@ def plotOffDiagOccSingles(sysVar):
     plt.rcParams.update(params)
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
-    pp = PdfPages('./plots/offdiagsingles.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'offdiagsingles.pdf')
 
     singlesdat = np.loadtxt('./data/offdiagsingle.dat')
     singlesinfo = np.loadtxt('./data/offdiagsingleinfo.dat')
@@ -1164,7 +1164,7 @@ def plotOffDiagOccSingles(sysVar):
 
 def plotTimescale(sysVar):
     print("Plotting difference to mean.", end='', flush=True)
-    pp = PdfPages('./plots/lndiff.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'lndiff.pdf')
     params = {
         'mathtext.default': 'rm'  # see http://matplotlib.org/users/customizing.html
     }
@@ -1245,7 +1245,7 @@ def plotTimescale(sysVar):
 
 def plotMatrix(fPath):
     fName = fPath.split('/')[-1:][0]
-    pp = PdfPages('./plots/' + fName[:-4] + '.pdf')
+    pp = PdfPages(sysVar.dataFolder + fName[:-4] + '.pdf')
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of matrix')
     dabs = np.loadtxt(fPath)
