@@ -54,30 +54,30 @@ def plotData(sysVar):
     pp = PdfPages(sysVar.dataFolder + 'plots.pdf')
 
     if sysVar.boolOccupations:
-        occfile = './data/occupation.dat'
+        occfile = sysVar.dataFolder + 'occupation.dat'
         occ_array = np.loadtxt(occfile)
 
-    normfile = './data/norm.dat'
+    normfile = sysVar.dataFolder + 'norm.dat'
     norm_array = np.loadtxt(normfile)
     # want deviation from 1
     norm_array[:, 1] = 1 - norm_array[:, 1]
 
     if sysVar.boolReducedEntropy:
-        entfile = './data/entropy.dat'
+        entfile = sysVar.dataFolder + 'entropy.dat'
         ent_array = np.loadtxt(entfile)
 
     if sysVar.boolPlotEngy:
-        engies = np.loadtxt('./data/hamiltonian_eigvals.dat')
+        engies = np.loadtxt(sysVar.dataFolder + 'hamiltonian_eigvals.dat')
 
     if sysVar.boolPlotDecomp:
-        stfacts = np.loadtxt('./data/state.dat')
+        stfacts = np.loadtxt(sysVar.dataFolder + 'state.dat')
 
     if sysVar.boolTotalEntropy:
-        totentfile = './data/total_entropy.dat'
+        totentfile = sysVar.dataFolder + 'total_entropy.dat'
         totent_array = np.loadtxt(totentfile)
 
     if sysVar.boolTotalEnergy:
-        energyfile = './data/total_energy.dat'
+        energyfile = sysVar.dataFolder + 'total_energy.dat'
         en_array = np.loadtxt(energyfile)
         en0 = en_array[0, 1]
         en_array[:, 1] -= en0
@@ -85,34 +85,34 @@ def plotData(sysVar):
         # print(' - |(E0 - Emicro)/E0|: %.0e - ' % (np.abs((en0 - engies[en_micind,1])/en0)), end='' )
 
     if sysVar.boolReducedEnergy:
-        redEnergyfile = './data/reduced_energy.dat'
+        redEnergyfile = sysVar.dataFolder + 'reduced_energy.dat'
         redEnergy = np.loadtxt(redEnergyfile)
 
     if sysVar.boolPlotOccEnDiag:
         occendiag = []
         occendiagweighted = []
         for i in range(sysVar.m):
-            occendiag.append(np.loadtxt('./data/occ_energybasis_diagonals_%i.dat' % i))
-            occendiagweighted.append(np.loadtxt('./data/occ_energybasis_diagonals_weighted_%i.dat' % i))
+            occendiag.append(np.loadtxt(sysVar.dataFolder + 'occ_energybasis_diagonals_%i.dat' % i))
+            occendiagweighted.append(np.loadtxt(sysVar.dataFolder + 'occ_energybasis_diagonals_weighted_%i.dat' % i))
 
     if sysVar.boolPlotOccEnDiagExp:
-        microexpfile = './data/occ_energybasis_diagonals_expectation.dat'
+        microexpfile = sysVar.dataFolder + 'occ_energybasis_diagonals_expectation.dat'
         microexp = np.loadtxt(microexpfile)
 
     if sysVar.boolPlotOffDiagOcc:
-        offdiagoccfile = './data/offdiagocc.dat'
+        offdiagoccfile = sysVar.dataFolder + 'offdiagocc.dat'
         offdiagocc = np.loadtxt(offdiagoccfile)
 
     if sysVar.boolPlotOffDiagDens:
-        offdiagdensfile = './data/offdiagdens.dat'
+        offdiagdensfile = sysVar.dataFolder + 'offdiagdens.dat'
         offdiagdens = np.loadtxt(offdiagdensfile)
 
     if sysVar.boolPlotOffDiagDensRed:
-        offdiagdensredfile = './data/offdiagdensred.dat'
+        offdiagdensredfile = sysVar.dataFolder + 'offdiagdensred.dat'
         offdiagdensred = np.loadtxt(offdiagdensredfile)
 
     if sysVar.boolPlotGreen:
-        greenfile = './data/' + [s for s in os.listdir('./data/') if 'green' in s][0]
+        greenfile = sysVar.dataFolder + [s for s in os.listdir(sysVar.dataFolder + '') if 'green' in s][0]
         greendat = np.loadtxt(greenfile)
 
     def complete_system_enttropy():
@@ -278,7 +278,7 @@ def plotData(sysVar):
             # ## Subsystems occupation numbers
 
         # store fluctuations in a data
-        fldat = open('./data/fluctuation.dat', 'w')
+        fldat = open(sysVar.dataFolder + 'fluctuation.dat', 'w')
         fldat.write('N_tot: %i\n' % (sysVar.N))
         tmp = np.zeros(len(step_array))
         for i in sysVar.kRed:
@@ -353,7 +353,7 @@ def plotData(sysVar):
             return 0
             # occupation number in levels against level index
 
-        occavg = np.loadtxt('./data/fluctuation.dat', usecols=(1,))
+        occavg = np.loadtxt(sysVar.dataFolder + 'fluctuation.dat', usecols=(1,))
         plt.xlim(-0.1, sysVar.m - 0.9)
         for l in range(sysVar.m):
             plt.errorbar(l, occavg[int(7 + 3 * l)] / sysVar.N, xerr=None, yerr=occavg[int(8 + 3 * l)] / sysVar.N,
@@ -610,8 +610,8 @@ def plotData(sysVar):
     if sysVar.boolPlotGreen:
 
         if False:
-            if not(os.path.isfile('./data/spectral_frequency_trace.dat') and
-                       os.path.isfile('./data/statistical_frequency_trace.dat')):
+            if not(os.path.isfile(sysVar.dataFolder + 'spectral_frequency_trace.dat') and
+                       os.path.isfile(sysVar.dataFolder + 'statistical_frequency_trace.dat')):
                 spectral_time = []
                 statistical_time = []
                 spectral_frequency = []
@@ -634,15 +634,15 @@ def plotData(sysVar):
                     spectral_frequency_trace[:, 1] = spectral_frequency_trace[:, 1] + spectral_frequency[i][:, 1]
                     statistical_frequency_trace[:, 1] = statistical_frequency_trace[:, 1] + statistical_frequency[i][:, 1]
 
-                np.savetxt('./data/spectral_frequency_trace.dat',
+                np.savetxt(sysVar.dataFolder + 'spectral_frequency_trace.dat',
                            np.column_stack((spectral_frequency_trace[:, 0].real, spectral_frequency_trace[:, 1].real,
                                             spectral_frequency_trace[:, 1].imag)))
-                np.savetxt('./data/statistical_frequency_trace.dat',
+                np.savetxt(sysVar.dataFolder + 'statistical_frequency_trace.dat',
                            np.column_stack((statistical_frequency_trace[:, 0].real, statistical_frequency_trace[:, 1].real,
                                             statistical_frequency_trace[:, 1].imag)))
             else:
-                spectral_frequency_trace_tmp = np.loadtxt('./data/spectral_frequency_trace.dat')
-                statistical_frequency_trace_tmp = np.loadtxt('./data/statistical_frequency_trace.dat')
+                spectral_frequency_trace_tmp = np.loadtxt(sysVar.dataFolder + 'spectral_frequency_trace.dat')
+                statistical_frequency_trace_tmp = np.loadtxt(sysVar.dataFolder + 'statistical_frequency_trace.dat')
                 spectral_frequency_trace = np.column_stack((
                     spectral_frequency_trace_tmp[:, 0],
                     (spectral_frequency_trace_tmp[:, 1] + 1j*spectral_frequency_trace_tmp[:, 2])
@@ -824,7 +824,7 @@ def plotData(sysVar):
     if sysVar.boolPlotSpectralDensity:
         ###
         plt.title('Density matrix spectral repres. abs')
-        dabs = np.loadtxt('./data/spectral/dm.dat')
+        dabs = np.loadtxt(sysVar.dataFolder + 'spectral/dm.dat')
         cmapVar = plt.cm.Reds
         cmapVar.set_under(color='black')
         plt.imshow(dabs, cmap=cmapVar, interpolation='none', vmin=1e-16)
@@ -899,7 +899,7 @@ def plotHamiltonian():
     pp = PdfPages(sysVar.dataFolder + 'hamiltonian.pdf')
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of hamiltonian')
-    dabs = np.loadtxt('./data/hamiltonian.dat')
+    dabs = np.loadtxt(sysVar.dataFolder + 'hamiltonian.dat')
     plt.xlabel('column')
     plt.ylabel('row')
     cmapVar = plt.cm.Reds
@@ -913,7 +913,7 @@ def plotHamiltonian():
     plt.clf()
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of time evolution matrix')
-    dabs = np.loadtxt('./data/evolutionmatrix.dat')
+    dabs = np.loadtxt(sysVar.dataFolder + 'evolutionmatrix.dat')
     plt.xlabel('column')
     plt.ylabel('row')
     cmapVar = plt.cm.Reds
@@ -940,7 +940,7 @@ def plotOccs(sysVar):
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     for i in range(sysVar.m):
         plt.title(r'$n_' + str(i) + '$')
-        dre = np.loadtxt('./data/occ_energybasis_%i_re.dat' % i)
+        dre = np.loadtxt(sysVar.dataFolder + 'occ_energybasis_%i_re.dat' % i)
         plt.xlabel('column')
         plt.ylabel('row')
         cmapVar = plt.cm.seismic
@@ -954,7 +954,7 @@ def plotOccs(sysVar):
     # now without diagonals and abs only
     for i in range(sysVar.m):
         plt.title(r'$n_' + str(i) + '$')
-        dre = np.loadtxt('./data/occ_energybasis_%i_re.dat' % i)
+        dre = np.loadtxt(sysVar.dataFolder + 'occ_energybasis_%i_re.dat' % i)
         np.fill_diagonal(dre, 0)
         plt.xlabel('column')
         plt.ylabel('row')
@@ -985,8 +985,8 @@ def plotOffDiagOccSingles(sysVar):
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
     pp = PdfPages(sysVar.dataFolder + 'offdiagsingles.pdf')
 
-    singlesdat = np.loadtxt('./data/offdiagsingle.dat')
-    singlesinfo = np.loadtxt('./data/offdiagsingleinfo.dat')
+    singlesdat = np.loadtxt(sysVar.dataFolder + 'offdiagsingle.dat')
+    singlesinfo = np.loadtxt(sysVar.dataFolder + 'offdiagsingleinfo.dat')
 
     dt = singlesdat[1, 0] - singlesdat[0, 0]
     nrm = singlesdat[:, 0] / dt
@@ -1087,12 +1087,12 @@ def plotOffDiagOccSingles(sysVar):
             plt.clf()
             plt.close()
         print('.', end='', flush=True)
-    diagdat = np.loadtxt('./data/diagsingles.dat')
+    diagdat = np.loadtxt(sysVar.dataFolder + 'diagsingles.dat')
 
-    if os.path.isfile('./data/energy.dat') and os.path.isfile('./data/hamiltonian_eigvals.dat'):
+    if os.path.isfile(sysVar.dataFolder + 'energy.dat') and os.path.isfile(sysVar.dataFolder + 'hamiltonian_eigvals.dat'):
         ### look for energy - this works because the energies are sorted
-        engy = np.loadtxt('./data/energy.dat')
-        eigengy = np.loadtxt('./data/hamiltonian_eigvals.dat')
+        engy = np.loadtxt(sysVar.dataFolder + 'energy.dat')
+        eigengy = np.loadtxt(sysVar.dataFolder + 'hamiltonian_eigvals.dat')
         diff = 0
         for l in range(sysVar.dim):
             if np.abs(eigengy[l, 1] - engy[0, 1]) > diff and l != 0:
@@ -1106,7 +1106,7 @@ def plotOffDiagOccSingles(sysVar):
             loran = eind - 15
 
     for i in range(sysVar.m):
-        if os.path.isfile('./data/energy.dat') and os.path.isfile('./data/hamiltonian_eigvals.dat'):
+        if os.path.isfile(sysVar.dataFolder + 'energy.dat') and os.path.isfile(sysVar.dataFolder + 'hamiltonian_eigvals.dat'):
             plt.title(r'Diagonal weighted elements of $n_{%i}$ in spectral decomp.' % (i))
             lo = np.int32(sysVar.dim * i)
             hi = np.int32(lo + sysVar.dim)
@@ -1124,8 +1124,8 @@ def plotOffDiagOccSingles(sysVar):
 
             pp.savefig()
             plt.clf()
-            if os.path.isfile('./data/occ' + str(i) + '_re.dat'):
-                occmat = np.loadtxt('./data/occ' + str(i) + '_re.dat')
+            if os.path.isfile(sysVar.dataFolder + 'occ' + str(i) + '_re.dat'):
+                occmat = np.loadtxt(sysVar.dataFolder + 'occ' + str(i) + '_re.dat')
                 diags = np.zeros(sysVar.dim)
 
                 ### large plot
@@ -1175,7 +1175,7 @@ def plotTimescale(sysVar):
 
     ### get the characteristic energy difference of the system
     if sysVar.boolEngyStore:
-        engys = np.loadtxt('./data/hamiltonian_eigvals.dat')
+        engys = np.loadtxt(sysVar.dataFolder + 'hamiltonian_eigvals.dat')
         enscale = np.abs(engys[0, 1] - engys[-1, 1]) / sysVar.dim
         del engys
 
@@ -1183,12 +1183,12 @@ def plotTimescale(sysVar):
     loavgind = int(loavgpercent * sysVar.dataPoints)  # index to start at when calculating average and stddev
     loavgtime = np.round(loavgpercent * (sysVar.deltaT * sysVar.steps * sysVar.plotTimeScale), 2)
 
-    occfile = './data/occupation.dat'
+    occfile = sysVar.dataFolder + 'occupation.dat'
     occ_array = np.loadtxt(occfile)
     # multiply step array with time scale
     step_array = occ_array[:, 0] * sysVar.plotTimeScale
 
-    entfile = './data/entropy.dat'
+    entfile = sysVar.dataFolder + 'entropy.dat'
     ent_array = np.loadtxt(entfile)
 
     occavg = []
