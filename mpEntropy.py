@@ -130,7 +130,7 @@ class mpSystem:
                         self.boolOccEnStore or self.boolOccEnDiag,
                         self.boolEntanglementSpectrum, self.boolCleanFiles)
             # touch the progress file
-            open('./data/progress.log', 'w').close()
+            open(self.dataFolder + 'progress.log', 'w').close()
         # mask selects only not traced out states
         self.mask = np.ones(self.m, dtype=bool)
         for k in self.kRed:
@@ -539,10 +539,10 @@ class mpSystem:
 
     def saveReducedHamiltonian(self):
         redham = self.reduceMatrix(self.hamiltonian.toarray())
-        save_npz("./data/reduced_hamiltonian.npz", coo_matrix(redham))
+        save_npz(self.dataFolder + "reduced_hamiltonian.npz", coo_matrix(redham))
         tmpvals, tmpvects = self.diagonalizeReducedMatrix(redham)
-        np.savetxt("./data/reduced_hamiltonian_eigenvalues.dat", tmpvals)
-        save_npz("./data/reduced_hamiltonian_eigenvectors.npz", tmpvects)
+        np.savetxt(self.dataFolder + "reduced_hamiltonian_eigenvalues.dat", tmpvals)
+        save_npz(self.dataFolder + "reduced_hamiltonian_eigenvectors.npz", tmpvects)
 
     def initAllHamiltonians(self):
         t0 = tm.time()
@@ -1304,7 +1304,7 @@ class mpSystem:
     def updateCorrelations(self):
         for ind in self.correlationsIndices:
             tmpop = self.operators[ind[0], ind[1]]
-            tmpnam = "./data/correl%i%i" % (ind[0], ind[1])
+            tmpnam = self.dataFolder + "correl%i%i" % (ind[0], ind[1])
             for i in range(1, int(len(ind) / 2)):
                 tmpop = tmpop.dot(self.operators[ind[i * 2], ind[i * 2 + 1]])
                 tmpnam += "%i%i" % (ind[i * 2], ind[i * 2 + 1])
@@ -1864,41 +1864,42 @@ class mpSystem:
         prepFolders(True)
 
 
-def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecbool=0, cleanbeforebool=0):
+def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecbool=0, cleanbeforebool=0,
+                folderpath="./data/"):
     # create the needed folders
     if cleanbeforebool:
-        if os.path.exists("./data/"):
-            for root, dirs, files in os.walk("./data/", topdown=False):
+        if os.path.exists(folderpath):
+            for root, dirs, files in os.walk(folderpath, topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
             print("Old data folder has been completely cleared")
-    if not os.path.exists("./data/"):
-        os.mkdir("./data/")
+    if not os.path.exists(folderpath):
+        os.mkdir(folderpath)
     if densbool:
-        if not os.path.exists("./data/density/"):
-            os.mkdir("./data/density/")
+        if not os.path.exists(folderpath + "density/"):
+            os.mkdir(folderpath + "density/")
     if reddensbool:
-        if not os.path.exists("./data/red_density/"):
-            os.mkdir("./data/red_density/")
+        if not os.path.exists(folderpath + "red_density/"):
+            os.mkdir(folderpath + "red_density/")
     if spectralbool:
-        if not os.path.exists("./data/spectral/"):
-            os.mkdir("./data/spectral/")
+        if not os.path.exists(folderpath + "spectral/"):
+            os.mkdir(folderpath + "spectral/")
     if entspecbool:
-        if not os.path.exists("./data/entanglement_spectrum/"):
-            os.mkdir("./data/entanglement_spectrum/")
+        if not os.path.exists(folderpath + "entanglement_spectrum/"):
+            os.mkdir(folderpath + "entanglement_spectrum/")
     if not os.path.exists("./plots/"):
         os.mkdir("./plots/")
     # remove the old stuff
     if clearbool:
-        if os.path.isfile("./data/density/densmat0.dat"):
+        if os.path.isfile(folderpath + "density/densmat0.dat"):
             for root, dirs, files in os.walk(self.dataFolder + 'density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
             print("Cleared density folder")
 
-        if os.path.isfile("./data/red_density/densmat0.dat"):
+        if os.path.isfile(folderpath + "red_density/densmat0.dat"):
             for root, dirs, files in os.walk(self.dataFolder + 'red_density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
