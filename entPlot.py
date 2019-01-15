@@ -51,7 +51,7 @@ def plotData(sysVar):
     plt.rcParams.update(params)
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
-    pp = PdfPages(sysVar.dataFolder + 'plots.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'plots/plots.pdf')
 
     if sysVar.boolOccupations:
         occfile = sysVar.dataFolder + 'occupation.dat'
@@ -112,7 +112,7 @@ def plotData(sysVar):
         offdiagdensred = np.loadtxt(offdiagdensredfile)
 
     if sysVar.boolPlotGreen:
-        greenfile = sysVar.dataFolder + [s for s in os.listdir(sysVar.dataFolder + '') if 'green' in s][0]
+        greenfile = sysVar.dataFolder + '' + [s for s in os.listdir(sysVar.dataFolder + '') if 'green' in s][0]
         greendat = np.loadtxt(greenfile)
 
     def complete_system_enttropy():
@@ -147,7 +147,7 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.', end='', flush=True)
-
+        exit()
         # Subsystem entropy with inlay
         max_time = step_array[-1]
         max_ind = int(max_time / step_array[-1] * len(step_array))
@@ -865,9 +865,9 @@ def plotDensityMatrixAnimation(steps, delta_t, files, stepsize=1, red=0, framera
         ax2.cla()
         ax3.cla()
         plt.suptitle('t = %(time).2f' % {'time': n * stor_step * delta_t * stepsize})
-        dabsfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + ".dat"
-        dimagfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + "_im.dat"
-        drealfile = "./data/" + rdstr + "density/densmat" + str(int(n)) + "_re.dat"
+        dabsfile = sysVar.dataFolder + rdstr + "density/densmat" + str(int(n)) + ".dat"
+        dimagfile = sysVar.dataFolder + rdstr + "density/densmat" + str(int(n)) + "_im.dat"
+        drealfile = sysVar.dataFolder + rdstr + "density/densmat" + str(int(n)) + "_re.dat"
         dabs = np.loadtxt(dabsfile)
         dimag = np.loadtxt(dimagfile)
         dreal = np.loadtxt(drealfile)
@@ -888,15 +888,15 @@ def plotDensityMatrixAnimation(steps, delta_t, files, stepsize=1, red=0, framera
         return im
 
     ani = animation.FuncAnimation(fig, iterate, np.arange(files, stepsize))
-    # ani.save(sysVar.dataFolder + 'density.gif', writer='imagemagick')
-    ani.save(sysVar.dataFolder + rdstr + 'density.mp4', fps=framerate, extra_args=['-vcodec', 'libx264'], bitrate=-1)
+    # ani.save(sysVar.dataFolder + 'plots/density.gif', writer='imagemagick')
+    ani.save(sysVar.dataFolder + 'plots/' + rdstr + 'density.mp4', fps=framerate, extra_args=['-vcodec', 'libx264'], bitrate=-1)
     plt.close()
     print("done!")
 
 
 def plotHamiltonian():
     print("Plotting hamiltonian to pdf.", end='', flush=True)
-    pp = PdfPages(sysVar.dataFolder + 'hamiltonian.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'plots/hamiltonian.pdf')
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of hamiltonian')
     dabs = np.loadtxt(sysVar.dataFolder + 'hamiltonian.dat')
@@ -929,7 +929,7 @@ def plotHamiltonian():
 
 def plotOccs(sysVar):
     print("Plotting occupations to pdf.", end='', flush=True)
-    pp = PdfPages(sysVar.dataFolder + 'occs.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'plots/occs.pdf')
     params = {
         'mathtext.default': 'rm'  # see http://matplotlib.org/users/customizing.html
     }
@@ -983,7 +983,7 @@ def plotOffDiagOccSingles(sysVar):
     plt.rcParams.update(params)
     plt.rc('text', usetex=True)
     plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Arial']})
-    pp = PdfPages(sysVar.dataFolder + 'offdiagsingles.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'plots/offdiagsingles.pdf')
 
     singlesdat = np.loadtxt(sysVar.dataFolder + 'offdiagsingle.dat')
     singlesinfo = np.loadtxt(sysVar.dataFolder + 'offdiagsingleinfo.dat')
@@ -1164,7 +1164,7 @@ def plotOffDiagOccSingles(sysVar):
 
 def plotTimescale(sysVar):
     print("Plotting difference to mean.", end='', flush=True)
-    pp = PdfPages(sysVar.dataFolder + 'lndiff.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'plots/lndiff.pdf')
     params = {
         'mathtext.default': 'rm'  # see http://matplotlib.org/users/customizing.html
     }
@@ -1245,7 +1245,7 @@ def plotTimescale(sysVar):
 
 def plotMatrix(fPath):
     fName = fPath.split('/')[-1:][0]
-    pp = PdfPages(sysVar.dataFolder + fName[:-4] + '.pdf')
+    pp = PdfPages(sysVar.dataFolder + 'plots/' + fName[:-4] + '.pdf')
     plt.figure(num=None, figsize=(10, 10), dpi=300)
     plt.title('absolute value of matrix')
     dabs = np.loadtxt(fPath)

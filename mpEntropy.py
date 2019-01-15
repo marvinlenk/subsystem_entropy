@@ -1889,8 +1889,8 @@ def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecb
     if entspecbool:
         if not os.path.exists(folderpath + "entanglement_spectrum/"):
             os.mkdir(folderpath + "entanglement_spectrum/")
-    if not os.path.exists("./plots/"):
-        os.mkdir("./plots/")
+    if not os.path.exists(folderpath + "plots/"):
+        os.mkdir(folderpath + "plots/")
     # remove the old stuff
     if clearbool:
         if os.path.isfile(folderpath + "density/densmat0.dat"):
