@@ -346,6 +346,8 @@ class mpSystem:
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolRetgreen = configParser.getboolean('filemanagement', 'retgreen')
         self.dataFolder = configParser.get('filemanagement', 'datafolder')
+        if not self.dataFolder[-1] == '/':
+            self.dataFolder = self.dataFolder + '/'
         # ## calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
         self.boolTotalEntropy = configParser.getboolean('calcparams', 'totalentropy')
