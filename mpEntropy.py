@@ -65,6 +65,7 @@ class mpSystem:
         self.boolDecompStore = False
         self.boolDiagExpStore = False
         self.boolRetgreen = False
+        self.dataFolder = ''
         # ## calculation-parameters
         self.boolOnlyRed = False
         self.boolTotalEntropy = False
@@ -344,6 +345,7 @@ class mpSystem:
         self.boolEngyStore = configParser.getboolean('filemanagement', 'energiesstore')
         self.boolDecompStore = configParser.getboolean('filemanagement', 'decompstore')
         self.boolRetgreen = configParser.getboolean('filemanagement', 'retgreen')
+        self.dataFolder = configParser.get('filemanagement', 'datafolder')
         # ## calculation-parameters
         self.boolOnlyRed = configParser.getboolean('calcparams', 'onlyreduced')
         self.boolTotalEntropy = configParser.getboolean('calcparams', 'totalentropy')
@@ -693,8 +695,8 @@ class mpSystem:
                 self.evolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.hamiltonian ** i) / factorial(i)
 
             if self.boolHamilStore:
-                storeMatrix(self.hamiltonian.toarray(), './data/hamiltonian.dat', 1)
-                storeMatrix(self.evolutionMatrix.toarray(), './data/evolutionmatrix.dat', 1)
+                storeMatrix(self.hamiltonian.toarray(), self.dataFolder + 'hamiltonian.dat', 1)
+                storeMatrix(self.evolutionMatrix.toarray(), self.dataFolder + 'evolutionmatrix.dat', 1)
 
             # for greenOnly, perform the WHOLE time evolution in one step (holy moly)
             # otherwise use the time step distance as prepared in __init__
@@ -1002,7 +1004,7 @@ class mpSystem:
             self.eigInvRed = la.inv(np.matrix(self.eigVectsRed.T))
             self.eigIndRed = True
             # TMP TMP TMP
-            tmpfil = open('./data/eigenvaluesRed.dat', 'w')
+            tmpfil = open(self.dataFolder + 'eigenvaluesRed.dat', 'w')
             for i in range(self.dimRed):
                 tmpfil.write("%i %.16e\n" % (i, self.eigValsRed[i]))
             tmpfil.close()
@@ -1032,7 +1034,7 @@ class mpSystem:
             t0 = tm.time()
 
             # decomposition in energy space       
-            tfil = open('./data/hamiltonian_eigvals.dat', 'w')
+            tfil = open(self.dataFolder + 'hamiltonian_eigvals.dat', 'w')
             if self.boolDecompStore:
                 tmpAbsSq = np.zeros(self.dim)
                 # generate all overlaps at once
@@ -1064,7 +1066,7 @@ class mpSystem:
             tfil.close()
 
             # decomposition in fock space
-            sfil = open('./data/state.dat', 'w')
+            sfil = open(self.dataFolder + 'state.dat', 'w')
             for i in range(self.dim):
                 tmpAbsSqFck = np.abs(self.state[i]) ** 2
                 if tmpAbsSqFck != 0:
@@ -1101,7 +1103,7 @@ class mpSystem:
 
             if self.boolDiagExpStore:
                 # diagonals in expectation value    
-                ethfil = open('./data/occ_energybasis_diagonals_expectation.dat', 'w')
+                ethfil = open(self.dataFolder + 'occ_energybasis_diagonals_expectation.dat', 'w')
                 for i in range(self.m):
                     tmpocc = np.dot(np.abs(self.enState) ** 2, self.offDiagOccMat[i].diagonal()).real
                     ethfil.write('%i %.16e \n' % (i, tmpocc))
@@ -1116,7 +1118,7 @@ class mpSystem:
             t0 = tm.time()
             for i in range(self.m):
                 # note that the off diag mat still contains the diagonals right now!
-                storeMatrix(self.offDiagOccMat[i], './data/occ_energybasis_%i.dat' % i, absOnly=0, stre=True,
+                storeMatrix(self.offDiagOccMat[i], self.dataFolder + 'occ_energybasis_%i.dat' % i, absOnly=0, stre=True,
                             stim=False,
                             stabs=False)
             print("Occupation number matrices stored in " + time_elapsed(t0, 60, 1))
@@ -1129,14 +1131,14 @@ class mpSystem:
             for i in range(self.m):
                 # note that the off diag mat still contains the diagonals right now!
                 # since the occupation numbers are real valued it is sufficient to only store the real part
-                np.savetxt('./data/occ_energybasis_diagonal_%i.dat' % i,
+                np.savetxt(self.dataFolder + 'occ_energybasis_diagonal_%i.dat' % i,
                            np.column_stack(
                                (
                                    np.arange(self.dim), self.eigVals, self.offDiagOccMat[i].diagonal().real
                                )
                            ), header=head)
                 # store the matrix elements weighted by the state decompisitopn factor abs()^2
-                np.savetxt('./data/occ_energybasis_diagonal_weighted_%i.dat' % i,
+                np.savetxt(self.dataFolder + 'occ_energybasis_diagonal_weighted_%i.dat' % i,
                            np.column_stack(
                                (
                                    np.arange(self.dim), self.eigVals,
@@ -1153,7 +1155,7 @@ class mpSystem:
 
         if self.occEnSingle and self.boolOffDiagOcc:
             t0 = tm.time()
-            infofile = open('./data/offdiagoccsinglesinfo.dat', 'w')
+            infofile = open(self.dataFolder + 'offdiagoccsinglesinfo.dat', 'w')
             if not (self.boolDiagExpStore or self.boolOffDiagOcc or self.boolDecompStore):
                 # generate all overlaps at once
                 # note that conj() is optional since the vectors can be chosen to be real
@@ -1350,7 +1352,7 @@ class mpSystem:
         bound = int(index_dist / 2)
 
         # open the green function file for writing
-        self.filGreen = open('./data/green_com%.2f.dat' % (offset_time + bound * dt), 'w')  # t, re, im
+        self.filGreen = open(self.dataFolder + 'green_com%.2f.dat' % (offset_time + bound * dt), 'w')  # t, re, im
         self.filGreen.write('#tau re>_1 im>_1 re<_1 im<_1... COM time is %f\n' % (offset_time + bound * dt))
 
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
@@ -1467,7 +1469,7 @@ class mpSystem:
         self.closeProgressFile()
 
         # open the green function file for writing
-        self.filGreen = open('./data/green_com%.2f.dat' % (int(self.steps * self.deltaT)), 'w')  # t, re, im
+        self.filGreen = open(self.dataFolder + 'green_com%.2f.dat' % (int(self.steps * self.deltaT)), 'w')  # t, re, im
         self.filGreen.write('#tau re> im> re< im<, COM time is %f\n' % (self.steps * self.deltaT))
 
         # if negative tau, set multiplication factor for file writing to -1
@@ -1711,14 +1713,14 @@ class mpSystem:
                 self.dmFileFactor = 1
                 if not self.boolOnlyRed:
                     if self.boolDMStore:
-                        storeMatrix(self.densityMatrix, './data/density/densitymatrix_t%u.dat' % self.evolTime)
+                        storeMatrix(self.densityMatrix, self.dataFolder + 'density/densitymatrix_t%u.dat' % self.evolTime)
                     if self.boolDMRedStore:
                         storeMatrix(self.densityMatrixRed,
-                                    './data/red_density/reduced_densitymatrix_t%u.dat' % self.evolTime)
+                                    self.dataFolder + 'red_density/reduced_densitymatrix_t%u.dat' % self.evolTime)
                     if self.boolDMRedDiagStore:
-                        np.savetxt('./data/red_density/reduced_densitymatrix_eigenvalues_t%u.dat' % self.evolTime,
+                        np.savetxt(self.dataFolder + 'red_density/reduced_densitymatrix_eigenvalues_t%u.dat' % self.evolTime,
                                    self.densityMatrixRedEigenvalues)
-                        save_npz('./data/red_density/reduced_densitymatrix_eigenstates_t%u.npz' % self.evolTime,
+                        save_npz(self.dataFolder + 'red_density/reduced_densitymatrix_eigenstates_t%u.npz' % self.evolTime,
                                  self.densityMatrixRedEigenvectors)
                     self.dmcount += 1
             else:
@@ -1748,7 +1750,7 @@ class mpSystem:
             # note that this is the only! time where the time scale is already included
             head = 'n_sys p(n_sys) /// Jt = $f' % (self.evolTime * self.plotTimeScale)
             sort_indices = self.entanglementSpectrumEnergy.argsort()
-            np.savetxt('./data/entanglement_spectrum/ent_spec_%.4f.dat' % (self.evolTime * self.plotTimeScale),
+            np.savetxt(self.dataFolder + 'entanglement_spectrum/ent_spec_%.4f.dat' % (self.evolTime * self.plotTimeScale),
                        np.column_stack((self.entanglementSpectrumEnergy[sort_indices],
                                         self.entanglementSpectrum[sort_indices])), header=head)
 
@@ -1767,31 +1769,31 @@ class mpSystem:
             self.filOffDiagDensRed.write('%.16e %.16e \n' % (self.evolTime, self.offDiagDensRed))
 
     def openProgressFile(self):
-        self.filProg = open('./data/progress.log', 'a')
+        self.filProg = open(self.dataFolder + 'progress.log', 'a')
 
     def closeProgressFile(self):
         self.filProg.close()
 
     def openFiles(self):
-        self.filNorm = open('./data/norm.dat', 'w')
+        self.filNorm = open(self.dataFolder + 'norm.dat', 'w')
         if self.boolReducedEntropy:
-            self.filEnt = open('./data/entropy.dat', 'w')
+            self.filEnt = open(self.dataFolder + 'entropy.dat', 'w')
         if self.boolOccupations:
-            self.filOcc = open('./data/occupation.dat', 'w')
+            self.filOcc = open(self.dataFolder + 'occupation.dat', 'w')
         if self.boolTotalEntropy:
-            self.filTotEnt = open('./data/total_entropy.dat', 'w')
+            self.filTotEnt = open(self.dataFolder + 'total_entropy.dat', 'w')
         if self.boolTotalEnergy:
-            self.filTotalEnergy = open('./data/total_energy.dat', 'w')
+            self.filTotalEnergy = open(self.dataFolder + 'total_energy.dat', 'w')
         if self.boolReducedEnergy:
-            self.filRedEnergy = open('./data/reduced_energy.dat', 'w')
+            self.filRedEnergy = open(self.dataFolder + 'reduced_energy.dat', 'w')
         if self.boolOffDiagOcc:
-            self.filOffDiagOcc = open('./data/offdiagocc.dat', 'w')
+            self.filOffDiagOcc = open(self.dataFolder + 'offdiagocc.dat', 'w')
             if self.occEnSingle:
-                self.filOffDiagOccSingles = open('./data/offdiagoccsingle.dat', 'w')
+                self.filOffDiagOccSingles = open(self.dataFolder + 'offdiagoccsingle.dat', 'w')
         if self.boolOffDiagDens:
-            self.filOffDiagDens = open('./data/offdiagdens.dat', 'w')
+            self.filOffDiagDens = open(self.dataFolder + 'offdiagdens.dat', 'w')
         if self.boolOffDiagDensRed:
-            self.filOffDiagDensRed = open('./data/offdiagdensred.dat', 'w')
+            self.filOffDiagDensRed = open(self.dataFolder + 'offdiagdensred.dat', 'w')
 
     # close all files
     def closeFiles(self):
@@ -1889,13 +1891,13 @@ def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecb
     # remove the old stuff
     if clearbool:
         if os.path.isfile("./data/density/densmat0.dat"):
-            for root, dirs, files in os.walk('./data/density/', topdown=False):
+            for root, dirs, files in os.walk(self.dataFolder + 'density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
             print("Cleared density folder")
 
         if os.path.isfile("./data/red_density/densmat0.dat"):
-            for root, dirs, files in os.walk('./data/red_density/', topdown=False):
+            for root, dirs, files in os.walk(self.dataFolder + 'red_density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
             print("Cleared reduced density folder")

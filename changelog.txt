@@ -1,5 +1,8 @@
 change log
 
+### 15.01.2018
+- added data folder option to configfile
+
 ### 26.12.2018
 - changed default in greater evolution matrix to be conj=False and switched cases in exponent sign choice
 - negative tau option for evaluateGreenOnly should now work
