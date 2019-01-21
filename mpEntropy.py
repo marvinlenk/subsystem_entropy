@@ -24,6 +24,7 @@ import entPlot as ep
 class mpSystem:
     # N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
     def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False, greenOnly=False):
+        t0 = tm.time()
         self.confFile = cFile
         self.greenOnly = greenOnly
 
@@ -176,8 +177,8 @@ class mpSystem:
             self.dmcount = 0  # needed for numbering of density matrix files
             self.dmFileFactor = 0  # counting value for density matrix storage
             # ##### variables for the partial trace algorithm
-            self.mRed = self.m - len(self.kRed)
-            self.mRedComp = len(self.kRed)
+            self.mRed = self.m - len(self.kRed)  # the number of leftover levels
+            self.mRedComp = len(self.kRed)   # the number of traced out levels
             self.entropyRed = 0
 
             # ##### energy eigenbasis stuff
@@ -288,6 +289,10 @@ class mpSystem:
                     # the raising operator transposed is the lowering op. of the higher dimension space
                     self.greenGreaterCreation.append(getGreaterCreation(self, i))
 
+        self.openProgressFile()
+        self.filProg.write('Initialized the class in ' + time_elapsed(t0, 60, 0) + '\n')
+        self.closeProgressFile()
+        print('Initialized the class in ' + time_elapsed(t0, 60, 0) + '\n')
     # end of init
 
     ###### reading from config file
@@ -443,21 +448,37 @@ class mpSystem:
     # end of updateDensityMatrix
 
     def initIteratorRed(self):
+        # temporary basis vector occupation number containers
         el1 = np.zeros(self.m, dtype=np.int)
         el2 = np.zeros(self.m, dtype=np.int)
+        # calculate the number of entries - it is always the upper triangle including the diagonal of the N-i particle
+        # subspace multiplied with the dimension of the i particle complementary subspace
+        entries = 0
+        for i in range((self.N + 1)):
+            dimred = dimOfBasis(self.N - i, self.mRed)
+            entries += np.int32((dimred ** 2 + dimred) / 2 * dimOfBasis(i, self.mRedComp))
+
+        self.iteratorRed = np.zeros((entries, 4), np.int32)
+        counter = 0
+        # building up the block diagonal reduced matrix with the largest block first, N particles in sub-system
         for i in reversed(range(self.N + 1)):
+            # go through all reduced basis vectors with i particles in it (note: offsetsRed is ascending)
+            # reminder: offsetsRed is necesarrily always 0 for index N and dimRed on index N+1
+            # j this is the row of the reduced matrix
             for j in range(self.offsetsRed[i], self.offsetsRed[i - 1]):
+                # now go through all upper triangle (incl. diagonal) elements
+                # partial trace algorithm is symmetric, regardless of matrix
                 for jj in range(j, self.offsetsRed[i - 1]):
                     for k in range(self.offsetsRedComp[self.N - i], self.offsetsRedComp[self.N - i - 1]):
                         el1[self.mask] = self.basisRed[j]
                         el1[~self.mask] = self.basisRedComp[k]
                         el2[self.mask] = self.basisRed[jj]
                         el2[~self.mask] = self.basisRedComp[k]
-                        self.iteratorRed = np.append(self.iteratorRed,
-                                                     [[j, jj, self.basisDict[tuple(el1)], self.basisDict[tuple(el2)]]],
-                                                     axis=0)
+                        self.iteratorRed[counter] = np.array(
+                            [j, jj, self.basisDict[tuple(el1)], self.basisDict[tuple(el2)]])
+                        counter += 1
 
-    # end of initTest
+    # end of initIteratorRed
 
     # noinspection PyTypeChecker
     def reduceDensityMatrix(self):
@@ -500,7 +521,7 @@ class mpSystem:
     # end of reduceDensityMatrixFromState
 
     def reduceMatrix(self, matrx):
-        tmpret = np.zeros((self.dimRed, self.dimRed))
+        tmpret = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
         if self.m == 2 and self.mRed == 1:
             for i in range(self.dimRed):
                 tmpret[i, i] = matrx[i]
@@ -2062,101 +2083,72 @@ def quadraticArrayGreenGreater(sysVar):
     return retArr
 
 
-# quadratic term in 2nd quantization for transition from m to l -> fills zero initialized matrix
+# quadratic term in 2nd quantization for transition from m to l
 # matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
 def getQuadratic(sysVar, l, m):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
+    entries = sysVar.dim - dimOfBasis(sysVar.N, sysVar.m-1)
+    data = np.zeros(entries, dtype=np.float64)
+    row = np.zeros(entries, dtype=np.float64)
+    col = np.zeros(entries, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
+    counter = 0
     for el in sysVar.basis:
         if el[m] != 0:
             tmp = el.copy()
             tmp[m] -= 1
             tmp[l] += 1
-            row = np.append(row, sysVar.basisDict[tuple(tmp)])
-            col = np.append(col, sysVar.basisDict[tuple(el)])
-            data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+            row[counter] = sysVar.basisDict[tuple(tmp)]
+            col[counter] = sysVar.basisDict[tuple(el)]
+            data[counter] = np.float64(sqrt(el[m]) * sqrt(tmp[l]))
+            counter += 1
 
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.dim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
 
-# quadratic term in 2nd quantization for transition from m to l -> fills zero initialized matrix
+# quadratic term in 2nd quantization for transition from m to l
 # matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
 def getQuadraticRed(sysVar, l, m):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
+    entries = sysVar.dimRed - dimOfBasis(sysVar.N, sysVar.mRed - 1)
+    data = np.zeros(entries, dtype=np.float64)
+    row = np.zeros(entries, dtype=np.float64)
+    col = np.zeros(entries, dtype=np.float64)
     tmp = np.zeros(sysVar.mRed, dtype=np.int)
+    counter = 0
     for el in sysVar.basisRed:
         if el[m] != 0:
             tmp = el.copy()
             tmp[m] -= 1
             tmp[l] += 1
-            row = np.append(row, sysVar.basisDictRed[tuple(tmp)])
-            col = np.append(col, sysVar.basisDictRed[tuple(el)])
-            data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+            row[counter] = sysVar.basisDictRed[tuple(tmp)]
+            col[counter] = sysVar.basisDictRed[tuple(el)]
+            data[counter] = np.float64(sqrt(el[m]) * sqrt(tmp[l]))
+            counter += 1
 
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.dimRed, sysVar.dimRed), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 
 
-# quadratic term in 2nd quantization for creation in l -> fills zero initialized matrix
-# matrix for a_l^d (r=row, c=column) is M[r][c] = SQRT(basis[r][l])
-def getCreatorRed(sysVar, l):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros(sysVar.mRed, dtype=np.int)
-    for el in sysVar.basisRed:
-        if sum(el) != sysVar.N:
-            tmp = el.copy()
-            tmp[l] += 1
-            row = np.append(row, sysVar.basisDictRed[tuple(tmp)])
-            col = np.append(col, sysVar.basisDictRed[tuple(el)])
-            data = np.append(data, np.float64(sqrt(tmp[l])))
-
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dimRed, sysVar.dimRed), dtype=np.float64).tocsr()
-    del row, col, data, tmp
-    return retmat
-
-
-# quadratic term in 2nd quantization for creation in l -> fills zero initialized matrix
-# matrix for a_l^d (r=row, c=column) is M[r][c] = SQRT(basis[r][l])
-def getDestructorRed(sysVar, l):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros(sysVar.mRed, dtype=np.int)
-    for el in sysVar.basisRed:
-        if sum(el) != 0 and el[l] > 0:
-            tmp = el.copy()
-            tmp[l] -= 1
-            row = np.append(row, sysVar.basisDictRed[tuple(tmp)])
-            col = np.append(col, sysVar.basisDictRed[tuple(el)])
-            data = np.append(data, np.float64(sqrt(tmp[l])))
-
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dimRed, sysVar.dimRed), dtype=np.float64).tocsr()
-    del row, col, data, tmp
-    return retmat
-
-
+# quadratic term in 2nd quantization for transition from m to l for system with one particle removed
+# matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
 def getQuadraticGreenLesser(sysVar, l, m):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
+    entries = sysVar.greenLesserDim - dimOfBasis(sysVar.N-1, sysVar.m - 1)
+    data = np.zeros(entries, dtype=np.float64)
+    row = np.zeros(entries, dtype=np.float64)
+    col = np.zeros(entries, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
+    counter = 0
     for el in sysVar.greenLesserBasis:
         if el[m] != 0:
             tmp = el.copy()
             tmp[m] -= 1
             tmp[l] += 1
-            row = np.append(row, sysVar.greenLesserBasisDict[tuple(tmp)])
-            col = np.append(col, sysVar.greenLesserBasisDict[tuple(el)])
-            data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+            row[counter] = sysVar.greenLesserBasisDict[tuple(tmp)]
+            col[counter] = sysVar.greenLesserBasisDict[tuple(el)]
+            data[counter] = np.float64(sqrt(el[m]) * sqrt(tmp[l]))
+            counter += 1
 
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenLesserDim, sysVar.greenLesserDim),
                         dtype=np.float64).tocsr()
@@ -2164,19 +2156,24 @@ def getQuadraticGreenLesser(sysVar, l, m):
     return retmat
 
 
+# quadratic term in 2nd quantization for transition from m to l for system with one particle added
+# matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
 def getQuadraticGreenGreater(sysVar, l, m):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
+    entries = sysVar.greenGreaterDim - dimOfBasis(sysVar.N + 1, sysVar.m - 1)
+    data = np.zeros(entries, dtype=np.float64)
+    row = np.zeros(entries, dtype=np.float64)
+    col = np.zeros(entries, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
+    counter = 0
     for el in sysVar.greenGreaterBasis:
         if el[m] != 0:
             tmp = el.copy()
             tmp[m] -= 1
             tmp[l] += 1
-            row = np.append(row, sysVar.greenGreaterBasisDict[tuple(tmp)])
-            col = np.append(col, sysVar.greenGreaterBasisDict[tuple(el)])
-            data = np.append(data, np.float64(sqrt(el[m]) * sqrt(tmp[l])))
+            row[counter] = sysVar.greenGreaterBasisDict[tuple(tmp)]
+            col[counter] = sysVar.greenGreaterBasisDict[tuple(el)]
+            data[counter] = np.float64(sqrt(el[m]) * sqrt(tmp[l]))
+            counter += 1
 
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenGreaterDim, sysVar.greenGreaterDim),
                         dtype=np.float64).tocsr()
@@ -2236,17 +2233,20 @@ def getQuarticGreen(quadops, k, l, m, n):
 # destruction operator (N -> N-1)
 # adjoint of this is creation on N-1
 def getLesserAnnihilation(sysVar, l):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
+    entries = sysVar.dim - dimOfBasis(sysVar.N, sysVar.m - 1)
+    data = np.zeros(entries, dtype=np.float64)
+    row = np.zeros(entries, dtype=np.float64)
+    col = np.zeros(entries, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
+    counter = 0
     for el in sysVar.basis:
         if el[l] != 0:
             tmp = el.copy()
             tmp[l] -= 1
-            row = np.append(row, sysVar.greenLesserBasisDict[tuple(tmp)])
-            col = np.append(col, sysVar.basisDict[tuple(el)])
-            data = np.append(data, np.sqrt(el[l], dtype=np.float64))
+            row[counter] = sysVar.greenLesserBasisDict[tuple(tmp)]
+            col[counter] = sysVar.basisDict[tuple(el)]
+            data[counter] = np.sqrt(el[l], dtype=np.float64)
+            counter += 1
 
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenLesserDim, sysVar.dim), dtype=np.float64).tocsr()
     del row, col, data, tmp
@@ -2256,55 +2256,21 @@ def getLesserAnnihilation(sysVar, l):
 # creation operator (N -> N+1)
 # adjoint of this is annihilation on N+1
 def getGreaterCreation(sysVar, l):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
+    entries = sysVar.dim
+    data = np.zeros(entries, dtype=np.float64)
+    row = np.zeros(entries, dtype=np.float64)
+    col = np.zeros(entries, dtype=np.float64)
     tmp = np.zeros(sysVar.m, dtype=np.int)
+    counter = 0
     for el in sysVar.basis:
         tmp = el.copy()
         tmp[l] += 1
-        row = np.append(row, sysVar.greenGreaterBasisDict[tuple(tmp)])
-        col = np.append(col, sysVar.basisDict[tuple(el)])
-        data = np.append(data, np.sqrt(tmp[l], dtype=np.float64))
+        row[counter] = sysVar.greenGreaterBasisDict[tuple(tmp)]
+        col[counter] = sysVar.basisDict[tuple(el)]
+        data[counter] = np.sqrt(tmp[l], dtype=np.float64)
+        counter += 1
 
     retmat = coo_matrix((data, (row, col)), shape=(sysVar.greenGreaterDim, sysVar.dim), dtype=np.float64).tocsr()
-    del row, col, data, tmp
-    return retmat
-
-
-# annihilation operator on N+1
-def getGreaterCreationAdj(sysVar, l):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros(sysVar.m, dtype=np.int)
-    for el in sysVar.greenGreaterBasis:
-        if el[l] != 0:
-            tmp = el.copy()
-            tmp[l] -= 1
-            col = np.append(col, sysVar.greenGreaterBasisDict[tuple(el)])
-            row = np.append(row, sysVar.basisDict[tuple(tmp)])
-            data = np.append(data, np.float64(sqrt(el[l])))
-
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.greenGreaterDim), dtype=np.float64).tocsr()
-    del row, col, data, tmp
-    return retmat
-
-
-# inverse of creation operator (have to multiply from left...)
-def getGreaterCreationInv(sysVar, l):
-    data = np.zeros(0, dtype=np.float64)
-    row = np.zeros(0, dtype=np.float64)
-    col = np.zeros(0, dtype=np.float64)
-    tmp = np.zeros(sysVar.m, dtype=np.int)
-    for el in sysVar.basis:
-        tmp = el.copy()
-        tmp[l] += 1
-        col = np.append(col, sysVar.greenGreaterBasisDict[tuple(tmp)])
-        row = np.append(row, sysVar.basisDict[tuple(el)])
-        data = np.append(data, np.float64(1 / sqrt(tmp[l])))
-
-    retmat = coo_matrix((data, (row, col)), shape=(sysVar.dim, sysVar.greenGreaterDim), dtype=np.float64).tocsr()
     del row, col, data, tmp
     return retmat
 

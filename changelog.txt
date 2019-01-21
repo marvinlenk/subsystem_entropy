@@ -1,6 +1,19 @@
 change log
 
-### 15.01.2018
+### 21.01.2019
+- corrected date of last changelog entry
+- speedup of initialize via change of getQuadratic
+    -> changed from appending to initializing with the right size straight away
+- removed getCreatorRed and getDestructorRed, they were obsolete and unusable
+- removed getGreaterCreationAdj
+- removed getGreaterCreationInv
+- changed reduce matrix to output dtype=self.datType matrix
+- speedup of initIteratorRed
+    -> changed from appending to initializing with the right size straight away
+- with that automatically fixed bug that initializing the iterator twice would just append it
+- added initialization time to stdout and progress out
+
+### 15.01.2010
 - added data folder option to configfile
 - added check if folder name ends on '/', will be appended if necessary
 
