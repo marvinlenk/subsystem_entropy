@@ -1,5 +1,8 @@
 change log
 
+### 22.01.2019
+- fixed bug where density matrix was not created when only calculating total entropy
+
 ### 21.01.2019
 - corrected date of last changelog entry
 - speedup of initialize via change of getQuadratic

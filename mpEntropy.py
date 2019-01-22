@@ -1614,7 +1614,8 @@ class mpSystem:
                 self.reduceDensityMatrix()
             if self.boolDMRedDiagStore:
                 self.diagonalizeReducedDensityMatrix()
-        elif self.boolDMStore and (self.dmFileFactor == self.dmFilesSkipFactor or self.dmFileFactor == 0):
+        elif self.boolDMStore and (self.dmFileFactor == self.dmFilesSkipFactor or self.dmFileFactor == 0) or \
+                self.boolTotalEntropy:
             self.updateDensityMatrix()
 
         if self.boolOccupations:
