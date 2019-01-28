@@ -443,7 +443,7 @@ class mpSystem:
             self.densityMatrix = np.zeros((self.dim, self.dim), dtype=self.datType)
             self.densityMatrixInd = True
 
-        self.densityMatrix = np.outer(self.state, self.state.conj())
+        np.outer(self.state, self.state.conj(), self.densityMatrix)
 
     # end of updateDensityMatrix
 
@@ -1472,7 +1472,7 @@ class mpSystem:
         self.openProgressFile()
 
         # first do the time evolution - negative tau does not affect this, state is evolved to COM time
-        self.state = self.evolutionMatrix.dot(self.state)
+        self.evolutionMatrix.dot(self.state, out=self.state)
         print("1 - Norm: %.16f \n" % (1.0 - la.norm(self.state)))
         self.filProg.write("1 - Norm: %.16f \n" % (1.0 - la.norm(self.state)))
         self.normalize()
@@ -1501,15 +1501,24 @@ class mpSystem:
         else:
             tausign = 1
 
+        # initialize the temporary state vectors
+        tmpGreaterState_array = np.zeros((self.m, self.dim), dtype=self.datType)
+        tmpLesserState_array = np.zeros((self.m, self.dim), dtype=self.datType)
+
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
         self.filGreen.write('%.16e ' % 0)
-        tmpGreaterState = self.greenGreaterCreation[0].T.dot(self.greenGreaterCreation[0].dot(self.state))
-        tmpLesserState = self.greenLesserAnnihilation[0].T.dot(self.greenLesserAnnihilation[0].dot(self.state))
+        tmpGreaterState_array[0] = self.greenGreaterCreation[0].T.dot(
+            self.greenGreaterCreation[0].dot(self.state))
+        tmpLesserState_array[0] = self.greenLesserAnnihilation[0].T.dot(
+            self.greenLesserAnnihilation[0].dot(self.state))
         for m in range(1, self.m):
-            tmpGreaterState += self.greenGreaterCreation[m].T.dot(self.greenGreaterCreation[m].dot(self.state))
-            tmpLesserState += self.greenLesserAnnihilation[m].T.dot(self.greenLesserAnnihilation[m].dot(self.state))
-        tmpGreenGreater = vdot(self.state, tmpGreaterState)
-        tmpGreenLesser = vdot(self.state, tmpLesserState)
+            tmpGreaterState_array[m] = self.greenGreaterCreation[m].T.dot(
+                self.greenGreaterCreation[m].dot(self.state))
+            tmpLesserState_array[m] = self.greenLesserAnnihilation[m].T.dot(
+                self.greenLesserAnnihilation[m].dot(self.state))
+        # sum over axis no. 0 gives the sum of the individual vectors
+        tmpGreenGreater = vdot(self.state, tmpGreaterState_array.sum(axis=0))
+        tmpGreenLesser = vdot(self.state, tmpLesserState_array.sum(axis=0))
         # note that the both Green functions are multiplied by -i, which is included in the writing below!
         # first number is real part, second imaginary
         # there is an overall minus sign!
@@ -1524,41 +1533,37 @@ class mpSystem:
         bound_permil = 1000.0 / self.greensteps  # use per 1000 to get easier condition for 1% and 10%
         for i in range(1, self.greensteps + 1):
             # raise the green evolution operator a deltaTau more
-            tmpGreaterEvol = tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix)
-            tmpLesserEvol = tmpLesserEvol.dot(self.greenLesserEvolutionMatrix)
+            tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix, out=tmpGreaterEvol)
+            tmpLesserEvol.dot(self.greenLesserEvolutionMatrix, out=tmpLesserEvol)
             # evolve the state in time
-            self.state = self.evolutionMatrix.dot(self.state)
+            self.evolutionMatrix.dot(self.state, out=self.state)
             self.normalize()
             # evolve the tmp state backwards in time
-            tmpState = tmpEvolutionMatrix.dot(tmpState)
+            tmpEvolutionMatrix.dot(tmpState, out=tmpState)
             tmpState /= la.norm(tmpState)
 
             # the dots only work via contraction with a state vector!
-            tmpGreaterState = \
-                self.greenGreaterCreation[0].T.dot(
-                    tmpGreaterEvol.dot(
-                        self.greenGreaterCreation[0].dot(
-                            self.state)))
-            tmpLesserState = \
-                self.greenLesserAnnihilation[0].T.dot(
-                    tmpLesserEvol.dot(
-                        self.greenLesserAnnihilation[0].dot(
-                            tmpState)))
+            tmpGreaterState_array[0] = self.greenGreaterCreation[0].T.dot(
+                tmpGreaterEvol.dot(
+                    self.greenGreaterCreation[0].dot(
+                        self.state)))
+            tmpLesserState_array[0] = self.greenLesserAnnihilation[0].T.dot(
+                tmpLesserEvol.dot(
+                    self.greenLesserAnnihilation[0].dot(
+                        tmpState)))
 
             for m in range(1, self.m):
-                tmpGreaterState += \
-                    self.greenGreaterCreation[m].T.dot(
-                        tmpGreaterEvol.dot(
-                            self.greenGreaterCreation[m].dot(
-                                self.state)))
-                tmpLesserState += \
-                    self.greenLesserAnnihilation[m].T.dot(
-                        tmpLesserEvol.dot(
-                            self.greenLesserAnnihilation[m].dot(
-                                tmpState)))
+                tmpGreaterState_array[m] = self.greenGreaterCreation[m].T.dot(
+                    tmpGreaterEvol.dot(
+                        self.greenGreaterCreation[m].dot(
+                            self.state)))
+                tmpLesserState_array[m] = self.greenLesserAnnihilation[m].T.dot(
+                    tmpLesserEvol.dot(
+                        self.greenLesserAnnihilation[m].dot(
+                            tmpState)))
 
-            tmpGreenGreater = vdot(tmpState, tmpGreaterState)
-            tmpGreenLesser = vdot(self.state, tmpLesserState)
+            tmpGreenGreater = vdot(tmpState, tmpGreaterState_array.sum(axis=0))
+            tmpGreenLesser = vdot(self.state, tmpLesserState_array.sum(axis=0))
             self.filGreen.write('%.16e ' % (self.deltaTaugreen * i * tausign))
 
             # note that the greater Green function is multiplied by -i, which is included in the writing below!
@@ -1638,7 +1643,7 @@ class mpSystem:
             self.updateCorrelations()  # note that the file writing is included!
 
     def timeStep(self):
-        self.state = self.evolutionMatrix.dot(self.state)
+        self.evolutionMatrix.dot(self.state, out=self.state)
 
     # end of timeStep
 

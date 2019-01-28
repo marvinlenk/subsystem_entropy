@@ -1,5 +1,12 @@
 change log
 
+### 28.01.2019
+- changed timeEvolution to use np.dot with output being the state vector itself (possible speedup)
+- changed updateDensityMatrix to use np.outer with output (definite speedup)
+- changed all occurences of the NUMPY dot product in evaluateGreenOnly to write to a specific output, not possible for
+    sparse matrices
+
+
 ### 22.01.2019
 - fixed bug where density matrix was not created when only calculating total entropy
 
