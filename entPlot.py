@@ -147,7 +147,7 @@ def plotData(sysVar):
         pp.savefig()
         plt.clf()
         print('.', end='', flush=True)
-        exit()
+
         # Subsystem entropy with inlay
         max_time = step_array[-1]
         max_ind = int(max_time / step_array[-1] * len(step_array))

@@ -1,11 +1,16 @@
 change log
 
+### 29.01.2019
+- removed exit() on line 150 from entPlot.py
+- prepared density matrix & state (unprotected) and reduced density matrix (protected) for multiprocessing
+- added multiprocessing as standard for reduced density matrix calculation, left old for performance checking
+
 ### 28.01.2019
 - changed timeEvolution to use np.dot with output being the state vector itself (possible speedup)
 - changed updateDensityMatrix to use np.outer with output (definite speedup)
 - changed all occurences of the NUMPY dot product in evaluateGreenOnly to write to a specific output, not possible for
     sparse matrices
-
+- speedup by conjugating state once for reduceDensityMatrixFromState
 
 ### 22.01.2019
 - fixed bug where density matrix was not created when only calculating total entropy

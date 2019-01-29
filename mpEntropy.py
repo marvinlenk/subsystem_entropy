@@ -15,6 +15,9 @@ from scipy.sparse import identity as spidentity
 from scipy.special import binom
 from scipy.special import erf
 from scipy.special.basic import factorial
+from multiprocessing import Pool
+from multiprocessing import Array as mpArray
+from multiprocessing import RawArray as mpRawArray
 
 import entPlot as ep
 
@@ -23,10 +26,26 @@ import entPlot as ep
 # noinspection PyTypeChecker
 class mpSystem:
     # N = total particle number, m = number of states in total, redStates = array of state indices to be traced out
-    def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False, greenOnly=False):
+    def __init__(self, cFile="default.ini", dtType=np.complex128, plotOnly=False, greenOnly=False, cores=False):
         t0 = tm.time()
         self.confFile = cFile
         self.greenOnly = greenOnly
+
+        if cores:
+            self.cores = cores
+        else:
+            mkl_nt = os.environ.get('MKL_NUM_THREADS')
+            omp_nt = os.environ.get('OMP_NUM_THREADS')
+            nexp_nt = os.environ.get('NUMEXPR_NUM_THREADS')
+            # it will first look for mkl if available
+            if mkl_nt is None and mkl_nt is None and nexp_nt is None:
+                self.cores = os.cpu_count()
+            elif mkl_nt is not None:
+                self.cores = int(mkl_nt)
+            elif omp_nt is not None:
+                self.cores = int(omp_nt)
+            else:
+                self.cores = int(nexp_nt)
 
         # here comes a ridiculously long list of variables which are initialized before loading the config
         self.N = 0
@@ -144,15 +163,21 @@ class mpSystem:
             self.basis = np.zeros((self.dim, self.m), dtype=np.int)
             fillBasis(self.basis, self.N, self.m)
             self.basisDict = basis2dict(self.basis, self.dim)
-            # note that there is an additional dimension there! needed for fast multiplication algorithm
-            self.state = np.zeros(self.dim, dtype=self.datType)
+            self.state_mpRawArray = mpRawArray('d', self.dim * 2)
+            self.state = np.frombuffer(self.state_mpRawArray, dtype=self.datType).reshape((self.dim,))
+            np.copyto(self.state, np.zeros(self.dim, dtype=self.datType))
+            self.stateConj_mpRawArray = mpRawArray('d', self.dim * 2)
+            self.stateConj = np.frombuffer(self.stateConj_mpRawArray, dtype=self.datType).reshape((self.dim,))
+            np.copyto(self.stateConj, np.zeros(self.dim, dtype=self.datType))
             # parameter for storing in file
             self.stateNorm = 0
             self.stateNormAbs = 0
             self.stateNormCheck = 1e1  # check if norm has been supressed too much
             # do not initialize yet - wait until hamiltonian decomposition has been done for memory efficiency
+            self.densityMatrix_mpRawArray = mpRawArray('d', 0)
             self.densityMatrix = np.array([])
             self.densityMatrixInd = False
+            self.multiprocDic = {}  # needed for multiprocessing
             self.entropy = 0
             self.totalEnergy = 0
             if self.boolReducedEnergy:
@@ -178,7 +203,7 @@ class mpSystem:
             self.dmFileFactor = 0  # counting value for density matrix storage
             # ##### variables for the partial trace algorithm
             self.mRed = self.m - len(self.kRed)  # the number of leftover levels
-            self.mRedComp = len(self.kRed)   # the number of traced out levels
+            self.mRedComp = len(self.kRed)  # the number of traced out levels
             self.entropyRed = 0
 
             # ##### energy eigenbasis stuff
@@ -188,7 +213,7 @@ class mpSystem:
             if self.boolOffDiagOcc:
                 self.offDiagOcc = np.zeros(self.m, dtype=self.datType)
                 if self.occEnSingle > 0:
-                    self.occEnInds = np.zeros((self.m, 2, self.occEnSingle), dtype=np.int16)
+                    self.occEnInds = np.zeros((self.m, 2, self.occEnSingle), dtype=np.uint16)
                     self.offDiagOccSingles = np.zeros((self.m, self.occEnSingle), dtype=self.datType)
 
             if self.boolOffDiagDens:
@@ -220,8 +245,17 @@ class mpSystem:
                 if self.mRed == 1:
                     self.densityMatrixRed = np.zeros((self.dimRed,), dtype=self.datType)
                 else:
-                    self.densityMatrixRed = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
-                self.iteratorRed = np.zeros((0, 4), dtype=np.int32)
+                    # if more than one level left, use multiprocessing
+                    if self.datType == np.complex128:
+                        self.densityMatrixRed_mpArray = mpArray('d', self.dimRed ** 2 * 2)
+                    elif self.datType == np.complex64:
+                        self.densityMatrixRed_mpArray = mpArray('f', self.dimRed ** 2 * 2)
+                    else:
+                        exit('Data type %s not supported' % str(self.datType))
+                    self.densityMatrixRed = \
+                        np.frombuffer(self.densityMatrixRed_mpArray.get_obj(),
+                                      dtype=self.datType).reshape((self.dimRed, self.dimRed))
+                self.iteratorRed = np.zeros((0, 4), dtype=np.uint32)
                 if not (self.m == 2 and self.mRed == 1):
                     self.initIteratorRed()
 
@@ -293,6 +327,7 @@ class mpSystem:
         self.filProg.write('Initialized the class in ' + time_elapsed(t0, 60, 0) + '\n')
         self.closeProgressFile()
         print('Initialized the class in ' + time_elapsed(t0, 60, 0) + '\n')
+
     # end of init
 
     ###### reading from config file
@@ -439,8 +474,14 @@ class mpSystem:
     ###### Methods:
     def updateDensityMatrix(self):
         if not self.densityMatrixInd:
-            # there might be a memory reallocation error with np.outer... however, initialization is always nice
-            self.densityMatrix = np.zeros((self.dim, self.dim), dtype=self.datType)
+            # if other data type the program would have already exited in the init process
+            if self.datType == np.complex128:
+                self.densityMatrix_mpRawArray = mpRawArray('d', self.dim ** 2 * 2)
+            else:
+                self.densityMatrix_mpRawArray = mpRawArray('f', self.dim ** 2 * 2)
+            self.densityMatrix = \
+                np.frombuffer(self.densityMatrix_mpRawArray, dtype=self.datType).reshape((self.dim, self.dim))
+            np.copyto(self.densityMatrix, np.zeros((self.dim, self.dim), dtype=self.datType))
             self.densityMatrixInd = True
 
         np.outer(self.state, self.state.conj(), self.densityMatrix)
@@ -456,9 +497,9 @@ class mpSystem:
         entries = 0
         for i in range((self.N + 1)):
             dimred = dimOfBasis(self.N - i, self.mRed)
-            entries += np.int32((dimred ** 2 + dimred) / 2 * dimOfBasis(i, self.mRedComp))
+            entries += np.uint32((dimred ** 2 + dimred) / 2 * dimOfBasis(i, self.mRedComp))
 
-        self.iteratorRed = np.zeros((entries, 4), np.int32)
+        self.iteratorRed = np.zeros((entries, 4), np.uint32)
         counter = 0
         # building up the block diagonal reduced matrix with the largest block first, N particles in sub-system
         for i in reversed(range(self.N + 1)):
@@ -481,7 +522,7 @@ class mpSystem:
     # end of initIteratorRed
 
     # noinspection PyTypeChecker
-    def reduceDensityMatrix(self):
+    def reduceDensityMatrix_old(self):
         if self.densityMatrixRed is None:
             return
 
@@ -500,7 +541,30 @@ class mpSystem:
                 if el[0] != el[1]:
                     self.densityMatrixRed[el[1], el[0]] += self.densityMatrix[el[3], el[2]]
 
-    def reduceDensityMatrixFromState(self):
+    def reduceDensityMatrix(self):
+        if self.densityMatrixRed is None:
+            return
+
+        if self.mRed == 1 and self.m == 2:
+            np.copyto(self.densityMatrixRed, self.densityMatrix.diagonal())
+            return
+
+        self.densityMatrixRed.fill(0)
+
+        with Pool(processes=self.cores, initializer=initWorker, initargs=(
+                        self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
+                        self.densityMatrixRed_mpArray, self.dim, self.dimRed, self.datType)) as pool:
+            if self.mRed == 1 and self.m != 2:
+                pool.map_async(reduceDensityMatrix_mp_helper_small,
+                               np.array_split(self.iteratorRed, self.cores))
+            else:
+                pool.map_async(reduceDensityMatrix_mp_helper,
+                               np.array_split(self.iteratorRed, self.cores))
+
+            pool.close()
+            pool.join()
+
+    def reduceDensityMatrixFromState_old(self):
         if self.densityMatrixRed is None:
             return
 
@@ -519,6 +583,32 @@ class mpSystem:
                     self.densityMatrixRed[el[1], el[0]] += self.state[el[3]] * self.state[el[2]].conj()
 
     # end of reduceDensityMatrixFromState
+
+    def reduceDensityMatrixFromState(self):
+        if self.densityMatrixRed is None:
+            return
+
+        np.conjugate(self.state, out=self.stateConj)
+
+        if self.mRed == 1 and self.m == 2:
+            np.copyto(self.densityMatrixRed, np.abs(self.state) ** 2)
+            return
+
+        self.densityMatrixRed.fill(0)
+
+        with Pool(processes=self.cores, initializer=initWorker, initargs=(
+                        self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
+                        self.densityMatrixRed_mpArray, self.dim, self.dimRed, self.datType)) as pool:
+            if self.mRed == 1 and self.m != 2:
+                pool.map_async(reduceDensityMatrixFromState_mp_helper_small,
+                               np.array_split(self.iteratorRed, self.cores))
+            else:
+                pool.map_async(reduceDensityMatrixFromState_mp_helper,
+                               np.array_split(self.iteratorRed, self.cores))
+
+            pool.close()
+            pool.join()
+
 
     def reduceMatrix(self, matrx):
         tmpret = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
@@ -797,7 +887,7 @@ class mpSystem:
             print('Warning - hamiltonian is not hermitian!')
         self.greenGreaterEvolutionMatrix = spidentity(self.greenGreaterDim, dtype=self.datType, format='csr')
 
-    # in contrast to the greater evolution matrix the default here is positive exponent
+        # in contrast to the greater evolution matrix the default here is positive exponent
         if conj:
             pre = (-1j)
         else:
@@ -1742,15 +1832,18 @@ class mpSystem:
                 self.dmFileFactor = 1
                 if not self.boolOnlyRed:
                     if self.boolDMStore:
-                        storeMatrix(self.densityMatrix, self.dataFolder + 'density/densitymatrix_t%u.dat' % self.evolTime)
+                        storeMatrix(self.densityMatrix,
+                                    self.dataFolder + 'density/densitymatrix_t%u.dat' % self.evolTime)
                     if self.boolDMRedStore:
                         storeMatrix(self.densityMatrixRed,
                                     self.dataFolder + 'red_density/reduced_densitymatrix_t%u.dat' % self.evolTime)
                     if self.boolDMRedDiagStore:
-                        np.savetxt(self.dataFolder + 'red_density/reduced_densitymatrix_eigenvalues_t%u.dat' % self.evolTime,
-                                   self.densityMatrixRedEigenvalues)
-                        save_npz(self.dataFolder + 'red_density/reduced_densitymatrix_eigenstates_t%u.npz' % self.evolTime,
-                                 self.densityMatrixRedEigenvectors)
+                        np.savetxt(
+                            self.dataFolder + 'red_density/reduced_densitymatrix_eigenvalues_t%u.dat' % self.evolTime,
+                            self.densityMatrixRedEigenvalues)
+                        save_npz(
+                            self.dataFolder + 'red_density/reduced_densitymatrix_eigenstates_t%u.npz' % self.evolTime,
+                            self.densityMatrixRedEigenvectors)
                     self.dmcount += 1
             else:
                 self.dmFileFactor += 1
@@ -1779,9 +1872,10 @@ class mpSystem:
             # note that this is the only! time where the time scale is already included
             head = 'n_sys p(n_sys) /// Jt = $f' % (self.evolTime * self.plotTimeScale)
             sort_indices = self.entanglementSpectrumEnergy.argsort()
-            np.savetxt(self.dataFolder + 'entanglement_spectrum/ent_spec_%.4f.dat' % (self.evolTime * self.plotTimeScale),
-                       np.column_stack((self.entanglementSpectrumEnergy[sort_indices],
-                                        self.entanglementSpectrum[sort_indices])), header=head)
+            np.savetxt(
+                self.dataFolder + 'entanglement_spectrum/ent_spec_%.4f.dat' % (self.evolTime * self.plotTimeScale),
+                np.column_stack((self.entanglementSpectrumEnergy[sort_indices],
+                                 self.entanglementSpectrum[sort_indices])), header=head)
 
         self.filNorm.write('%.16e %.16e %.16e \n' % (self.evolTime, self.stateNorm, self.stateNormAbs))
 
@@ -2092,7 +2186,7 @@ def quadraticArrayGreenGreater(sysVar):
 # quadratic term in 2nd quantization for transition from m to l
 # matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
 def getQuadratic(sysVar, l, m):
-    entries = sysVar.dim - dimOfBasis(sysVar.N, sysVar.m-1)
+    entries = sysVar.dim - dimOfBasis(sysVar.N, sysVar.m - 1)
     data = np.zeros(entries, dtype=np.float64)
     row = np.zeros(entries, dtype=np.float64)
     col = np.zeros(entries, dtype=np.float64)
@@ -2140,7 +2234,7 @@ def getQuadraticRed(sysVar, l, m):
 # quadratic term in 2nd quantization for transition from m to l for system with one particle removed
 # matrix for a_l^d a_m (r=row, c=column) is M[r][c] = SQRT(basis[r][l]*basis[c][m])
 def getQuadraticGreenLesser(sysVar, l, m):
-    entries = sysVar.greenLesserDim - dimOfBasis(sysVar.N-1, sysVar.m - 1)
+    entries = sysVar.greenLesserDim - dimOfBasis(sysVar.N - 1, sysVar.m - 1)
     data = np.zeros(entries, dtype=np.float64)
     row = np.zeros(entries, dtype=np.float64)
     col = np.zeros(entries, dtype=np.float64)
@@ -2366,3 +2460,74 @@ def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
                 f.write('%.16e ' % np.abs(mat[(n, nn)]))
             f.write('%.16e\n' % np.abs(mat[(n, matDim - 1)]))
         f.close()
+
+
+multiprocDic = {}
+
+
+def initWorker(state, stateConj, densmat, densmat_red, dim, dimRed, datType):
+    multiprocDic['state'] = state
+    multiprocDic['stateConj'] = stateConj
+    multiprocDic['densityMatrix'] = densmat
+    multiprocDic['densityMatrixRed'] = densmat_red
+    multiprocDic['shapeState'] = (dim,)
+    multiprocDic['shapeMat'] = (dim, dim)
+    multiprocDic['shapeRed'] = (dimRed, dimRed)
+    multiprocDic['datType'] = datType
+
+
+def reduceDensityMatrixFromState_mp_helper_small(iterator_array):
+    state_np = \
+        np.frombuffer(multiprocDic['state'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
+    stateConj_np = \
+        np.frombuffer(multiprocDic['stateConj'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
+    densMat_red_np = \
+        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
+                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
+
+    for el in iterator_array:
+        densMat_red_np[el[0]] += state_np[el[2]] * stateConj_np[el[3]]
+
+    return 1
+
+
+def reduceDensityMatrixFromState_mp_helper(iterator_array):
+    state_np = \
+        np.frombuffer(multiprocDic['state'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
+    stateConj_np = \
+        np.frombuffer(multiprocDic['stateConj'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
+    densMat_red_np = \
+        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
+                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
+
+    for el in iterator_array:
+        densMat_red_np[el[0], el[1]] += state_np[el[2]] * stateConj_np[el[3]]
+        if el[0] != el[1]:
+            densMat_red_np[el[1], el[0]] += state_np[el[3]] * stateConj_np[el[2]]
+    return 1
+
+def reduceDensityMatrix_mp_helper_small(iterator_array):
+    densMat_np = \
+        np.frombuffer(multiprocDic['densityMatrix'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeMat'])
+    densMat_red_np = \
+        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
+                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
+
+    for el in iterator_array:
+        densMat_red_np[el[0]] += densMat_np[el[2], el[3]]
+
+    return 1
+
+
+def reduceDensityMatrix_mp_helper(iterator_array):
+    densMat_np = \
+        np.frombuffer(multiprocDic['densityMatrix'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeMat'])
+    densMat_red_np = \
+        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
+                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
+
+    for el in iterator_array:
+        densMat_red_np[el[0], el[1]] += densMat_np[el[2], el[3]]
+        if el[0] != el[1]:
+            densMat_red_np[el[1], el[0]] += densMat_np[el[3], el[2]]
+    return 1
