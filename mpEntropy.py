@@ -521,26 +521,6 @@ class mpSystem:
 
     # end of initIteratorRed
 
-    # noinspection PyTypeChecker
-    def reduceDensityMatrix_old(self):
-        if self.densityMatrixRed is None:
-            return
-
-        if self.mRed == 1:
-            if self.m == 2:
-                self.densityMatrixRed = self.densityMatrix.diagonal()
-            else:
-                self.densityMatrixRed.fill(0)
-                for el in self.iteratorRed:
-                    # noinspection PyTypeChecker
-                    self.densityMatrixRed[el[0]] += self.densityMatrix[el[2], el[3]]
-        else:
-            self.densityMatrixRed.fill(0)
-            for el in self.iteratorRed:
-                self.densityMatrixRed[el[0], el[1]] += self.densityMatrix[el[2], el[3]]
-                if el[0] != el[1]:
-                    self.densityMatrixRed[el[1], el[0]] += self.densityMatrix[el[3], el[2]]
-
     def reduceDensityMatrix(self):
         if self.densityMatrixRed is None:
             return
@@ -563,26 +543,6 @@ class mpSystem:
 
             pool.close()
             pool.join()
-
-    def reduceDensityMatrixFromState_old(self):
-        if self.densityMatrixRed is None:
-            return
-
-        if self.mRed == 1:
-            if self.m == 2:
-                self.densityMatrixRed = np.abs(self.state) ** 2
-            else:
-                self.densityMatrixRed.fill(0)
-                for el in self.iteratorRed:
-                    self.densityMatrixRed[el[0]] += self.state[el[2]] * self.state[el[3]].conj()
-        else:
-            self.densityMatrixRed.fill(0)
-            for el in self.iteratorRed:
-                self.densityMatrixRed[el[0], el[1]] += self.state[el[2]] * self.state[el[3]].conj()
-                if el[0] != el[1]:
-                    self.densityMatrixRed[el[1], el[0]] += self.state[el[3]] * self.state[el[2]].conj()
-
-    # end of reduceDensityMatrixFromState
 
     def reduceDensityMatrixFromState(self):
         if self.densityMatrixRed is None:
@@ -608,7 +568,6 @@ class mpSystem:
 
             pool.close()
             pool.join()
-
 
     def reduceMatrix(self, matrx):
         tmpret = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
@@ -795,7 +754,10 @@ class mpSystem:
             print('Warning - Time evolution of order 0 means no dynamics...')
         if not np.allclose(self.hamiltonian.toarray(), self.hamiltonian.toarray().T.conjugate()):
             print('Warning - hamiltonian is not hermitian!')
-        self.evolutionMatrix = spidentity(self.dim, dtype=self.datType, format='csr')
+        if self.evolutionMatrix is None:
+            # apparently C-order is faster when using the dot product with out
+            self.evolutionMatrix = np.zeros((self.dim, self.dim), dtype=self.datType, order='C')
+        tmpmat = spidentity(self.dim, dtype=self.datType, format='csr')
 
         if conj:
             pre = 1j
@@ -805,20 +767,19 @@ class mpSystem:
         # the normal evolution matrix
         if not greenstep:
             for i in range(1, self.order + 1):
-                self.evolutionMatrix += (pre ** i) * (self.deltaT ** i) * (self.hamiltonian ** i) / factorial(i)
-
-            if self.boolHamilStore:
-                storeMatrix(self.hamiltonian.toarray(), self.dataFolder + 'hamiltonian.dat', 1)
-                storeMatrix(self.evolutionMatrix.toarray(), self.dataFolder + 'evolutionmatrix.dat', 1)
+                tmpmat += (pre ** i) * (self.deltaT ** i) * (self.hamiltonian ** i) / factorial(i)
 
             # for greenOnly, perform the WHOLE time evolution in one step (holy moly)
             # otherwise use the time step distance as prepared in __init__
+            # note that it will be cast to c-contiguous order automatically
             if self.greenOnly:
-                self.evolutionMatrix = np.asfortranarray(
-                    npmatrix_power(self.evolutionMatrix.toarray(), self.steps), dtype=self.datType)
+                np.copyto(self.evolutionMatrix, npmatrix_power(tmpmat.toarray(order='F'), self.steps))
             else:
-                self.evolutionMatrix = np.asfortranarray(
-                    npmatrix_power(self.evolutionMatrix.toarray(), self.evolStepDist), dtype=self.datType)
+                np.copyto(self.evolutionMatrix, npmatrix_power(tmpmat.toarray(order='F'), self.evolStepDist))
+
+            if self.boolHamilStore:
+                storeMatrix(self.hamiltonian.toarray(), self.dataFolder + 'hamiltonian.dat', 1)
+                storeMatrix(self.evolutionMatrix, self.dataFolder + 'evolutionmatrix.dat', 1)
 
             # Store hamiltonian eigenvalues
             if diagonalize:
@@ -826,9 +787,8 @@ class mpSystem:
         # the short step evolution matrix for the green function calculation
         else:
             for i in range(1, self.order + 1):
-                self.evolutionMatrix += (pre ** i) * (self.deltaTgreen ** i) * (self.hamiltonian ** i) / factorial(i)
-            self.evolutionMatrix = np.asfortranarray(
-                npmatrix_power(self.evolutionMatrix.toarray(), int(self.greenStepDist / 2)), dtype=self.datType)
+                tmpmat += (pre ** i) * (self.deltaTgreen ** i) * (self.hamiltonian ** i) / factorial(i)
+            np.copyto(self.evolutionMatrix, npmatrix_power(tmpmat.toarray(order='F'), int(self.greenStepDist / 2)))
 
     # end
 
@@ -1385,7 +1345,6 @@ class mpSystem:
             self.reduceDensityMatrixFromState()
             self.entanglementSpectrum = self.densityMatrixRed.real
             if self.boolEntanglementSpectrum and not self.entanglementSpectrumIndicator:
-                # tmp = self.systemOccupationOperator.toarray().diagonal().real
                 tmp = self.onsite * self.systemLevelIterator[0] * self.operatorsRed[0, 0] \
                       + self.interequal * self.operatorsRed[0, 0] * self.operatorsRed[0, 0]
                 for i in range(1, len(self.systemLevelIterator)):

@@ -1,5 +1,9 @@
 change log
 
+### 30.01.2019
+- removed old reduced density matrix calculation
+- imporoved initEvolutionMatrix performance by memory usage tweaks and changing to fortran array type for matrix_power
+
 ### 29.01.2019
 - removed exit() on line 150 from entPlot.py
 - prepared density matrix & state (unprotected) and reduced density matrix (protected) for multiprocessing
