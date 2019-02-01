@@ -160,13 +160,19 @@ class mpSystem:
         # system variables
         if not plotOnly:
             self.datType = dtType
+            if self.datType is np.complex128:
+                self.mpRawArrayType = 'd'
+            elif self.datType is np.complex64:
+                self.mpRawArrayType = 'f'
+            else:
+                exit('Data type %s not supported' % str(self.datType))
             self.basis = np.zeros((self.dim, self.m), dtype=np.int)
             fillBasis(self.basis, self.N, self.m)
             self.basisDict = basis2dict(self.basis, self.dim)
-            self.state_mpRawArray = mpRawArray('d', self.dim * 2)
+            self.state_mpRawArray = mpRawArray(self.mpRawArrayType, self.dim * 2)
             self.state = np.frombuffer(self.state_mpRawArray, dtype=self.datType).reshape((self.dim,))
             np.copyto(self.state, np.zeros(self.dim, dtype=self.datType))
-            self.stateConj_mpRawArray = mpRawArray('d', self.dim * 2)
+            self.stateConj_mpRawArray = mpRawArray(self.mpRawArrayType, self.dim * 2)
             self.stateConj = np.frombuffer(self.stateConj_mpRawArray, dtype=self.datType).reshape((self.dim,))
             np.copyto(self.stateConj, np.zeros(self.dim, dtype=self.datType))
             # parameter for storing in file
@@ -174,7 +180,7 @@ class mpSystem:
             self.stateNormAbs = 0
             self.stateNormCheck = 1e1  # check if norm has been supressed too much
             # do not initialize yet - wait until hamiltonian decomposition has been done for memory efficiency
-            self.densityMatrix_mpRawArray = mpRawArray('d', 0)
+            self.densityMatrix_mpRawArray = mpRawArray(self.mpRawArrayType, 0)
             self.densityMatrix = np.array([])
             self.densityMatrixInd = False
             self.multiprocDic = {}  # needed for multiprocessing
@@ -246,12 +252,7 @@ class mpSystem:
                     self.densityMatrixRed = np.zeros((self.dimRed,), dtype=self.datType)
                 else:
                     # if more than one level left, use multiprocessing
-                    if self.datType == np.complex128:
-                        self.densityMatrixRed_mpArray = mpArray('d', self.dimRed ** 2 * 2)
-                    elif self.datType == np.complex64:
-                        self.densityMatrixRed_mpArray = mpArray('f', self.dimRed ** 2 * 2)
-                    else:
-                        exit('Data type %s not supported' % str(self.datType))
+                    self.densityMatrixRed_mpArray = mpArray(self.mpRawArrayType, self.dimRed ** 2 * 2)
                     self.densityMatrixRed = \
                         np.frombuffer(self.densityMatrixRed_mpArray.get_obj(),
                                       dtype=self.datType).reshape((self.dimRed, self.dimRed))
@@ -474,11 +475,7 @@ class mpSystem:
     ###### Methods:
     def updateDensityMatrix(self):
         if not self.densityMatrixInd:
-            # if other data type the program would have already exited in the init process
-            if self.datType == np.complex128:
-                self.densityMatrix_mpRawArray = mpRawArray('d', self.dim ** 2 * 2)
-            else:
-                self.densityMatrix_mpRawArray = mpRawArray('f', self.dim ** 2 * 2)
+            self.densityMatrix_mpRawArray = mpRawArray(self.mpRawArrayType, self.dim ** 2 * 2)
             self.densityMatrix = \
                 np.frombuffer(self.densityMatrix_mpRawArray, dtype=self.datType).reshape((self.dim, self.dim))
             np.copyto(self.densityMatrix, np.zeros((self.dim, self.dim), dtype=self.datType))

@@ -1,5 +1,9 @@
 change log
 
+### 01.02.2019
+- changed shared array initialization to adapt to complex128 or complex64
+- when running the default setup there are several negative eigenvalues and it is very slow - why?
+
 ### 30.01.2019
 - removed old reduced density matrix calculation
 - imporoved initEvolutionMatrix performance by memory usage tweaks and changing to fortran array type for matrix_power
