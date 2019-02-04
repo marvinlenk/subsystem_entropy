@@ -1,5 +1,11 @@
 change log
 
+### 04.02.2019
+- changed static method clearDensityData to be actually static
+- changed the clear density data part of prep folders to take the correct path
+- when the number of reduction steps is smaller than 4e4 and number of cores is not explicitly given, reduce to single
+    core reduction algorithm due to large overhead
+
 ### 01.02.2019
 - changed shared array initialization to adapt to complex128 or complex64
 - when running the default setup there are several negative eigenvalues and it is very slow - why?

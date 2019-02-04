@@ -16,7 +16,6 @@ from scipy.special import binom
 from scipy.special import erf
 from scipy.special.basic import factorial
 from multiprocessing import Pool
-from multiprocessing import Array as mpArray
 from multiprocessing import RawArray as mpRawArray
 
 import entPlot as ep
@@ -31,6 +30,7 @@ class mpSystem:
         self.confFile = cFile
         self.greenOnly = greenOnly
 
+        # number of cores might get changed to one later
         if cores:
             self.cores = cores
         else:
@@ -247,19 +247,41 @@ class mpSystem:
                 self.offsetsRedComp = basisOffsets(self.N, self.mRedComp)
                 self.basisRedComp = np.zeros((self.dimRedComp, self.mRedComp), dtype=np.int)
                 fillReducedBasis(self.basisRedComp, self.N, self.mRedComp, self.offsetsRedComp)
+                self.reductionSteps = self.calculateReductionSteps()
+                if not (self.m == 2 and self.mRed == 1):
+                    # note that the iterator is not defined if not necessary
+                    if self.reductionSteps < 4e4 and not cores:
+                        self.cores = 1
+                    self.iteratorRed = np.array_split(self.generateIteratorRed(), self.cores)
+                    self.densityMatrixRedCoordinates = np.concatenate(
+                        [np.concatenate(self.iteratorRed).T[:2].T, np.concatenate(self.iteratorRed).T[1::-1].T]
+                    ).T
                 # if only one level left, reduced matrix is diagonal
                 if self.mRed == 1:
                     self.densityMatrixRed = np.zeros((self.dimRed,), dtype=self.datType)
                 else:
                     # if more than one level left, use multiprocessing
-                    self.densityMatrixRed_mpArray = mpArray(self.mpRawArrayType, self.dimRed ** 2 * 2)
+                    # a shared matrix is not quite necessary by construction but do it anyways
+                    self.densityMatrixRed_mpRawArray = mpRawArray(self.mpRawArrayType, self.dimRed ** 2 * 2)
                     self.densityMatrixRed = \
-                        np.frombuffer(self.densityMatrixRed_mpArray.get_obj(),
+                        np.frombuffer(self.densityMatrixRed_mpRawArray,
                                       dtype=self.datType).reshape((self.dimRed, self.dimRed))
-                self.iteratorRed = np.zeros((0, 4), dtype=np.uint32)
-                if not (self.m == 2 and self.mRed == 1):
-                    self.initIteratorRed()
-
+                    self.densityMatrixRedConstructorRaw = {}  # is a dictionary
+                    self.densityMatrixRedConstructor = np.empty((self.cores,), dtype=np.ndarray)
+                    self.densityMatrixRedConstructorConjRaw = {}  # is a dictionary
+                    self.densityMatrixRedConstructorConj = np.empty((self.cores,), dtype=np.ndarray)
+                    i = 0
+                    # fill dictionary by process number, each gets an array
+                    for el in self.iteratorRed:
+                        self.densityMatrixRedConstructorRaw["%i" % i] = mpRawArray(self.mpRawArrayType, len(el) * 2)
+                        self.densityMatrixRedConstructor[i] = \
+                            np.frombuffer(self.densityMatrixRedConstructorRaw["%i" % i],
+                                          dtype=self.datType).reshape((len(el),))
+                        self.densityMatrixRedConstructorConjRaw["%i" % i] = mpRawArray(self.mpRawArrayType, len(el) * 2)
+                        self.densityMatrixRedConstructorConj[i] = \
+                            np.frombuffer(self.densityMatrixRedConstructorRaw["%i" % i],
+                                          dtype=self.datType).reshape((len(el),))
+                        i += 1
             if self.boolDMRedDiagStore:
                 self.densityMatrixRedEigenvalues = None
                 self.densityMatrixRedEigenvectors = None
@@ -485,18 +507,21 @@ class mpSystem:
 
     # end of updateDensityMatrix
 
-    def initIteratorRed(self):
-        # temporary basis vector occupation number containers
-        el1 = np.zeros(self.m, dtype=np.int)
-        el2 = np.zeros(self.m, dtype=np.int)
+    def calculateReductionSteps(self):
         # calculate the number of entries - it is always the upper triangle including the diagonal of the N-i particle
         # subspace multiplied with the dimension of the i particle complementary subspace
         entries = 0
         for i in range((self.N + 1)):
             dimred = dimOfBasis(self.N - i, self.mRed)
             entries += np.uint32((dimred ** 2 + dimred) / 2 * dimOfBasis(i, self.mRedComp))
+        return entries
 
-        self.iteratorRed = np.zeros((entries, 4), np.uint32)
+    def generateIteratorRed(self):
+        # temporary basis vector occupation number containers
+        el1 = np.zeros(self.m, dtype=np.int)
+        el2 = np.zeros(self.m, dtype=np.int)
+
+        iteratorRed = np.zeros((self.reductionSteps, 4), np.uint32)
         counter = 0
         # building up the block diagonal reduced matrix with the largest block first, N particles in sub-system
         for i in reversed(range(self.N + 1)):
@@ -512,9 +537,10 @@ class mpSystem:
                         el1[~self.mask] = self.basisRedComp[k]
                         el2[self.mask] = self.basisRed[jj]
                         el2[~self.mask] = self.basisRedComp[k]
-                        self.iteratorRed[counter] = np.array(
+                        iteratorRed[counter] = np.array(
                             [j, jj, self.basisDict[tuple(el1)], self.basisDict[tuple(el2)]])
                         counter += 1
+        return iteratorRed
 
     # end of initIteratorRed
 
@@ -528,18 +554,34 @@ class mpSystem:
 
         self.densityMatrixRed.fill(0)
 
-        with Pool(processes=self.cores, initializer=initWorker, initargs=(
-                        self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
-                        self.densityMatrixRed_mpArray, self.dim, self.dimRed, self.datType)) as pool:
+        if self.cores == 1:
+            initWorker(self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
+                       self.dim, self.dimRed, self.datType, self.densityMatrixRedConstructorRaw,
+                       self.densityMatrixRedConstructorConjRaw)
             if self.mRed == 1 and self.m != 2:
-                pool.map_async(reduceDensityMatrix_mp_helper_small,
-                               np.array_split(self.iteratorRed, self.cores))
+                reduceDensityMatrix_mp_helper_small(self.iteratorRed[0], 0)
             else:
-                pool.map_async(reduceDensityMatrix_mp_helper,
-                               np.array_split(self.iteratorRed, self.cores))
+                reduceDensityMatrix_mp_helper(self.iteratorRed[0], 0)
+        else:
+            with Pool(processes=self.cores, initializer=initWorker, initargs=(
+                            self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
+                            self.dim, self.dimRed, self.datType, self.densityMatrixRedConstructorRaw,
+                            self.densityMatrixRedConstructorConjRaw)) as pool:
+                if self.mRed == 1 and self.m != 2:
+                    pool.map_async(reduceDensityMatrix_mp_helper_small,
+                                   (self.iteratorRed, np.arange(self.cores)))
+                else:
+                    pool.map_async(reduceDensityMatrix_mp_helper,
+                                   (self.iteratorRed, np.arange(self.cores)))
 
-            pool.close()
-            pool.join()
+                pool.close()
+                pool.join()
+
+        coo_matrix(
+            (np.concatenate([
+                np.concatenate(self.densityMatrixRedConstructor), np.concatenate(self.densityMatrixRedConstructorConj)
+            ]), self.densityMatrixRedCoordinates), shape=(self.dimRed, self.dimRed)
+        ).toarray(out=self.densityMatrixRed)
 
     def reduceDensityMatrixFromState(self):
         if self.densityMatrixRed is None:
@@ -553,18 +595,35 @@ class mpSystem:
 
         self.densityMatrixRed.fill(0)
 
-        with Pool(processes=self.cores, initializer=initWorker, initargs=(
-                        self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
-                        self.densityMatrixRed_mpArray, self.dim, self.dimRed, self.datType)) as pool:
+        if self.cores == 1:
+            initWorker(self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
+                       self.dim, self.dimRed, self.datType, self.densityMatrixRedConstructorRaw,
+                       self.densityMatrixRedConstructorConjRaw)
             if self.mRed == 1 and self.m != 2:
-                pool.map_async(reduceDensityMatrixFromState_mp_helper_small,
-                               np.array_split(self.iteratorRed, self.cores))
+                reduceDensityMatrixFromState_mp_helper_small(self.iteratorRed[0], 0)
             else:
-                pool.map_async(reduceDensityMatrixFromState_mp_helper,
-                               np.array_split(self.iteratorRed, self.cores))
+                reduceDensityMatrixFromState_mp_helper(self.iteratorRed[0], 0)
+        else:
+            with Pool(processes=self.cores, initializer=initWorker, initargs=(
+                            self.state_mpRawArray, self.stateConj_mpRawArray, self.densityMatrix_mpRawArray,
+                            self.dim, self.dimRed, self.datType, self.densityMatrixRedConstructorRaw,
+                            self.densityMatrixRedConstructorConjRaw)) as pool:
+                if self.mRed == 1 and self.m != 2:
+                    pool.map_async(reduceDensityMatrixFromState_mp_helper_small,
+                                   (self.iteratorRed, np.arange(self.cores)))
+                else:
+                    pool.map_async(reduceDensityMatrixFromState_mp_helper,
+                                   (self.iteratorRed, np.arange(self.cores)))
 
-            pool.close()
-            pool.join()
+                pool.close()
+                pool.join()
+
+        coo_matrix(
+            (np.concatenate([
+                np.concatenate(self.densityMatrixRedConstructor), np.concatenate(self.densityMatrixRedConstructorConj)
+            ]), self.densityMatrixRedCoordinates), shape=(self.dimRed, self.dimRed), dtype=self.datType
+        ).toarray(out=self.densityMatrixRed)
+
 
     def reduceMatrix(self, matrx):
         tmpret = np.zeros((self.dimRed, self.dimRed), dtype=self.datType)
@@ -572,7 +631,7 @@ class mpSystem:
             for i in range(self.dimRed):
                 tmpret[i, i] = matrx[i]
         else:
-            for el in self.iteratorRed:
+            for el in np.concatenate(self.iteratorRed):
                 tmpret[el[0], el[1]] += matrx[el[2], el[3]]
                 if el[0] != el[1]:
                     tmpret[el[1], el[0]] += matrx[el[3], el[2]]
@@ -1937,8 +1996,8 @@ class mpSystem:
             prepFolders(True, folderpath=self.dataFolder)  # clear out all the density matrix folders
 
     @staticmethod
-    def clearDensityData():
-        prepFolders(True, folderpath=self.dataFolder)
+    def clearDensityData(path="./data/"):
+        prepFolders(True, path)
 
 
 def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecbool=0, cleanbeforebool=0,
@@ -1971,13 +2030,13 @@ def prepFolders(clearbool=0, densbool=0, reddensbool=0, spectralbool=0, entspecb
     # remove the old stuff
     if clearbool:
         if os.path.isfile(folderpath + "density/densmat0.dat"):
-            for root, dirs, files in os.walk(self.dataFolder + 'density/', topdown=False):
+            for root, dirs, files in os.walk(folderpath + 'density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
             print("Cleared density folder")
 
         if os.path.isfile(folderpath + "red_density/densmat0.dat"):
-            for root, dirs, files in os.walk(self.dataFolder + 'red_density/', topdown=False):
+            for root, dirs, files in os.walk(folderpath + 'red_density/', topdown=False):
                 for name in files:
                     os.remove(os.path.join(root, name))
             print("Cleared reduced density folder")
@@ -2421,69 +2480,81 @@ def storeMatrix(mat, fil, absOnly=0, stre=True, stim=True, stabs=True):
 multiprocDic = {}
 
 
-def initWorker(state, stateConj, densmat, densmat_red, dim, dimRed, datType):
+def initWorker(state, stateConj, densmat, dim, dimRed, datType, constructorRaw, constructorRawConj):
     multiprocDic['state'] = state
     multiprocDic['stateConj'] = stateConj
     multiprocDic['densityMatrix'] = densmat
-    multiprocDic['densityMatrixRed'] = densmat_red
     multiprocDic['shapeState'] = (dim,)
     multiprocDic['shapeMat'] = (dim, dim)
     multiprocDic['shapeRed'] = (dimRed, dimRed)
     multiprocDic['datType'] = datType
+    for i in range(len(constructorRaw)):
+        multiprocDic['retArray%i' % i] = constructorRaw['%i' % i]
+        multiprocDic['retArrayConj%i' % i] = constructorRawConj['%i' % i]
 
 
-def reduceDensityMatrixFromState_mp_helper_small(iterator_array):
+def reduceDensityMatrixFromState_mp_helper_small(iterator_array, id):
     state_np = \
         np.frombuffer(multiprocDic['state'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
     stateConj_np = \
         np.frombuffer(multiprocDic['stateConj'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
-    densMat_red_np = \
-        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
-                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
-
+    densMat_constructor = \
+        np.frombuffer(multiprocDic['retArray%i' % id], dtype=multiprocDic['datType']).reshape(len(iterator_array))
+    i = 0
     for el in iterator_array:
-        densMat_red_np[el[0]] += state_np[el[2]] * stateConj_np[el[3]]
-
+        densMat_constructor[0] = state_np[el[2]] * stateConj_np[el[3]]
+        i += 1
     return 1
 
 
-def reduceDensityMatrixFromState_mp_helper(iterator_array):
+def reduceDensityMatrixFromState_mp_helper(iterator_array, id):
     state_np = \
         np.frombuffer(multiprocDic['state'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
     stateConj_np = \
         np.frombuffer(multiprocDic['stateConj'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeState'])
-    densMat_red_np = \
-        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
-                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
+    densMat_constructor = \
+        np.frombuffer(multiprocDic['retArray%i' % id], dtype=multiprocDic['datType']).reshape(len(iterator_array))
+    densMat_constructor_conjugate = \
+        np.frombuffer(multiprocDic['retArrayConj%i' % id], dtype=multiprocDic['datType']).reshape(len(iterator_array))
 
+    i = 0
     for el in iterator_array:
-        densMat_red_np[el[0], el[1]] += state_np[el[2]] * stateConj_np[el[3]]
+        densMat_constructor[i] = state_np[el[2]] * stateConj_np[el[3]]
         if el[0] != el[1]:
-            densMat_red_np[el[1], el[0]] += state_np[el[3]] * stateConj_np[el[2]]
-    return 1
-
-def reduceDensityMatrix_mp_helper_small(iterator_array):
-    densMat_np = \
-        np.frombuffer(multiprocDic['densityMatrix'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeMat'])
-    densMat_red_np = \
-        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
-                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
-
-    for el in iterator_array:
-        densMat_red_np[el[0]] += densMat_np[el[2], el[3]]
-
+            densMat_constructor_conjugate[i] = state_np[el[3]] * stateConj_np[el[2]]
+        else:
+            densMat_constructor_conjugate[i] = 0
+        i += 1
     return 1
 
 
-def reduceDensityMatrix_mp_helper(iterator_array):
+def reduceDensityMatrix_mp_helper_small(iterator_array, id):
     densMat_np = \
         np.frombuffer(multiprocDic['densityMatrix'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeMat'])
-    densMat_red_np = \
-        np.frombuffer(multiprocDic['densityMatrixRed'].get_obj(),
-                      dtype=multiprocDic['datType']).reshape(multiprocDic['shapeRed'])
+    densMat_constructor = \
+        np.frombuffer(multiprocDic['retArray%i' % id], dtype=multiprocDic['datType']).reshape(len(iterator_array))
 
+    i = 0
     for el in iterator_array:
-        densMat_red_np[el[0], el[1]] += densMat_np[el[2], el[3]]
+        densMat_constructor[i] = densMat_np[el[2], el[3]]
+        i += 1
+    return 1
+
+
+def reduceDensityMatrix_mp_helper(iterator_array, id):
+    densMat_np = \
+        np.frombuffer(multiprocDic['densityMatrix'], dtype=multiprocDic['datType']).reshape(multiprocDic['shapeMat'])
+    densMat_constructor = \
+        np.frombuffer(multiprocDic['retArray%i' % id], dtype=multiprocDic['datType']).reshape(len(iterator_array))
+    densMat_constructor_conjugate = \
+        np.frombuffer(multiprocDic['retArrayConj%i' % id], dtype=multiprocDic['datType']).reshape(len(iterator_array))
+
+    i = 0
+    for el in iterator_array:
+        densMat_constructor[i] = densMat_np[el[2], el[3]]
         if el[0] != el[1]:
-            densMat_red_np[el[1], el[0]] += densMat_np[el[3], el[2]]
+            densMat_constructor_conjugate[i] = densMat_np[el[3], el[2]]
+        else:
+            densMat_constructor_conjugate[i] = 0
+        i += 1
     return 1
