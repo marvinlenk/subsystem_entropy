@@ -1,5 +1,12 @@
 change log
 
+### 06.02.2019
+- added notification when only utilizing one core
+- changed iterator to be shared memory as well, passing arguments didn't work as planned so the density matrix was wrong
+    this then finally resolved the error noticed in commit 0c675fe from 01.02.2019
+- reduction of overhead and CPU blocking by creating 1 less process and let the final part be taken by the main process
+- check if the partial trace still gives correct results!
+
 ### 04.02.2019
 - changed static method clearDensityData to be actually static
 - changed the clear density data part of prep folders to take the correct path
