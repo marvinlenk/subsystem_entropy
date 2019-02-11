@@ -295,7 +295,7 @@ class mpSystem:
                         self.densityMatrixRedConstructorConjRaw["%i" % i] = \
                             mpRawArray(self.mpRawArrayType, int(self.iteratorRedSliceLengths[i] * 2))
                         self.densityMatrixRedConstructorConj[i] = \
-                            np.frombuffer(self.densityMatrixRedConstructorRaw["%i" % i],
+                            np.frombuffer(self.densityMatrixRedConstructorConjRaw["%i" % i],
                                           dtype=self.datType).reshape((self.iteratorRedSliceLengths[i],))
             if self.boolDMRedDiagStore:
                 self.densityMatrixRedEigenvalues = None
@@ -1447,7 +1447,6 @@ class mpSystem:
                 self.entropyRed -= el.real * nplog(el.real)
             elif el.real < -1e-7:
                 print('Oh god, there is an eigenvalue below -1e-7 in the reduced density matrix! Namely:', el)
-
     # end of updateEntropyRed
 
     def updateOccNumbers(self):

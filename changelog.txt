@@ -1,5 +1,8 @@
 change log
 
+### 11.02.2019
+- fixed severe bug where conjugate construction array was linked to normal construction array memory!
+
 ### 06.02.2019
 - added notification when only utilizing one core
 - changed iterator to be shared memory as well, passing arguments didn't work as planned so the density matrix was wrong
