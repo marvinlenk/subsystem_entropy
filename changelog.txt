@@ -1,5 +1,13 @@
 change log
 
+### 28.03.2019
+- changed grammar in error message of evaluateGreenOnly
+- changed definition of difference time to match fourier transform
+    -> switched conj. and normal in initLesser(/Greater)EvolutionMatrix
+    -> switched self.state and tmpState
+- changed only trace calculation in evaluateGreenOnly to single level and trace calculation
+- (hopefully) improved time estimation in evaluateGreenOnly
+
 ### 11.02.2019
 - fixed severe bug where conjugate construction array was linked to normal construction array memory!
 

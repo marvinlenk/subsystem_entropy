@@ -891,9 +891,9 @@ class mpSystem:
         self.greenLesserEvolutionMatrix = spidentity(self.greenLesserDim, dtype=self.datType, format='csr')
 
         if conj:
-            pre = 1j
-        else:
             pre = (-1j)
+        else:
+            pre = 1j
 
         # normal green function evolution operator for deltaT
         if not self.greenOnly:
@@ -934,9 +934,9 @@ class mpSystem:
 
         # in contrast to the greater evolution matrix the default here is positive exponent
         if conj:
-            pre = (-1j)
-        else:
             pre = 1j
+        else:
+            pre = (-1j)
 
         # normal green function evolution operator for deltaT
         if not self.greenOnly:
@@ -1600,7 +1600,7 @@ class mpSystem:
 
     def evaluateGreenOnly(self):
         if not self.greenOnly:
-            print("WARNING: Green only is not set - several features will not automatically be adjusted.")
+            print("WARNING: Green only is not set - several features will not be adjusted automatically.")
         # offset is given in time as the first time to evaluate
         self.openProgressFile()
 
@@ -1624,9 +1624,13 @@ class mpSystem:
         print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
         self.closeProgressFile()
 
-        # open the green function file for writing
-        self.filGreen = open(self.dataFolder + 'green_com%.2f.dat' % (int(self.steps * self.deltaT)), 'w')  # t, re, im
-        self.filGreen.write('#tau re> im> re< im<, COM time is %f\n' % (self.steps * self.deltaT))
+        self.filGreen = []
+        for m in range(0, self.m):
+            # open the green function file for writing
+            self.filGreen.append(open(self.dataFolder + 'green_%i_com%.2f.dat' % (m, self.steps * self.deltaT), 'w'))
+            self.filGreen[m].write('#tau re> im> re< im<, COM time is %f\n' % (self.steps * self.deltaT))
+        self.filGreen.append(open(self.dataFolder + 'green_trace_com%.2f.dat' % (self.steps * self.deltaT), 'w'))
+        self.filGreen[self.m].write('#tau re> im> re< im<, COM time is %f\n' % (self.steps * self.deltaT))
 
         # if negative tau, set multiplication factor for file writing to -1
         if self.boolNegativeTau:
@@ -1638,32 +1642,39 @@ class mpSystem:
         tmpGreaterState_array = np.zeros((self.m, self.dim), dtype=self.datType)
         tmpLesserState_array = np.zeros((self.m, self.dim), dtype=self.datType)
 
+        # initialize the temporary function value containers
+        tmpGreenGreater = np.zeros((self.m + 1,), dtype=self.datType)
+        tmpGreenLesser = np.zeros((self.m + 1,), dtype=self.datType)
+
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
-        self.filGreen.write('%.16e ' % 0)
         tmpGreaterState_array[0] = self.greenGreaterCreation[0].T.dot(
             self.greenGreaterCreation[0].dot(self.state))
         tmpLesserState_array[0] = self.greenLesserAnnihilation[0].T.dot(
             self.greenLesserAnnihilation[0].dot(self.state))
+        tmpGreenGreater[0] = vdot(self.state, tmpGreaterState_array[0])
+        tmpGreenLesser[0] = vdot(self.state, tmpLesserState_array[0])
         for m in range(1, self.m):
             tmpGreaterState_array[m] = self.greenGreaterCreation[m].T.dot(
                 self.greenGreaterCreation[m].dot(self.state))
             tmpLesserState_array[m] = self.greenLesserAnnihilation[m].T.dot(
                 self.greenLesserAnnihilation[m].dot(self.state))
-        # sum over axis no. 0 gives the sum of the individual vectors
-        tmpGreenGreater = vdot(self.state, tmpGreaterState_array.sum(axis=0))
-        tmpGreenLesser = vdot(self.state, tmpLesserState_array.sum(axis=0))
+            tmpGreenGreater[m] = vdot(self.state, tmpGreaterState_array[m])
+            tmpGreenLesser[m] = vdot(self.state, tmpLesserState_array[m])
+        tmpGreenGreater[self.m] = tmpGreenGreater[:-1].sum()
+        tmpGreenLesser[self.m] = tmpGreenLesser[:-1].sum()
         # note that the both Green functions are multiplied by -i, which is included in the writing below!
         # first number is real part, second imaginary
         # there is an overall minus sign!
-        self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
-        self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
-        self.filGreen.write(' \n')
+        for m in range(0, self.m + 1):
+            self.filGreen[m].write('%.16e ' % 0)
+            self.filGreen[m].write('%.16e %.16e ' % (tmpGreenGreater[m].imag, -1 * tmpGreenGreater[m].real))
+            self.filGreen[m].write('%.16e %.16e  \n' % (tmpGreenLesser[m].imag, -1 * tmpGreenLesser[m].real))
 
         # now start from the first non-zero difference time
         t0 = tm.time()
         t1 = tm.time()
-        tavg = 0
-        bound_permil = 1000.0 / self.greensteps  # use per 1000 to get easier condition for 1% and 10%
+        tavg = 0  #average time calculation
+        previous_percent = 0  #stores the last printed percent value
         for i in range(1, self.greensteps + 1):
             # raise the green evolution operator a deltaTau more
             tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix, out=tmpGreaterEvol)
@@ -1679,61 +1690,71 @@ class mpSystem:
             tmpGreaterState_array[0] = self.greenGreaterCreation[0].T.dot(
                 tmpGreaterEvol.dot(
                     self.greenGreaterCreation[0].dot(
-                        self.state)))
+                        tmpState)))
             tmpLesserState_array[0] = self.greenLesserAnnihilation[0].T.dot(
                 tmpLesserEvol.dot(
                     self.greenLesserAnnihilation[0].dot(
-                        tmpState)))
+                        self.state)))
 
             for m in range(1, self.m):
                 tmpGreaterState_array[m] = self.greenGreaterCreation[m].T.dot(
                     tmpGreaterEvol.dot(
                         self.greenGreaterCreation[m].dot(
-                            self.state)))
+                            tmpState)))
                 tmpLesserState_array[m] = self.greenLesserAnnihilation[m].T.dot(
                     tmpLesserEvol.dot(
                         self.greenLesserAnnihilation[m].dot(
-                            tmpState)))
+                            self.state)))
 
-            tmpGreenGreater = vdot(tmpState, tmpGreaterState_array.sum(axis=0))
-            tmpGreenLesser = vdot(self.state, tmpLesserState_array.sum(axis=0))
-            self.filGreen.write('%.16e ' % (self.deltaTaugreen * i * tausign))
+            for m in range(0, self.m):
+                tmpGreenGreater[m] = vdot(self.state, tmpGreaterState_array[m])
+                tmpGreenLesser[m] = vdot(tmpState, tmpLesserState_array[m])
 
-            # note that the greater Green function is multiplied by -i, which is included in the writing below!
-            # note that the lesser Green function is multiplied by -i, which is included in the writing below!
-            # first number is real part, second imaginary
-            # there is an overall minus sign!
-            self.filGreen.write('%.16e %.16e ' % (tmpGreenGreater.imag, -1 * tmpGreenGreater.real))
-            self.filGreen.write('%.16e %.16e ' % (tmpGreenLesser.imag, -1 * tmpGreenLesser.real))
-            self.filGreen.write(' \n')
+            tmpGreenGreater[self.m] = tmpGreenGreater[:-1].sum()
+            tmpGreenLesser[self.m] = tmpGreenLesser[:-1].sum()
+            for m in range(0, self.m + 1):
+                self.filGreen[m].write('%.16e ' % (self.deltaTaugreen * i * tausign))
+                # note that the greater Green function is multiplied by -i, which is included in the writing below!
+                # note that the lesser Green function is multiplied by -i, which is included in the writing below!
+                # first number is real part, second imaginary
+                # there is an overall minus sign!
+                self.filGreen[m].write('%.16e %.16e ' % (tmpGreenGreater[m].imag, -1 * tmpGreenGreater[m].real))
+                self.filGreen[m].write('%.16e %.16e  \n' % (tmpGreenLesser[m].imag, -1 * tmpGreenLesser[m].real))
 
             # time estimation start
-            if round(i * bound_permil, 1) % 10.0 == 0:
+            tmp_percent = int(100.0 * i / self.greensteps)
+            if tmp_percent > previous_percent:
                 self.openProgressFile()
-                self.filProg.write('.')
-                print('.', end='', flush=True)
-                if round(i * bound_permil, 1) % 100 == 0:
-                    tavg *= int(i - self.greensteps / 10)  # calculate from time/step back to unit: time
-                    tavg += tm.time() - t1  # add passed time
-                    tavg /= i  # average over total number of steps
+                if int(tmp_percent / 10) != int(previous_percent / 10):
+                    for j in range(int(10 - (previous_percent % 10))):
+                        self.filProg.write('.')
+                        print('.', end='', flush=True)
+                    tavg = tm.time() - t1
+                    tavg /= int(self.greensteps / 10)  # average over total number of steps
                     t1 = tm.time()
-                    print(' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0),
+                    print(' ' + str(int(tmp_percent / 10) * 10) + "% elapsed: " + time_form(t1 - t0),
                           end='', flush=True)
 
                     self.filProg.write(
-                        ' ' + str(int(i * bound_permil / 10)) + "% elapsed: " + time_form(tm.time() - t0))
+                        ' ' + str(int(tmp_percent / 10) * 10) + "% elapsed: " + time_form(t1 - t0))
                     if i != self.greensteps:
                         print(" ###### eta: " + time_form(tavg * (self.greensteps - i)) + "\n" + str(
-                            int(i * bound_permil / 10)) + "% ", end='', flush=True)
+                            int(tmp_percent / 10) * 10) + "% ", end='', flush=True)
                         self.filProg.write(" ###### eta: " + time_form(tavg * (self.greensteps - i)) + "\n" + str(
-                            int(i * bound_permil / 10)) + "%")
+                            int(tmp_percent / 10) * 10) + "%")
                     else:
                         print('\n')
                         self.filProg.write('\n')
+                else:
+                    for j in range(tmp_percent - previous_percent):
+                        self.filProg.write('.')
+                        print('.', end='', flush=True)
                 self.closeProgressFile()
+                previous_percent = tmp_percent
                 # time estimation end
 
-        self.filGreen.close()
+        for m in range(self.m + 1):
+            self.filGreen[m].close()
 
     # update everything EXCEPT for total entropy and energy - they are only updated 100 times
     def updateEverything(self):
