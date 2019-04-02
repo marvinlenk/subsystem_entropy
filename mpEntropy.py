@@ -1613,7 +1613,7 @@ class mpSystem:
         self.initEvolutionMatrix(conj=self.boolNegativeTau, greenstep=True)
 
         # this is the negative time state
-        tmpState = self.state
+        tmpState = self.state.copy()
         tmpEvolutionMatrix = self.evolutionMatrix.conjugate().T.copy()
 
         # initialize the evolution operators as the identity (which corresponds to tau=0)

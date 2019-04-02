@@ -1,5 +1,9 @@
 change log
 
+### 02.04.2019
+- fixed bug where green functions were calculated wrong... the state with negative time evolution was mapped onto the
+    normal state so at each step the state was evolved forwards in time and then back.
+
 ### 28.03.2019
 - changed grammar in error message of evaluateGreenOnly
 - changed definition of difference time to match fourier transform
