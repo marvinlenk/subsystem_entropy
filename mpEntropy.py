@@ -1613,7 +1613,9 @@ class mpSystem:
         self.initEvolutionMatrix(conj=self.boolNegativeTau, greenstep=True)
 
         # this is the negative time state
-        tmpState = self.state.copy()
+        tmpState_Raw = mpRawArray(self.mpRawArrayType, self.dim * 2)
+        tmpState = np.frombuffer(tmpState_Raw, dtype=self.datType).reshape((self.dim,))
+        np.copyto(tmpState, self.state)
         tmpEvolutionMatrix = self.evolutionMatrix.conjugate().T.copy()
 
         # initialize the evolution operators as the identity (which corresponds to tau=0)
@@ -1639,27 +1641,20 @@ class mpSystem:
             tausign = 1
 
         # initialize the temporary state vectors
-        tmpGreaterState_array = np.zeros((self.m, self.dim), dtype=self.datType)
-        tmpLesserState_array = np.zeros((self.m, self.dim), dtype=self.datType)
+        tmpGreaterState_array = np.zeros((self.m, dimOfBasis(self.N + 1, self.m)), dtype=self.datType)
+        tmpLesserState_array = np.zeros((self.m, dimOfBasis(self.N - 1, self.m)), dtype=self.datType)
 
         # initialize the temporary function value containers
         tmpGreenGreater = np.zeros((self.m + 1,), dtype=self.datType)
         tmpGreenLesser = np.zeros((self.m + 1,), dtype=self.datType)
 
         # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
-        tmpGreaterState_array[0] = self.greenGreaterCreation[0].T.dot(
-            self.greenGreaterCreation[0].dot(self.state))
-        tmpLesserState_array[0] = self.greenLesserAnnihilation[0].T.dot(
-            self.greenLesserAnnihilation[0].dot(self.state))
-        tmpGreenGreater[0] = vdot(self.state, tmpGreaterState_array[0])
-        tmpGreenLesser[0] = vdot(self.state, tmpLesserState_array[0])
-        for m in range(1, self.m):
-            tmpGreaterState_array[m] = self.greenGreaterCreation[m].T.dot(
-                self.greenGreaterCreation[m].dot(self.state))
-            tmpLesserState_array[m] = self.greenLesserAnnihilation[m].T.dot(
-                self.greenLesserAnnihilation[m].dot(self.state))
-            tmpGreenGreater[m] = vdot(self.state, tmpGreaterState_array[m])
-            tmpGreenLesser[m] = vdot(self.state, tmpLesserState_array[m])
+        # the conjugates are the left hand sided ones
+        for m in range(0, self.m):
+            np.copyto(tmpGreaterState_array[m], self.greenGreaterCreation[m].dot(self.state))
+            np.copyto(tmpLesserState_array[m], self.greenLesserAnnihilation[m].dot(self.state))
+            tmpGreenGreater[m] = vdot(self.state, self.greenGreaterCreation[m].T.dot(tmpGreaterState_array[m]))
+            tmpGreenLesser[m] = vdot(self.state, self.greenLesserAnnihilation[m].T.dot(tmpLesserState_array[m]))
         tmpGreenGreater[self.m] = tmpGreenGreater[:-1].sum()
         tmpGreenLesser[self.m] = tmpGreenLesser[:-1].sum()
         # note that the both Green functions are multiplied by -i, which is included in the writing below!
@@ -1673,8 +1668,7 @@ class mpSystem:
         # now start from the first non-zero difference time
         t0 = tm.time()
         t1 = tm.time()
-        tavg = 0  #average time calculation
-        previous_percent = 0  #stores the last printed percent value
+        previous_percent = 0  # stores the last printed percent value
         for i in range(1, self.greensteps + 1):
             # raise the green evolution operator a deltaTau more
             tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix, out=tmpGreaterEvol)
@@ -1687,28 +1681,14 @@ class mpSystem:
             tmpState /= la.norm(tmpState)
 
             # the dots only work via contraction with a state vector!
-            tmpGreaterState_array[0] = self.greenGreaterCreation[0].T.dot(
-                tmpGreaterEvol.dot(
-                    self.greenGreaterCreation[0].dot(
-                        tmpState)))
-            tmpLesserState_array[0] = self.greenLesserAnnihilation[0].T.dot(
-                tmpLesserEvol.dot(
-                    self.greenLesserAnnihilation[0].dot(
-                        self.state)))
+            for m in range(0, self.m):
+                tmpGreaterEvol.dot(self.greenGreaterCreation[m].dot(tmpState), out=tmpGreaterState_array[m])
 
-            for m in range(1, self.m):
-                tmpGreaterState_array[m] = self.greenGreaterCreation[m].T.dot(
-                    tmpGreaterEvol.dot(
-                        self.greenGreaterCreation[m].dot(
-                            tmpState)))
-                tmpLesserState_array[m] = self.greenLesserAnnihilation[m].T.dot(
-                    tmpLesserEvol.dot(
-                        self.greenLesserAnnihilation[m].dot(
-                            self.state)))
+                tmpLesserEvol.dot(self.greenLesserAnnihilation[m].dot(self.state), out=tmpLesserState_array[m])
 
             for m in range(0, self.m):
-                tmpGreenGreater[m] = vdot(self.state, tmpGreaterState_array[m])
-                tmpGreenLesser[m] = vdot(tmpState, tmpLesserState_array[m])
+                tmpGreenGreater[m] = vdot(self.state, self.greenGreaterCreation[m].T.dot(tmpGreaterState_array[m]))
+                tmpGreenLesser[m] = vdot(tmpState, self.greenLesserAnnihilation[m].T.dot(tmpLesserState_array[m]))
 
             tmpGreenGreater[self.m] = tmpGreenGreater[:-1].sum()
             tmpGreenLesser[self.m] = tmpGreenLesser[:-1].sum()
@@ -1726,7 +1706,7 @@ class mpSystem:
             if tmp_percent > previous_percent:
                 self.openProgressFile()
                 if int(tmp_percent / 10) != int(previous_percent / 10):
-                    for j in range(int(10 - (previous_percent % 10))):
+                    for _ in range(int(10 - (previous_percent % 10))):
                         self.filProg.write('.')
                         print('.', end='', flush=True)
                     tavg = tm.time() - t1
@@ -1746,7 +1726,7 @@ class mpSystem:
                         print('\n')
                         self.filProg.write('\n')
                 else:
-                    for j in range(tmp_percent - previous_percent):
+                    for _ in range(tmp_percent - previous_percent):
                         self.filProg.write('.')
                         print('.', end='', flush=True)
                 self.closeProgressFile()

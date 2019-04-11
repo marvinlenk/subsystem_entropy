@@ -1,5 +1,13 @@
 change log
 
+### 11.04.2019
+- changed the way how the matrix-vector products are composed for evaluate_green_only so it can be more efficient
+    benchmarks showed minor speedup for small systems but it gets better for large systems with many threads
+    also it has been checked to produce the same results
+
+### 03.04.2019
+- changed temporary state in evaluateGreenOnly to be a shared array as well
+
 ### 02.04.2019
 - fixed bug where green functions were calculated wrong... the state with negative time evolution was mapped onto the
     normal state so at each step the state was evolved forwards in time and then back.
