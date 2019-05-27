@@ -14,7 +14,7 @@ print("Dimension of the basis:", sysVar.dim)
 sysVar.initHamiltonian()
 H=csc_matrix(sysVar.hamiltonian)
 
-dp=0
+dp=10**5
 
 
 
@@ -52,7 +52,8 @@ psi=psi0
 #l4 = np.zeros(dp)
 
 U0 = U(H, 0.1)
-
+T = U(H, 0.05)
+S = T.getH()
 #evolution routine
 
 
@@ -87,10 +88,10 @@ U0 = U(H, 0.1)
 
 #two time correlation function routine
 i=0
-j=0
+j=1
 ni = sysVar.operators[i,i]
 nj = sysVar.operators[j,j]
-P=20
+P=32
 #evolve the initial state to t=t
 
 U0 = U(H, 0.1)
@@ -109,27 +110,80 @@ U2=U0.getH()
 
 #calculates the correlation function for positive tau
 def f1(P):
+    l1  = []
+    l2  = []
+    st1 = T.dot(state_1)
+    st2 = T.dot(state_2)
+    ex1 = vdot(st1, ni.dot(st1))
+    ex2 = vdot(psi, nj.dot(psi))
+    v1 = vdot(st1, ni.dot(st2))
+    v2 =  vdot(st1, ni.dot(st2)) - ex1 * ex2
+    l1.append((0.05, v1.real, v2.real))
+    l2.append((0.05, v1.imag, v2.imag))
     V =U1
     for i in range(P):
-        st1 = V.dot(state_1)
-        st2 = V.dot(state_2)
+        st1 = V.dot(st1)
+        st2 = V.dot(st2)
+        ex1 = vdot(st1, ni.dot(st1))
+        ex2 = vdot(psi,nj.dot(psi))
+        v1 = vdot(st1, ni.dot(st2))
+        v2 = vdot(st1, ni.dot(st2)) - ex1 * ex2
+        l1.append(((i+1)*0.1+0.05, v1.real, v2.real))
+        l2.append(((i + 1) * 0.1 + 0.05, v1.imag, v2.imag))
 
-        print ( 0.1*(2**i),  vdot(st1, ni.dot(st2)))
-        V = V.dot(V)
-
+        V = V.dot(U0)
+    return l1, l2
 #calculates the negative function for negative tau
 
 def f2(P):
+    l1 = []
+    l2 = []
+    st1 = S.dot(state_1)
+    st2 = S.dot(state_2)
+    ex1 = vdot(st1, ni.dot(st1))
+    ex2 = vdot(psi, nj.dot(psi))
+    v1 = vdot(st1, ni.dot(st2))
+    v2 = vdot(st1, ni.dot(st2)) - ex1 * ex2
+    l1.append((-0.05, v1.real, v2.real))
+    l2.append((-0.05, v1.imag, v2.imag))
     W = U2
     for i in range(P):
-        st1 = W.dot(state_1)
-        st2 = W.dot(state_2)
+        st1 = W.dot(st1)
+        st2 = W.dot(st2)
+        ex1 = vdot(st1, ni.dot(st1))
+        ex2 = vdot(psi, nj.dot(psi))
+        v1 = vdot(st1, ni.dot(st2))
+        v2 = vdot(st1, ni.dot(st2)) - ex1 * ex2
+        l1.append((-(i + 1) * 0.1 - 0.05, v1.real, v2.real))
+        l2.append((-(i + 1) * 0.1 - 0.05, v1.imag, v2.imag))
 
-        print ( -0.1*(2**i),  vdot(st1,ni.dot(st2)))
-        W = W.dot(W)
+        W = W.dot(U2)
+    l1 = list(reversed(l1))
+    l2 = list(reversed(l2))
+    return l1, l2
 
-f1(P)
-f2(P)
+
+
+#print(f2(P)[0])
+
+#print(f1(P)[0])
+
+rl = f2(P)[0]+f1(P)[0]
+
+im = f2(P)[1]+ f1(P)[1]
+
+np.savetxt('real.txt', rl)
+np.savetxt('imaginary.txt', im)
+
+
+
+
+
+#rl= f2(P)[0].extend(f1(P)[0])
+
+#im= f2(P)[1].extend(f1(P)[1])
+
+
 
 
 
