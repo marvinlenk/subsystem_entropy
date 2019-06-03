@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from random import random
-l=[]
+
+l=np.loadtxt('energies_N25_Delta10_U1_Uprime0.1.dat')
 
 
 N=100
 
 def lev_sp_hist(l):
     ar = []
-    for i in range(101,len(l)-100):
+    for i in range(21,len(l)-5000):
         ar.append(l[i])
 
     lsp=[]
