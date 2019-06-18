@@ -1598,7 +1598,7 @@ class mpSystem:
 
         self.filGreen.close()
 
-    def evaluateGreenOnly(self):
+    def evaluateGreenOnly(self, initialtau=0):
         if not self.greenOnly:
             print("WARNING: Green only is not set - several features will not be adjusted automatically.")
         # offset is given in time as the first time to evaluate
@@ -1621,6 +1621,21 @@ class mpSystem:
         # initialize the evolution operators as the identity (which corresponds to tau=0)
         tmpGreaterEvol = np.identity(self.greenGreaterDim, dtype=self.datType)
         tmpLesserEvol = np.identity(self.greenLesserDim, dtype=self.datType)
+
+        # evolve the difference time to initialtau
+        if initialtau != 0:
+            inittauexp = int(initialtau / self.deltaTaugreen)
+            if inittauexp * self.deltaTaugreen - initialtau >= initialtau * 0.01:
+                exit("The difference time offset %i is not realizable with the step size %f!"
+                     % (initialtau, self.deltaTaugreen))
+            np.copyto(tmpGreaterEvol, npmatrix_power(self.greenGreaterEvolutionMatrix, inittauexp))
+            np.copyto(tmpLesserEvol, npmatrix_power(self.greenLesserEvolutionMatrix, inittauexp))
+            # evolve the state in time
+            npmatrix_power(self.evolutionMatrix, inittauexp).dot(self.state, out=self.state)
+            self.normalize()
+            # evolve the tmp state backwards in time
+            npmatrix_power(tmpEvolutionMatrix, inittauexp).dot(tmpState, out=tmpState)
+            tmpState /= la.norm(tmpState)
 
         self.filProg.write('Starting evalutation of Green\'s function:\n' + ' 0% ')
         print('Starting evalutation of Green\'s function:\n' + '0% ', end='', flush=True)
@@ -1648,42 +1663,25 @@ class mpSystem:
         tmpGreenGreater = np.zeros((self.m + 1,), dtype=self.datType)
         tmpGreenLesser = np.zeros((self.m + 1,), dtype=self.datType)
 
-        # handle the i=0 case => equal time greater is -i*(n_i+1), lesser is -i*n_i
-        # the conjugates are the left hand sided ones
-        for m in range(0, self.m):
-            np.copyto(tmpGreaterState_array[m], self.greenGreaterCreation[m].dot(self.state))
-            np.copyto(tmpLesserState_array[m], self.greenLesserAnnihilation[m].dot(self.state))
-            tmpGreenGreater[m] = vdot(self.state, self.greenGreaterCreation[m].T.dot(tmpGreaterState_array[m]))
-            tmpGreenLesser[m] = vdot(self.state, self.greenLesserAnnihilation[m].T.dot(tmpLesserState_array[m]))
-        tmpGreenGreater[self.m] = tmpGreenGreater[:-1].sum()
-        tmpGreenLesser[self.m] = tmpGreenLesser[:-1].sum()
-        # note that the both Green functions are multiplied by -i, which is included in the writing below!
-        # first number is real part, second imaginary
-        # there is an overall minus sign!
-        for m in range(0, self.m + 1):
-            self.filGreen[m].write('%.16e ' % 0)
-            self.filGreen[m].write('%.16e %.16e ' % (tmpGreenGreater[m].imag, -1 * tmpGreenGreater[m].real))
-            self.filGreen[m].write('%.16e %.16e  \n' % (tmpGreenLesser[m].imag, -1 * tmpGreenLesser[m].real))
-
-        # now start from the first non-zero difference time
+        # remark: equal time greater is -i*(n_i+1), lesser is -i*n_i
         t0 = tm.time()
         t1 = tm.time()
         previous_percent = 0  # stores the last printed percent value
-        for i in range(1, self.greensteps + 1):
+        for i in range(0, self.greensteps + 1):
             # raise the green evolution operator a deltaTau more
-            tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix, out=tmpGreaterEvol)
-            tmpLesserEvol.dot(self.greenLesserEvolutionMatrix, out=tmpLesserEvol)
-            # evolve the state in time
-            self.evolutionMatrix.dot(self.state, out=self.state)
-            self.normalize()
-            # evolve the tmp state backwards in time
-            tmpEvolutionMatrix.dot(tmpState, out=tmpState)
-            tmpState /= la.norm(tmpState)
+            if i != 0:
+                tmpGreaterEvol.dot(self.greenGreaterEvolutionMatrix, out=tmpGreaterEvol)
+                tmpLesserEvol.dot(self.greenLesserEvolutionMatrix, out=tmpLesserEvol)
+                # evolve the state in time
+                self.evolutionMatrix.dot(self.state, out=self.state)
+                self.normalize()
+                # evolve the tmp state backwards in time
+                tmpEvolutionMatrix.dot(tmpState, out=tmpState)
+                tmpState /= la.norm(tmpState)
 
             # the dots only work via contraction with a state vector!
             for m in range(0, self.m):
                 tmpGreaterEvol.dot(self.greenGreaterCreation[m].dot(tmpState), out=tmpGreaterState_array[m])
-
                 tmpLesserEvol.dot(self.greenLesserAnnihilation[m].dot(self.state), out=tmpLesserState_array[m])
 
             for m in range(0, self.m):
@@ -1693,11 +1691,10 @@ class mpSystem:
             tmpGreenGreater[self.m] = tmpGreenGreater[:-1].sum()
             tmpGreenLesser[self.m] = tmpGreenLesser[:-1].sum()
             for m in range(0, self.m + 1):
-                self.filGreen[m].write('%.16e ' % (self.deltaTaugreen * i * tausign))
+                self.filGreen[m].write('%.16e ' % ((self.deltaTaugreen * i + initialtau) * tausign))
                 # note that the greater Green function is multiplied by -i, which is included in the writing below!
                 # note that the lesser Green function is multiplied by -i, which is included in the writing below!
                 # first number is real part, second imaginary
-                # there is an overall minus sign!
                 self.filGreen[m].write('%.16e %.16e ' % (tmpGreenGreater[m].imag, -1 * tmpGreenGreater[m].real))
                 self.filGreen[m].write('%.16e %.16e  \n' % (tmpGreenLesser[m].imag, -1 * tmpGreenLesser[m].real))
 

@@ -1,5 +1,10 @@
 change log
 
+### 17.04.2019
+- included the first function evaluation of evaluateGreenOnly in the loop.
+- removed some obsolete comments in evaluateGreenOnly
+- added initial tau to evaluateGreenOnly
+
 ### 11.04.2019
 - changed the way how the matrix-vector products are composed for evaluate_green_only so it can be more efficient
     benchmarks showed minor speedup for small systems but it gets better for large systems with many threads
