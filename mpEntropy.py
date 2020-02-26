@@ -248,7 +248,11 @@ class mpSystem:
                 self.basisRedComp = np.zeros((self.dimRedComp, self.mRedComp), dtype=np.int)
                 fillReducedBasis(self.basisRedComp, self.N, self.mRedComp, self.offsetsRedComp)
                 self.reductionSteps = self.calculateReductionSteps()
-                if not (self.m == 2 and self.mRed == 1):
+                # if only one level left, reduced matrix is diagonal
+                # can be heavily utilized for two level systems! (only store array)
+                if (self.m == 2 and self.mRed == 1):
+                    self.densityMatrixRed = np.zeros((self.dimRed,), dtype=self.datType)
+                else:
                     # note that the iterator is not defined if not necessary
                     if self.reductionSteps < 4e4 and not cores:
                         self.cores = 1
@@ -271,16 +275,12 @@ class mpSystem:
                     self.densityMatrixRedCoordinates = np.concatenate(
                         [np.concatenate(self.iteratorRed).T[:2].T, np.concatenate(self.iteratorRed).T[1::-1].T]
                     ).T
-                # if only one level left, reduced matrix is diagonal
-                if self.mRed == 1:
-                    self.densityMatrixRed = np.zeros((self.dimRed,), dtype=self.datType)
-                else:
-                    # if more than one level left, use multiprocessing
                     # a shared matrix is not quite necessary by construction but do it anyways
                     self.densityMatrixRed_mpRawArray = mpRawArray(self.mpRawArrayType, self.dimRed ** 2 * 2)
                     self.densityMatrixRed = \
                         np.frombuffer(self.densityMatrixRed_mpRawArray,
                                       dtype=self.datType).reshape((self.dimRed, self.dimRed))
+
                     self.densityMatrixRedConstructorRaw = {}  # is a dictionary
                     self.densityMatrixRedConstructor = np.empty((self.cores,), dtype=np.ndarray)
                     self.densityMatrixRedConstructorConjRaw = {}  # is a dictionary
@@ -297,6 +297,7 @@ class mpSystem:
                         self.densityMatrixRedConstructorConj[i] = \
                             np.frombuffer(self.densityMatrixRedConstructorConjRaw["%i" % i],
                                           dtype=self.datType).reshape((self.iteratorRedSliceLengths[i],))
+
             if self.boolDMRedDiagStore:
                 self.densityMatrixRedEigenvalues = None
                 self.densityMatrixRedEigenvectors = None
@@ -1428,7 +1429,10 @@ class mpSystem:
         else:
             # if only one level left, density matrix is already diagonal
             self.reduceDensityMatrixFromState()
-            self.entanglementSpectrum = self.densityMatrixRed.real
+            if self.m == 2:
+                self.entanglementSpectrum = self.densityMatrixRed.real
+            else:
+                self.entanglementSpectrum = self.densityMatrixRed.diagonal().real
             if self.boolEntanglementSpectrum and not self.entanglementSpectrumIndicator:
                 tmp = self.onsite * self.systemLevelIterator[0] * self.operatorsRed[0, 0] \
                       + self.interequal * self.operatorsRed[0, 0] * self.operatorsRed[0, 0]

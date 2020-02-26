@@ -1,5 +1,8 @@
 change log
 
+### 26.02.2020
+- fixed initialization of reduced density matrix ressources when having mRed==1 and m!=2
+
 ### 17.04.2019
 - included the first function evaluation of evaluateGreenOnly in the loop.
 - removed some obsolete comments in evaluateGreenOnly
